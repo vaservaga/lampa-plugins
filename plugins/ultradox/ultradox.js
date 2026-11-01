@@ -4,18 +4,24 @@
  *          Settings -> Plugins -> +  (e.g. https://cdn.jsdelivr.net/gh/vaservaga/lampa-plugins@<commit-sha>/plugins/ultradox/ultradox.js)
  * Requires Lampa already configured to use TorrServer (internal torrclient + TorrServer URL).
  *
- * UI (Phase 2): core card grid (.category-full + Template 'card'),
- * category buttons in the head (simple-button), TorrServer playback.
+ * UI (Phase 3, NUM parity): core card grid (.category-full + Template 'card')
+ * with the type badge top-left, quality badge bottom-left, TMDB rating badge
+ * bottom-right and the year under the title; category buttons in the head
+ * (simple-button); full detail page (validated backdrop, poster left, meta,
+ * TMDB rating line, overview) with a release selector. Ratings come from TMDB
+ * through the Lampa core TMDB integration (Lampa.TMDB.key()/api()); the key
+ * lives in Lampa's own TMDB settings, never in this plugin. Torrent/TorrServer
+ * playback is a later stage, not wired here.
  */
 (function () {
     'use strict';
 
     if (window.plugin_ultradox_ready) return;
     if (!window.Lampa) {
+        // Lampa is not ready yet: wait for it. All top-level definitions below
+        // must run regardless, so boot() is deferred to the end of this IIFE.
         document.addEventListener('DOMContentLoaded', function () { if (window.Lampa) boot(); });
-        return;
     }
-    boot();
 
     // Direct mode: public mirrors only, no LAN dependency. Primary is 045.ultradox.click;
     // 010.ultadox.space is a verified alias (same HTML structure, redirects to 045).
@@ -46,6 +52,23 @@
             '<div class="udx-content__list"></div>' +
         '</div>';
 
+    var DETAIL_HTML =
+        '<div class="udxf">' +
+            '<div class="udxf__backdrop" aria-hidden="true"></div>' +
+            '<div class="udxf__gradient" aria-hidden="true"></div>' +
+            '<div class="udxf__body">' +
+                '<img class="udxf__poster" alt="">' +
+                '<div class="udxf__meta">' +
+                    '<div class="udxf__top"></div>' +
+                    '<div class="udxf__title"></div>' +
+                    '<div class="udxf__line"></div>' +
+                    '<div class="udxf__rating"></div>' +
+                    '<div class="udxf__overview"></div>' +
+                    '<div class="udxf__actions"><div class="simple-button selector udx-f__play"></div></div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
     var STYLE_HTML = '<style id="ultradox-style">' +
         '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
         '.udx-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.93),rgba(6,28,41,.60)),#061c29 center/cover no-repeat;opacity:0;transition:opacity .25s ease;}' +
@@ -56,6 +79,27 @@
         '.udx-cat.udx-active{background-color:#fff;color:#000;}' +
         '.udx-content__list{position:relative;z-index:1;padding-top:80px;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:#9aa4b2;font-size:1.5em;}' +
+        '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
+        '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
+        '.udx-chip__kind{flex-shrink:0;background:#57F570;color:#0f3d1a;font-weight:700;}' +
+        '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,0.88);color:#14202a;}' +
+        '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
+        '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
+        '.udxf__backdrop--on{opacity:1;}' +
+        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.55),rgba(6,28,41,.88) 72%);}' +
+        '.udxf__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 6% 0 5%;box-sizing:border-box;}' +
+        '.udxf__poster{flex-shrink:0;width:12em;border-radius:.5em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
+        '.udxf__meta{margin-left:2.2em;min-width:0;max-width:62%;}' +
+        '.udxf__top{font-size:1.05em;color:#cdd8e4;letter-spacing:.03em;}' +
+        '.udxf__title{font-size:2.1em;font-weight:700;line-height:1.15;color:#fff;margin-top:.35em;}' +
+        '.udxf__line{font-size:1.05em;color:#9fb2c4;margin-top:.9em;}' +
+        '.udxf__overview{font-size:1.05em;line-height:1.4;color:#e7eef5;margin-top:1em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}' +
+        '.udxf__actions{margin-top:1.8em;}' +
+        '.udx-f__play{display:inline-block;min-width:11em;text-align:center;padding:.55em 1.4em;background:#57F570;color:#0f3d1a;font-weight:700;border-radius:.4em;font-size:1.05em;}' +
+        '.udx-f__play.focus{background:#57F570;color:#0f3d1a;box-shadow:0 0 0 .3em #fff;border-radius:.6em;}' +
+        '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
+        '.udx-rate{position:absolute;right:10px;bottom:10px;z-index:2;background:rgba(6,20,30,.78);color:#ffd76a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.8em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
+        '.udxf__rating{font-size:1.05em;font-weight:700;color:#ffd76a;margin-top:1em;}' +
         '</style>';
 
     function boot() {
@@ -65,7 +109,9 @@
         L.Lang.add({
             ultradox_title: { uk: 'Ultradox', ru: 'Ultradox', en: 'Ultradox', be: 'Ultradox' },
             ultradox_empty: { uk: 'Нічого не знайдено', ru: 'Ничего не найдено', en: 'Nothing found', be: 'Нічога не знайдзена' },
-            ultradox_no_link: { uk: 'Немає посилання на торент', ru: 'Нет ссылки на торрент', en: 'No torrent link', be: 'Няма спасылкі' }
+            ultradox_no_link: { uk: 'Немає посилання на торент', ru: 'Нет ссылки на торрент', en: 'No torrent link', be: 'Няма спасылкі' },
+            ultradox_watch: { uk: 'Дивитися', ru: 'Смотреть', en: 'Watch', be: 'Глядзець' },
+            ultradox_release_selected: { uk: 'Реліз вибрано', ru: 'Релиз выбран', en: 'Release selected', be: 'Выбран рэліз' }
         });
 
         L.Manifest.plugins = {
@@ -77,6 +123,8 @@
         };
 
         L.Component.add('ultradox', Component);
+        L.Component.add('ultradox_full', FullPage);
+        Tmdb.init();
 
         function addMenu() {
             if ($('.menu .menu__list').length == 0) return;
@@ -121,6 +169,85 @@
     function countryFromDetail(html) {
         var m = (html || '').match(/<li[^>]*itemprop="contributor"[^>]*>\s*<span>\s*Страна:\s*<\/span>\s*([^<]+)/i);
         return m ? strip(m[1]) : '';
+    }
+
+    // Detail-page payload for the full release page: metadata lines, the plot
+    // overview (technical tail like "Формат: ..." cut off), the IMDB id embedded
+    // in the ratings block, a validated backdrop, and the concrete release list.
+    function parseDetail(html) {
+        var out = {
+            overview: '', genre: '', country: '', year: '', runtime: '',
+            translation: '', quality: '', imdb: '', backdrop: '', releases: []
+        };
+        if (!html) return out;
+        function field(re) { var m = html.match(re); return m ? strip(m[1]) : ''; }
+
+        var dm = html.match(/<meta name="description" content="([\s\S]*?)">/);
+        if (dm) {
+            var ov = decode(dm[1]);
+            var cut = ov.match(/\sФормат:/);
+            if (cut) ov = ov.slice(0, cut.index);
+            out.overview = ov.replace(/\s+/g, ' ').trim();
+        }
+        out.genre = field(/<span>Жанр:<\/span>\s*([\s\S]*?)<\/li>/i);
+        out.country = field(/<span>\s*Страна:\s*<\/span>\s*([^<]+)/i);
+        out.year = field(/<span>Год:<\/span>\s*([^<]+)/i);
+        out.runtime = field(/<span>Время:<\/span>\s*([^<]+)/i);
+        out.translation = field(/<span>Перевод:<\/span>\s*([\s\S]*?)<\/li>/i);
+        out.quality = field(/<span>Качество:<\/span>\s*([^<]+)/i);
+
+        var pic = html.match(/imdb\/pic\/(\d+)\.gif/);
+        var leech = html.match(/do=go&url=([A-Za-z0-9+/=]+)%3D%3D/);
+        if (pic) out.imdb = 'tt' + pic[1];
+        else if (leech) {
+            try {
+                var u = atob(leech[1].replace(/%3D/g, '='));
+                var t = u.match(/tt\d+/);
+                if (t) out.imdb = t[0];
+            } catch (e) {}
+        }
+
+        var og = html.match(/og:image" content="([^"]+)"/);
+        if (og && validBackdrop(og[1])) out.backdrop = og[1];
+
+        var mags = parseMagnets(html);
+        for (var i = 0; i < mags.length; i++) {
+            var name = mags[i].dn ? decodeURIComponent(mags[i].dn) : '';
+            out.releases.push({
+                name: name,
+                label: releaseLabel(name),
+                size: bytesToHuman(mags[i].xl),
+                sizeBytes: mags[i].xl,
+                magnet: mags[i].magnet
+            });
+        }
+        return out;
+    }
+
+    // The og:image of a release page is usually the wide fanart, but for some
+    // titles it is a rating badge (Kinopoisk/IMDB gif). Only accept a real photo.
+    function validBackdrop(url) {
+        if (!url || !/^https?:/i.test(url)) return '';
+        if (/\/rating\/|imdb\/pic|kinopoisk\.ru/i.test(url)) return '';
+        if (!/\.(jpe?g|png|webp)(\?|$)/i.test(url)) return '';
+        return url;
+    }
+
+    // Compact release label from a torrent file name: season/episode (series),
+    // quality token and resolution. "1O8Op" (letter O) is normalised to 1080p.
+    function releaseLabel(name) {
+        var s = String(name || '').replace(/\.torrent$/i, '').replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+        var norm = s.replace(/1O8Op/gi, '1080p');
+        var parts = [];
+        var season = norm.match(/\bS(\d{1,2})\b/i);
+        var ep = norm.match(/\bE(\d{1,3})\b/i);
+        if (season) parts.push('С' + season[1] + (ep ? '.' + ep[1] : ''));
+        var qual = norm.match(/\b(WEB-DLRip|WEB-DL|BDRip|HDRip|HDTVRip|DVRip|CamRip)\b/i);
+        if (qual) parts.push(qual[1].toUpperCase());
+        var res = norm.match(/\b(2160p|1080p|720p|576p|540p|480p|400p|360p|4k)\b/i);
+        if (res) parts.push(res[1].toUpperCase() === '4K' ? '2160p' : res[1].toUpperCase());
+        if (!parts.length) parts.push(s.split(' ').slice(0, 3).join(' '));
+        return parts.join(' ');
     }
 
     function filterRussianProductions(items, done) {
@@ -199,19 +326,163 @@
             .trim();
     }
 
-    function sizeToBytes(s) {
-        if (!s) return 0;
-        var m = String(s).match(/(\d+(?:\.\d+)?)\s*(TB|GB|Gb|MB|KB)/i);
-        if (!m) return 0;
-        var n = parseFloat(m[1]);
-        var u = m[2].toUpperCase();
-        var mult = { KB: 1024, MB: 1048576, GB: 1073741824, TB: 1099511627776 };
-        return Math.round(n * (mult[u] || 0));
-    }
-
     function decode(s) {
         return (s || '').replace(/&amp;/g, '&').replace(/&#0?39;/g, "'").replace(/&quot;/g, '"');
     }
+
+    // The site puts the year in parentheses at the end of the title; it is
+    // dropped for display (card titles and the full page title).
+    function stripYear(title) {
+        return String(title || '').replace(/\s*\((19|20)\d{2}\)\s*$/, '');
+    }
+
+    // External rating data (value, age rating, release status) from TMDB via
+    // the Lampa core TMDB integration: the key comes from Lampa's own TMDB
+    // settings (Lampa.TMDB.key()) and requests go through Lampa.TMDB.api()
+    // (the tmdb_proxy plugin routes them via Lampa's server-side proxy when
+    // enabled). The plugin never hardcodes or stores a key. No key / no
+    // resolvable match / failed request => the rating UI is hidden (no
+    // placeholder, no fabricated value).
+    var Tmdb = { enabled: false, cache: null };
+    var tmdbInFlight = 0;
+    var tmdbQueue = [];
+    var TMDB_MAX_INFLIGHT = 2;
+
+    function tmdbKey() {
+        try { return window.Lampa.TMDB.key(); } catch (e) { return ''; }
+    }
+
+    Tmdb.init = function () {
+        if (!window.Lampa.TMDB) return;
+        if (!tmdbKey()) return;
+        Tmdb.enabled = true;
+        try {
+            var raw = window.Lampa.Storage.get('udx_tmdb_cache', '{}');
+            Tmdb.cache = (typeof raw === 'string') ? (JSON.parse(raw) || {}) : (raw || {});
+        } catch (e) { Tmdb.cache = {}; }
+    };
+
+    Tmdb.saveCache = function () {
+        try { window.Lampa.Storage.set('udx_tmdb_cache', JSON.stringify(Tmdb.cache || {})); } catch (e) {}
+    };
+
+    function tmdbGet(path, ok, fail) {
+        var L = window.Lampa;
+        var net = new L.Reguest();
+        net.timeout(15000);
+        var url = (L.TMDB.api ? L.TMDB.api(path) : 'https://api.themoviedb.org/3/' + path);
+        net.native(url, function (txt) {
+            var j = null;
+            try { j = JSON.parse(String(txt)); } catch (e) {}
+            if (!j || j.success === false) { fail(); return; }
+            ok(j);
+        }, fail);
+    }
+
+    function tmdbEnqueue(job) {
+        if (tmdbInFlight < TMDB_MAX_INFLIGHT) { tmdbInFlight++; job(); return; }
+        tmdbQueue.push(job);
+    }
+
+    function tmdbDone() {
+        tmdbInFlight--;
+        if (tmdbQueue.length) { tmdbInFlight++; tmdbQueue.shift()(); }
+    }
+
+    function normTitle(s) {
+        return String(s || '').toLowerCase().replace(/[^a-zа-яёіїєґ\s]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    // Resolve a work to a TMDB entry. Conservative on purpose: the title must
+    // match exactly (normalized) and, when known, the year too — otherwise we
+    // rather hide the rating than show a value that belongs to another work.
+    Tmdb.find = function (item, done) {
+        if (!Tmdb.enabled) { done(null); return; }
+        var title = stripYear(item.title);
+        if (!title) { done(null); return; }
+        var type = item.serial ? 'tv' : 'movie';
+        var key = type + '|' + normTitle(title) + '|' + (item.year || '');
+        if (Tmdb.cache && Object.prototype.hasOwnProperty.call(Tmdb.cache, key)) {
+            var c = Tmdb.cache[key];
+            done(c && c.id ? c : null);
+            return;
+        }
+        var lang = 'ru';
+        try { lang = window.Lampa.Storage.get('tmdb_lang', 'ru') || 'ru'; } catch (e) {}
+        var qs = 'search/' + type + '?api_key=' + tmdbKey() + '&query=' + encodeURIComponent(title) + '&language=' + lang;
+        if (type === 'tv' && item.year) qs += '&first_air_date_year=' + item.year;
+        tmdbEnqueue(function () {
+            tmdbGet(qs, function (j) {
+                var res = (j && j.results) || [];
+                var want = normTitle(title);
+                var match = null;
+                for (var i = 0; i < res.length && !match; i++) {
+                    var r = res[i];
+                    var name = normTitle(type === 'tv' ? r.name : r.title);
+                    if (name !== want) continue;
+                    var yr = String(type === 'tv' ? (r.first_air_date || '') : (r.release_date || '')).slice(0, 4);
+                    if (item.year && yr && yr !== String(item.year)) continue;
+                    match = { id: r.id, v: r.vote_average || 0 };
+                }
+                Tmdb.cache[key] = match || { id: 0 };
+                Tmdb.saveCache();
+                done(match);
+                tmdbDone();
+            }, function () {
+                done(null);
+                tmdbDone();
+            });
+        });
+    };
+
+    Tmdb.rate = function (item, done) {
+        Tmdb.find(item, done);
+    };
+
+    function pickCert(j) {
+        var rs = (j && j.release_dates && j.release_dates.results) || [];
+        var pref = ['RU', 'US'];
+        var i, k, p, rd;
+        for (p = 0; p < pref.length; p++) {
+            for (i = 0; i < rs.length; i++) {
+                if (rs[i].iso_3166_1 !== pref[p]) continue;
+                rd = rs[i].release_dates || [];
+                for (k = 0; k < rd.length; k++) if (rd[k].certification) return rd[k].certification;
+            }
+        }
+        for (i = 0; i < rs.length; i++) {
+            rd = rs[i].release_dates || [];
+            for (k = 0; k < rd.length; k++) if (rd[k].certification) return rd[k].certification;
+        }
+        return '';
+    }
+
+    // Rating + age rating + release status for the detail page: the search
+    // match plus the entry details (certification, status) when available.
+    Tmdb.full = function (item, done) {
+        Tmdb.find(item, function (m) {
+            if (!m) { done(null); return; }
+            var dkey = m.id + ':d';
+            if (Tmdb.cache && Object.prototype.hasOwnProperty.call(Tmdb.cache, dkey)) {
+                var c = Tmdb.cache[dkey];
+                done({ v: m.v, cert: c.cert || '', status: c.status || '' });
+                return;
+            }
+            var path = (item.serial ? 'tv/' : 'movie/') + m.id + '?api_key=' + tmdbKey() + '&language=ru';
+            tmdbEnqueue(function () {
+                tmdbGet(path, function (j) {
+                    var info = { cert: pickCert(j), status: j.status || '' };
+                    Tmdb.cache[dkey] = info;
+                    Tmdb.saveCache();
+                    done({ v: m.v, cert: info.cert, status: info.status });
+                    tmdbDone();
+                }, function () {
+                    done({ v: m.v, cert: '', status: '' });
+                    tmdbDone();
+                });
+            });
+        });
+    };
 
     function parse(html, base) {
         var out = [];
@@ -303,9 +574,19 @@
         return { hash: h ? h[1] : '', xl: x ? parseInt(x[1], 10) : 0 };
     }
 
-    function fileLabel(f) {
-        var dn = (f.dn || '').replace(/\.torrent$/i, '');
-        return dn || 'Файл';
+    // Unique releases of a detail page as [{magnet, xl, dn}], deduped by hash.
+    // A release may appear both as a download block and a magnet icon link.
+    function parseMagnets(html) {
+        var out = [], seen = {};
+        var ms = (html || '').match(/magnet:[^\s"<>]+/g) || [];
+        for (var i = 0; i < ms.length; i++) {
+            var m = decode(ms[i]);
+            var info = magnetInfo(m);
+            if (!info.hash || seen[info.hash]) continue;
+            seen[info.hash] = true;
+            out.push({ magnet: m, xl: info.xl, dn: (m.match(/dn=([^&]+)/) || [])[1] || '' });
+        }
+        return out;
     }
 
     function bytesToHuman(b) {
@@ -313,37 +594,6 @@
         var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0, n = b;
         while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
         return (n >= 10 ? Math.round(n) : n.toFixed(1)) + ' ' + u[i];
-    }
-
-    function fetchRealMagnets(itemUrl, ok, err) {
-        if (!itemUrl) { if (err) err(); return; }
-        fetchText(itemUrl, function (html) {
-            var found = [], seen = {};
-            var ms = (html || '').match(/magnet:[^\s"<>]+/g) || [];
-            for (var i = 0; i < ms.length; i++) {
-                var m = decode(ms[i]);
-                var info = magnetInfo(m);
-                if (!info.hash || seen[info.hash]) continue;
-                seen[info.hash] = true;
-                found.push({ magnet: m, xl: info.xl, dn: (m.match(/dn=([^&]+)/) || [])[1] || '' });
-            }
-            if (found.length) ok(found); else if (err) err();
-        }, function () { if (err) err(); });
-    }
-
-    function pickBest(found, wantBytes) {
-        if (!found || !found.length) return null;
-        if (!wantBytes) {
-            var b = found[0];
-            for (var i = 1; i < found.length; i++) if (found[i].xl > b.xl) b = found[i];
-            return b;
-        }
-        var best = null, bd = -1;
-        for (var j = 0; j < found.length; j++) {
-            var d = Math.abs(found[j].xl - wantBytes);
-            if (bd < 0 || d < bd) { bd = d; best = found[j]; }
-        }
-        return best;
     }
 
     function Component(object) {
@@ -514,45 +764,53 @@
         };
 
         this.appendCard = function (item) {
-            var ym = item.title.match(/\((19\d{2}|20\d{2})\)/) || item.title.match(/(19|20)\d{2}/);
-            var year = ym ? (ym[1] || ym[0]) : '';
+            var title = stripYear(item.title);
+            var card = L.Template.js('card', { title: title, release_year: item.year || '' });
+            card.find('.card__title').text(title);
 
-            var card = L.Template.js('card', { title: item.title, release_year: year });
-            card.find('.card__title').text(item.title);
-
+            // The small line below the title only carries what is absent from
+            // the poster (quality/size of fallback rows).
             var meta = [];
             if (item.type && !item.poster) meta.push(item.type);
-            if (year) meta.push(year);
             if (item.size) meta.push(item.size);
-            card.find('.card__age').text(meta.join(' • '));
+            if (meta.length) card.find('.card__age').text(meta.join(' • '));
+            else card.find('.card__age').remove();
 
             if (item.poster) {
                 var img = card.find('.card__img');
                 img.src = item.poster;
                 img.onerror = function () { this.src = './img/img_broken.svg'; };
-                if (item.type) {
-                    var t = document.createElement('div');
-                    t.addClass('card__type');
-                    t.text(item.type);
-                    card.find('.card__view').append(t);
-                }
-            } else {
-                var v = card.find('.card__view');
-                if (v) v.remove();
             }
 
-            var el = {
-                title: item.title,
-                Title: item.title,
-                Tracker: 'Ultradox',
-                size: item.size,
-                Size: sizeToBytes(item.size),
-                Seeders: 0,
-                Peers: 0,
-                MagnetUri: item.magnet,
-                Link: item.fileUrl || item.magnet,
-                _udx: item
-            };
+            // NUM parity: type badge top-left, quality badge bottom-left (only
+            // a real quality token; the type itself is the top-left badge).
+            var kind = document.createElement('div');
+            kind.addClass('udx-kind');
+            kind.text(item.serial ? 'Серіал' : 'Фільм');
+            card.find('.card__view').append(kind);
+
+            var qm = String(item.type || '').match(/\b(WEB-DL|Rip|BDRip|HDRip|HDTVRip|DVRip|CamRip|4K|2160p|1080p|720p)\b/i);
+            if (qm) {
+                var chip = document.createElement('div');
+                chip.addClass('udx-chip');
+                var qs = document.createElement('span');
+                qs.addClass('udx-chip__quality');
+                qs.text(qm[0].toUpperCase());
+                chip.append(qs);
+                card.find('.card__view').append(chip);
+            }
+
+            // Rating badge bottom-right from TMDB (async, cached); hidden when
+            // there is no resolvable match (no placeholder, no fabricated value).
+            if (Tmdb.enabled) {
+                Tmdb.rate(item, function (m) {
+                    if (!m || !m.v) return;
+                    var rate = document.createElement('div');
+                    rate.addClass('udx-rate');
+                    rate.text(String(Math.round(m.v * 10) / 10));
+                    card.find('.card__view').append(rate);
+                });
+            }
 
             var self = this;
 
@@ -571,11 +829,12 @@
             });
 
             card.on('hover:enter', function () {
-                self.chooseFile(el);
-            });
-
-            card.on('hover:long', function () {
-                self.chooseFile(el);
+                L.Activity.push({
+                    url: '',
+                    title: item.title,
+                    component: 'ultradox_full',
+                    item: item
+                });
             });
 
             card.on('visible', function () {
@@ -585,71 +844,6 @@
             if (!last) last = card;
             if (L.Controller.own && L.Controller.own(this)) L.Controller.collectionAppend(card);
             grid.append(card);
-        };
-
-        this.playAuto = function (el) {
-            this.run(el, null);
-        };
-
-        this.chooseFile = function (el) {
-            var self = this;
-            this.ensureReal(el, function (found) {
-                if (found.length == 1) { self.run(el, 0); return; }
-                L.Select.show({
-                    title: el.title,
-                    items: found.map(function (f, i) {
-                        return { title: fileLabel(f) + ' • ' + bytesToHuman(f.xl), id: i };
-                    }),
-                    onBack: function () { L.Controller.toggle('content'); },
-                    onSelect: function (a) {
-                        L.Controller.toggle('content');
-                        self.run(el, a.id);
-                    }
-                });
-            });
-        };
-
-        this.ensureReal = function (el, cb) {
-            if (el._udx && el._udx._real) { cb(el._udx._real); return; }
-            var self = this;
-            if (this.activity) this.activity.loader(true);
-            fetchRealMagnets(el._udx ? el._udx.itemUrl : '', function (found) {
-                if (el._udx) el._udx._real = found;
-                if (self.activity) self.activity.loader(false);
-                cb(found);
-            }, function () {
-                if (self.activity) self.activity.loader(false);
-                cb([]);
-            });
-        };
-
-        this.run = function (el, idx) {
-            var self = this;
-            this.ensureReal(el, function (found) {
-                var best = (idx == null) ? pickBest(found, el.Size) : found[idx];
-                if (!best) {
-                    L.Noty.show(L.Lang.translate('ultradox_no_link'));
-                    return;
-                }
-                var o = {
-                    title: el.title,
-                    Title: el.title,
-                    Tracker: 'Ultradox',
-                    size: bytesToHuman(best.xl),
-                    Size: best.xl,
-                    Seeders: 0,
-                    Peers: 0,
-                    MagnetUri: best.magnet,
-                    Link: ''
-                };
-                var movie = {
-                    title: el.title,
-                    original_title: el.title,
-                    img: '',
-                    number_of_seasons: (el._udx && el._udx.serial) ? 1 : undefined
-                };
-                L.Torrent.start(o, movie);
-            });
         };
 
         this.start = function () {
@@ -688,4 +882,159 @@
             catBtns = [];
         };
     }
+
+    // Full release page (catalog -> OK): backdrop only from the film's own fanart,
+    // poster on the left, metadata + overview on the right, and a "Watch" action
+    // that opens the list of the film's concrete releases; selecting one shows a
+    // short confirmation only (playback is a later stage). No TMDB, no core full
+    // component. Back returns to the catalog on the same card.
+    function FullPage(object) {
+        var L = window.Lampa;
+        var item = object.item || {};
+        var detail = null;
+        var built = false;
+        var playBtn = null;
+        var html = document.createElement('div');
+
+        this.create = function () {
+            if (this.activity) this.activity.loader(true);
+            this.loadDetail();
+            return this.render();
+        };
+
+        this.render = function () {
+            return html;
+        };
+
+        this.loadDetail = function () {
+            var self = this;
+            fetchText(item.itemUrl || '', function (raw) {
+                detail = parseDetail(raw);
+                self.build();
+            }, function () {
+                detail = { overview: '', genre: '', country: '', year: '', runtime: '', translation: '', quality: '', imdb: '', backdrop: '', releases: [] };
+                self.build();
+            });
+        };
+
+        this.build = function () {
+            if (this.activity) this.activity.loader(false);
+
+            if (!built) {
+                built = true;
+                html.append($(DETAIL_HTML));
+                playBtn = html.find('.udx-f__play');
+                playBtn.text(L.Lang.translate('ultradox_watch'));
+                var self = this;
+                playBtn.on('hover:enter', function () { self.showReleases(); });
+                var poster = html.find('.udxf__poster');
+                if (item.poster) {
+                    poster[0].src = item.poster;
+                    poster[0].onerror = function () { this.src = './img/img_broken.svg'; };
+                } else {
+                    poster.remove();
+                }
+                L.Layer.update(html);
+            }
+
+            this.fill();
+            if (this.activity) this.activity.toggle();
+        };
+
+        this.fill = function () {
+            var d = detail || {};
+
+            var bg = html.find('.udxf__backdrop');
+            if (d.backdrop) {
+                bg[0].style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
+                bg.addClass('udxf__backdrop--on');
+            }
+
+            html.find('.udxf__title').text(stripYear(item.title));
+
+            var top = [];
+            if (d.country) top.push(d.country);
+            if (d.year) top.push(d.year);
+            var topEl = html.find('.udxf__top');
+            if (top.length) topEl.text(top.join(' • ')); else topEl.remove();
+
+            var line = [];
+            if (d.genre) line.push(d.genre);
+            if (d.runtime) line.push(d.runtime);
+            if (d.translation) line.push(d.translation);
+            var lineEl = html.find('.udxf__line');
+            if (line.length) lineEl.text(line.join(' • ')); else lineEl.remove();
+
+            var ov = html.find('.udxf__overview');
+            if (d.overview) ov.text(d.overview); else ov.remove();
+
+            // External rating line (TMDB via Lampa core): value, age rating and
+            // release status when available; hidden when there is no match.
+            var ratingEl = html.find('.udxf__rating');
+            if (!Tmdb.enabled) { ratingEl.remove(); return; }
+            Tmdb.full(item, function (r) {
+                if (!r || (!r.v && !r.cert && !r.status)) { ratingEl.remove(); return; }
+                var parts = [];
+                if (r.v) parts.push('TMDB ' + (Math.round(r.v * 10) / 10));
+                if (r.cert) parts.push(r.cert);
+                if (r.status) parts.push(r.status);
+                ratingEl.text(parts.join(' • '));
+            });
+        };
+
+        this.showReleases = function () {
+            var rel = (detail && detail.releases) || [];
+            if (!rel.length) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
+            L.Select.show({
+                title: item.title,
+                items: rel.map(function (r) {
+                    var parts = [];
+                    if (r.label) parts.push(r.label);
+                    if (r.size) parts.push(r.size);
+                    return { title: parts.join(' • '), id: r };
+                }),
+                onBack: function () { L.Controller.toggle('content'); },
+                onSelect: function () {
+                    L.Controller.toggle('content');
+                    L.Noty.show(L.Lang.translate('ultradox_release_selected'));
+                }
+            });
+        };
+
+        this.start = function () {
+            if (L.Activity.active() && L.Activity.active().activity !== this.activity) return;
+
+            L.Controller.add('content', {
+                link: this,
+                invisible: true,
+                toggle: function () {
+                    L.Controller.collectionSet(html);
+                    L.Controller.collectionFocus(playBtn, html);
+                },
+                left: function () {
+                    if (NavCanMove('left')) NavMove('left');
+                    else L.Controller.toggle('menu');
+                },
+                right: function () { NavMove('right'); },
+                up: function () {
+                    if (NavCanMove('up')) NavMove('up');
+                    else L.Controller.toggle('head');
+                },
+                down: function () { NavMove('down'); },
+                back: function () { L.Activity.backward(); }
+            });
+
+            L.Controller.toggle('content');
+        };
+
+        this.pause = function () {};
+        this.stop = function () {};
+
+        this.destroy = function () {
+            html.remove();
+            built = false;
+        };
+    }
+
+    if (window.Lampa) boot();
 })();

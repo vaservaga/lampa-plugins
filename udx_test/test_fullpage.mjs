@@ -1,0 +1,385 @@
+// udx_test/test_fullpage.mjs
+//
+// Contract test for the Ultradox FullPage (detail page -> release selection)
+// plus a catalog-card smoke test, run against a mocked Lampa environment.
+//
+// Verifies:
+//   1. Static scan of the plugin source: no Torrent.start / MagnetUri /
+//      playRelease tokens remain (no executable playback path left).
+//   2. The detail page builds from the fetched page: backdrop, title, metadata
+//      lines, overview; the real release list keeps label/size/magnet as UI data.
+//   3. Selecting a series release and a film release closes the selector
+//      (content controller toggle) and shows a short confirmation via L.Noty.
+//   4. L.Torrent.start is NEVER called: the mock throws on any call AND a
+//      counter must stay at zero for this test to PASS.
+//   5. Catalog card still renders and opens the FullPage on hover:enter; the
+//      old long-press playback trigger (hover:long) is gone.
+//   6. All network fetches go to the public mirrors or the TMDB API only
+//      (no TorrServer/LAN).
+//   7. NUM-parity card: type badge top-left (.udx-kind), year under the title
+//      (release_year), TMDB rating badge bottom-right (.udx-rate); no rating
+//      badge when there is no resolvable match.
+//   8. Detail rating line (.udxf__rating): TMDB value + age rating + status;
+//      hidden without a match; repeated work uses the TMDB cache (no refetch).
+//
+// Run from the lampa-plugins root:  node udx_test/test_fullpage.mjs
+
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const SRC = path.join(ROOT, 'plugins', 'ultradox', 'ultradox.js');
+const src = readFileSync(SRC, 'utf8');
+
+let failures = 0;
+function check(name, cond, extra) {
+    const ok = !!cond;
+    if (!ok) failures++;
+    console.log((ok ? '  ok  ' : '  FAIL  ') + name + (!ok && extra !== undefined ? '  -> ' + extra : ''));
+}
+
+// ---------- 1. static scan: no executable torrent launch left in the source ----------
+for (const token of [/(?:L\.)?Torrent\.start/, /MagnetUri/, /playRelease/]) {
+    check('static: source has no ' + token, !token.test(src));
+}
+
+// ---------- minimal DOM ----------
+function makeEl(tag) {
+    const el = {
+        tagName: String(tag).toUpperCase(),
+        children: [],
+        classes: new Set(),
+        handlers: {},
+        style: {},
+        _text: '',
+        _parent: null,
+        _setParent(p) { el._parent = p; },
+        text(v) { if (v === undefined) return el._text; el._text = String(v); return el; },
+        append(...k) {
+            for (const x of k) {
+                if (Array.isArray(x)) { // $() queries unwrap to their elements
+                    for (const y of x) { if (y && y._setParent) y._setParent(el); el.children.push(y); }
+                } else {
+                    if (x && x._setParent) x._setParent(el);
+                    el.children.push(x);
+                }
+            }
+            return el;
+        },
+        empty() { el.children.length = 0; return el; },
+        remove() {
+            if (el._parent) {
+                const i = el._parent.children.indexOf(el);
+                if (i !== -1) el._parent.children.splice(i, 1);
+                el._parent = null;
+            }
+            return el;
+        },
+        addClass(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.add(x)); return el; },
+        removeClass(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.delete(x)); return el; },
+        on(ev, fn) { (el.handlers[ev] || (el.handlers[ev] = [])).push(fn); return el; },
+        css(o) { Object.assign(el.style, o); return el; },
+        find(sel) {
+            const cls = String(sel).replace(/^\./, '');
+            const out = [];
+            (function walk(node) {
+                for (const c of node.children || []) {
+                    if (c && c.classes && c.classes.has(cls)) out.push(c);
+                    if (c && c.children) walk(c);
+                }
+            })(el);
+            return asQuery(out);
+        }
+    };
+    return el;
+}
+
+function asQuery(list) {
+    const q = list.slice();
+    q.append = (...k) => { list.forEach((e) => e.append(...k)); return q; };
+    q.text = (v) => { if (v === undefined) return list.map((e) => e.text()).join(''); list.forEach((e) => e.text(v)); return q; };
+    q.addClass = (c) => { list.forEach((e) => e.addClass(c)); return q; };
+    q.removeClass = (c) => { list.forEach((e) => e.removeClass(c)); return q; };
+    q.remove = () => { list.forEach((e) => e.remove()); return q; };
+    q.empty = () => { list.forEach((e) => e.empty()); return q; };
+    q.css = (o) => { list.forEach((e) => e.css(o)); return q; };
+    q.on = (ev, fn) => { list.forEach((e) => e.on(ev, fn)); return q; };
+    q.eq = (i) => asQuery(list.slice(i, i + 1));
+    return q;
+}
+
+function parseHtml(html) {
+    const root = makeEl('#root');
+    const stack = [root];
+    const re = /<\/?([a-zA-Z][\w-]*)((?:\s+[\w-]+(?:="[^"]*")?)*)\s*(\/?)>|([^<]+)/g;
+    let m;
+    while ((m = re.exec(html))) {
+        if (m[4] !== undefined) {
+            const t = m[4].trim();
+            if (t) stack[stack.length - 1]._text += t;
+            continue;
+        }
+        if (m[0][1] === '/') {
+            while (stack.length > 1 && stack[stack.length - 1].tagName !== m[1].toUpperCase()) stack.pop();
+            if (stack.length > 1) stack.pop();
+            continue;
+        }
+        const el = makeEl(m[1]);
+        const cm = (m[2] || '').match(/class="([^"]*)"/);
+        if (cm) cm[1].split(/\s+/).filter(Boolean).forEach((c) => el.classes.add(c));
+        el._parent = stack[stack.length - 1];
+        stack[stack.length - 1].children.push(el);
+        if (m[3] !== '/' && m[1] !== 'img') stack.push(el);
+    }
+    return root.children;
+}
+
+// ---------- fixtures (shape mirrors the live Ultradox pages) ----------
+const MIRRORS = ['https://045.ultradox.click', 'https://010.ultadox.space'];
+const SERIES_URL = 'https://045.ultradox.click/serial/show-name-2021/';
+const FILM_URL = 'https://045.ultradox.click/film/great-movie-2023/';
+
+const CATALOG_HTML =
+    '<html><body>' +
+    '<div class="top__slider">' +
+    '<div class="top__slider_div__item"><a href="/serial/show-name-2021/"><img src="/upload/show.jpg"></a>' +
+    '<span>Show Name (2021)</span><span class="short-quality">Сериал</span></div></div>' +
+    '</body></html>';
+
+const SERIES_HTML =
+    '<html><head>' +
+    '<meta name="description" content="Детективний серіал про агентку. Формат: MKV.">' +
+    '<meta property="og:image" content="https://045.ultradox.click/upload/show-fanart.jpg">' +
+    '</head><body><ul>' +
+    '<li><span>Жанр:</span> Детектив, Драма</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 2021</li>' +
+    '<li><span>Время:</span> 45 мин.</li>' +
+    '<li><span>Перевод:</span> Многоголосый</li>' +
+    '<li><span>Качество:</span> WEB-DLRip</li>' +
+    '</ul>' +
+    '<img src="https://045.ultradox.click/imdb/pic/15468572.gif">' +
+    '<a href="magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&amp;dn=Show.Name.S01.E01.1080p.WEB-DLRip.mkv&amp;xl=10737418240"></a>' +
+    '<a href="magnet:?xt=urn:btih:fedcba9876543210fedcba9876543210fedcba98&amp;dn=Show.Name.S01.E02.1080p.WEB-DLRip.mkv&amp;xl=10737418240"></a>' +
+    '</body></html>';
+
+const FILM_HTML =
+    '<html><head>' +
+    '<meta name="description" content="Епічна історія космічної одесьи. Формат: MP4.">' +
+    '<meta property="og:image" content="https://045.ultradox.click/upload/movie-fanart.jpg">' +
+    '</head><body><ul>' +
+    '<li><span>Жанр:</span> Фантастика</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> Франція</li>' +
+    '<li><span>Год:</span> 2023</li>' +
+    '<li><span>Время:</span> 128 мин.</li>' +
+    '<li><span>Перевод:</span> Дубляж</li>' +
+    '</ul>' +
+    '<a href="magnet:?xt=urn:btih:aaaa1111bbbb2222cccc3333dddd4444eeee5555&amp;dn=Great.Movie.2023.2160p.WEB-DL.H265.mkv&amp;xl=21474836480"></a>' +
+    '</body></html>';
+
+const ROUTES = new Map([
+    ['https://045.ultradox.click/serial/', CATALOG_HTML],
+    [SERIES_URL, SERIES_HTML],
+    [FILM_URL, FILM_HTML]
+]);
+
+// TMDB API routes (deterministic query strings the plugin builds; see
+// specs/001-ultradox-num-parity/contracts/tmdb-api.md).
+const TMDB_BASE = 'https://api.themoviedb.org/3/';
+ROUTES.set(TMDB_BASE + 'search/tv?api_key=test-key&query=Show%20Name&language=ru&first_air_date_year=2021', JSON.stringify({ success: true, results: [{ id: 1, name: 'Show Name', first_air_date: '2021-01-15', vote_average: 8.7 }] }));
+ROUTES.set(TMDB_BASE + 'search/tv?api_key=test-key&query=Show%20Name&language=ru', JSON.stringify({ success: true, results: [{ id: 1, name: 'Show Name', first_air_date: '2021-01-15', vote_average: 8.7 }] }));
+ROUTES.set(TMDB_BASE + 'search/movie?api_key=test-key&query=Great%20Movie&language=ru', JSON.stringify({ success: true, results: [{ id: 2, title: 'Great Movie', release_date: '2023-05-10', vote_average: 7.9 }] }));
+ROUTES.set(TMDB_BASE + 'search/movie?api_key=test-key&query=Missing&language=ru', JSON.stringify({ success: true, results: [] }));
+ROUTES.set(TMDB_BASE + 'tv/1?api_key=test-key&language=ru', JSON.stringify({ success: true, status: 'Returning Series', release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'TV-14' }] }] } }));
+ROUTES.set(TMDB_BASE + 'movie/2?api_key=test-key&language=ru', JSON.stringify({ success: true, status: 'Released', release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG-13' }] }] } }));
+
+// ---------- Lampa mock ----------
+const fetches = [];
+const L = {
+    Lang: {
+        _dict: {},
+        add(d) { Object.assign(this._dict, d); },
+        translate(k) { const e = this._dict[k]; return e ? (e.uk || e.en || k) : k; }
+    },
+    Manifest: { plugins: {} },
+    Component: { _c: {}, add(name, ctor) { this._c[name] = ctor; }, get(name) { return this._c[name]; } },
+    Listener: { follow() {} },
+    Layer: { update() {}, visible() {} },
+    Scroll: class {
+        constructor() { this.onEnd = null; }
+        append() {}
+        render() { return makeEl('scroll'); }
+        minus() {}
+        reset() {}
+        update() {}
+        destroy() {}
+    },
+    Template: { calls: [], lastParams: null, js(name, params) {
+        this.lastParams = params || null;
+        const c = makeEl('card');
+        ['card__title', 'card__age', 'card__view'].forEach((cls) => {
+            const ch = makeEl('div'); ch.classes.add(cls); c.children.push(ch);
+        });
+        const img = makeEl('img'); img.classes.add('card__img'); c.children.push(img);
+        L.Template.calls.push(c);
+        return c;
+    } },
+    Activity: { pushes: [], push(a) { this.pushes.push(a); }, active() { return null; }, backward() {}, toggle() {}, loader() {} },
+    Controller: {
+        toggles: {},
+        add() {},
+        toggle(n) { this.toggles[n] = (this.toggles[n] || 0) + 1; },
+        collectionSet() {},
+        collectionFocus() {},
+        own() { return false; },
+        collectionAppend() {}
+    },
+    Select: { last: null, show(cfg) { this.last = cfg; } },
+    Noty: { msgs: [], show(m) { this.msgs.push(m); } },
+    Storage: {
+        _s: {},
+        get(k, d) { const v = this._s[k]; return v === undefined ? d : v; },
+        set(k, v) { this._s[k] = String(v); }
+    },
+    TMDB: {
+        key() { return 'test-key'; },
+        api(u) { return 'https://api.themoviedb.org/3/' + u; }
+    },
+    // Guard: any call to Torrent.start throws AND is counted; the test passes
+    // only while the counter stays at zero.
+    Torrent: { calls: 0, start() { this.calls++; throw new Error('L.Torrent.start is forbidden in this stage'); } },
+    Reguest: class {
+        timeout() {}
+        native(url, ok, err) {
+            fetches.push(url);
+            const h = ROUTES.get(url);
+            if (h !== undefined) ok(h);
+            else err(new Error('no route: ' + url));
+        }
+    }
+};
+
+globalThis.window = { Lampa: L, appready: true, plugin_ultradox_ready: false };
+globalThis.Lampa = L; // in the browser window.Lampa is the global binding
+globalThis.document = { addEventListener() {}, createElement: (t) => makeEl(t) };
+globalThis.$ = (arg) => (typeof arg === 'string' ? asQuery(parseHtml(arg)) : (arg && arg.tagName ? asQuery([arg]) : arg));
+globalThis.atob = (s) => Buffer.from(s, 'base64').toString('binary');
+
+console.log('boot: loading plugin source');
+vm.runInThisContext(src, { filename: 'ultradox.js' });
+check('boot: ultradox_full component registered', typeof L.Component.get('ultradox_full') === 'function');
+check('boot: ultradox component registered', typeof L.Component.get('ultradox') === 'function');
+
+// ---------- 5. catalog card smoke (the card -> FullPage transition must survive) ----------
+console.log('catalog: card render + navigation');
+const Comp = L.Component.get('ultradox');
+const cat = new Comp({ category: 'serial' });
+cat.activity = { loader() {}, toggle() {} };
+cat.create();
+
+check('catalog: exactly one card rendered', L.Template.calls.length === 1);
+const card = L.Template.calls[0];
+check('catalog: card title (trailing year stripped)', card && card.find('.card__title').text() === 'Show Name', card && card.find('.card__title').text());
+check('catalog: long-press playback trigger removed', card && !card.handlers['hover:long']);
+card.handlers['hover:focus'].forEach((f) => f());
+check('catalog: hover:focus does not throw', true);
+card.handlers['hover:enter'].forEach((f) => f());
+const pushed = L.Activity.pushes[L.Activity.pushes.length - 1];
+check('catalog: enter opens FullPage with item', pushed && pushed.component === 'ultradox_full' && pushed.item && pushed.item.itemUrl === SERIES_URL);
+check('catalog: no Torrent.start', L.Torrent.calls === 0);
+
+// ---------- NUM-parity card: badges + year + rating ----------
+check('catalog: release_year under the title', L.Template.lastParams && L.Template.lastParams.release_year === '2021', JSON.stringify(L.Template.lastParams));
+check('catalog: type badge top-left', card.find('.udx-kind').length === 1 && card.find('.udx-kind').text() === 'Серіал', card.find('.udx-kind').length ? card.find('.udx-kind').text() : 'missing');
+check('catalog: quality chip only for real quality tokens', card.find('.udx-chip').length === 0, String(card.find('.udx-chip').length));
+check('catalog: TMDB rating badge bottom-right', card.find('.udx-rate').length === 1 && card.find('.udx-rate').text() === '8.7', card.find('.udx-rate').length ? card.find('.udx-rate').text() : 'missing');
+
+// ---------- 2/3/4. FullPage: detail build + series release selection ----------
+console.log('fullpage: series detail + release selection');
+const FP = L.Component.get('ultradox_full');
+const series = new FP({ item: { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: 'https://045.ultradox.click/upload/show.jpg' } });
+series.activity = { loader() {}, toggle() {} };
+series.create();
+
+const sh = series.render();
+check('fullpage: title text (year suffix stripped)', sh.find('.udxf__title').text() === 'Show Name', sh.find('.udxf__title').text());
+check('fullpage: backdrop image set', sh.find('.udxf__backdrop')[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/show-fanart.jpg")');
+check('fullpage: backdrop visible', sh.find('.udxf__backdrop')[0].classes.has('udxf__backdrop--on'));
+check('fullpage: top line', sh.find('.udxf__top').text() === 'США • 2021', sh.find('.udxf__top').text());
+check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', sh.find('.udxf__line').text());
+check('fullpage: overview (technical tail cut)', sh.find('.udxf__overview').text() === 'Детективний серіал про агентку.');
+check('fullpage: TMDB rating line (value + cert + status)', sh.find('.udxf__rating').length === 1 && sh.find('.udxf__rating').text() === 'TMDB 8.7 • TV-14 • Returning Series', sh.find('.udxf__rating').length ? sh.find('.udxf__rating').text() : 'missing');
+
+series.showReleases();
+let sel = L.Select.last;
+check('fullpage: selector titled by item', sel && sel.title === 'Show Name (2021)');
+check('fullpage: two real releases listed', sel && sel.items.length === 2, sel && String(sel.items.length));
+check('fullpage: release 1 label+size as UI data', sel && sel.items[0].title === 'С01.01 WEB-DLRIP 1080P • 10 GB', sel && sel.items[0].title);
+check('fullpage: release 1 magnet kept as UI data', sel && /^magnet:\?xt=urn:btih:0123456789abcdef/.test(sel.items[0].id.magnet));
+check('fullpage: release 2 label+size as UI data', sel && sel.items[1].title === 'С01.02 WEB-DLRIP 1080P • 10 GB', sel && sel.items[1].title);
+
+let toggles = L.Controller.toggles.content || 0;
+let noties = L.Noty.msgs.length;
+sel.onSelect(sel.items[0]);
+check('fullpage: series select closes selector (content toggle)', (L.Controller.toggles.content || 0) === toggles + 1);
+check('fullpage: series select confirmation shown', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'), L.Noty.msgs[L.Noty.msgs.length - 1]);
+check('fullpage: series select did not start a torrent', L.Torrent.calls === 0);
+
+series.showReleases();
+toggles = L.Controller.toggles.content || 0;
+noties = L.Noty.msgs.length;
+L.Select.last.onBack();
+check('fullpage: onBack closes selector too', (L.Controller.toggles.content || 0) === toggles + 1 && L.Noty.msgs.length === noties);
+
+// ---------- 2/3/4. FullPage: film release selection ----------
+console.log('fullpage: film detail + release selection');
+const film = new FP({ item: { title: 'Great Movie (2023)', serial: false, itemUrl: FILM_URL, poster: '' } });
+film.activity = { loader() {}, toggle() {} };
+film.create();
+
+const fm = film.render();
+check('fullpage(film): top line', fm.find('.udxf__top').text() === 'Франція • 2023', fm.find('.udxf__top').text());
+check('fullpage(film): overview', fm.find('.udxf__overview').text() === 'Епічна історія космічної одесьи.');
+check('fullpage(film): TMDB rating line', fm.find('.udxf__rating').length === 1 && fm.find('.udxf__rating').text() === 'TMDB 7.9 • PG-13 • Released', fm.find('.udxf__rating').length ? fm.find('.udxf__rating').text() : 'missing');
+
+film.showReleases();
+sel = L.Select.last;
+check('fullpage(film): one real release listed', sel && sel.items.length === 1, sel && String(sel.items.length));
+check('fullpage(film): release label+size as UI data', sel && sel.items[0].title === 'WEB-DL 2160P • 20 GB', sel && sel.items[0].title);
+check('fullpage(film): magnet kept as UI data', sel && /^magnet:\?xt=urn:btih:aaaa1111bbbb2222/.test(sel.items[0].id.magnet));
+
+toggles = L.Controller.toggles.content || 0;
+sel.onSelect(sel.items[0]);
+check('fullpage(film): select closes selector (content toggle)', (L.Controller.toggles.content || 0) === toggles + 1);
+check('fullpage(film): confirmation shown', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'));
+check('fullpage(film): did not start a torrent', L.Torrent.calls === 0);
+
+// ---------- empty detail: no releases -> noty, selector untouched ----------
+console.log('fullpage: empty detail');
+const missing = new FP({ item: { title: 'Missing (1999)', serial: false, itemUrl: 'https://045.ultradox.click/serial/missing-1999/', poster: '' } });
+missing.activity = { loader() {}, toggle() {} };
+missing.create();
+const selBefore = L.Select.last;
+missing.showReleases();
+check('fullpage: no releases -> noty, no new selector', L.Select.last === selBefore && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_link'));
+check('fullpage: no TMDB match -> rating line hidden', missing.render().find('.udxf__rating').length === 0, String(missing.render().find('.udxf__rating').length));
+
+// ---------- TMDB cache: a repeated work must not refetch ----------
+console.log('tmdb cache: repeated work does not refetch');
+const tmdbFetchesBefore = fetches.filter((u) => u.indexOf('https://api.themoviedb.org/') === 0).length;
+const series2 = new FP({ item: { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: '' } });
+series2.activity = { loader() {}, toggle() {} };
+series2.create();
+const tmdbFetchesAfter = fetches.filter((u) => u.indexOf('https://api.themoviedb.org/') === 0).length;
+check('tmdb: repeated work uses cache (no new requests)', tmdbFetchesAfter === tmdbFetchesBefore, tmdbFetchesBefore + ' -> ' + tmdbFetchesAfter);
+check('tmdb: repeated detail rating line still correct', series2.render().find('.udxf__rating').text() === 'TMDB 8.7 • TV-14 • Returning Series', series2.render().find('.udxf__rating').text());
+
+// ---------- 6. network: public mirrors only ----------
+check('network: only public mirrors + TMDB API requested', fetches.every((u) => MIRRORS.some((m) => u.indexOf(m) === 0) || u.indexOf('https://api.themoviedb.org/') === 0), JSON.stringify(fetches));
+
+// ---------- final verdict ----------
+check('torrent: L.Torrent.start counter is zero', L.Torrent.calls === 0);
+console.log(failures ? 'FAIL (' + failures + ' check(s) failed)' : 'PASS');
+process.exitCode = failures ? 1 : 0;
