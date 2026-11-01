@@ -81,9 +81,11 @@
         '.udx-cat.udx-active{background-color:#fff;color:#000;}' +
         '.udx-content__list{position:relative;z-index:1;padding-top:80px;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:#9aa4b2;font-size:1.5em;}' +
+        '.udx-content .card__view{position:relative;overflow:hidden;}' +
+        '.udx-content .card__title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
+        '.udx-content .card__age{min-height:1.4em;font-size:0.85em;line-height:1.4em;color:#9aa4b2;}' +
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
-        '.udx-chip__kind{flex-shrink:0;background:#57F570;color:#0f3d1a;font-weight:700;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,0.88);color:#14202a;}' +
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
@@ -99,7 +101,7 @@
         '.udxf__actions{margin-top:1.8em;}' +
         '.udx-f__play{display:inline-block;min-width:11em;text-align:center;padding:.55em 1.4em;background:#57F570;color:#0f3d1a;font-weight:700;border-radius:.4em;font-size:1.05em;}' +
         '.udx-f__play.focus{background:#57F570;color:#0f3d1a;box-shadow:0 0 0 .3em #fff;border-radius:.6em;}' +
-        '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
+        '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         '.udx-rate{position:absolute;right:10px;bottom:10px;z-index:2;background:rgba(6,20,30,.78);color:#ffd76a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.8em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         '.udxf__rating{font-size:1.05em;font-weight:700;color:#ffd76a;margin-top:1em;}' +
         '</style>';
@@ -338,6 +340,32 @@
         return String(title || '').replace(/\s*\((19|20)\d{2}\)\s*$/, '');
     }
 
+    // One compact quality token from the raw site value (e.g.
+    // "WEB-DL/WEB-DLRip" -> "WEB-DL"): a single real token, no slash, no repeats.
+    function qualityToken(type) {
+        var s = String(type || '');
+        var tokens = ['WEB-DLRip', 'WEB-DL', 'BDRip', 'HDRip', 'HDTVRip', 'DVRip', 'CamRip', '2160p', '4K', '1080p', '720p', '576p'];
+        var i;
+        for (i = 0; i < tokens.length; i++) {
+            if (new RegExp('\\b' + tokens[i].replace(/-/g, '\\-') + '\\b', 'i').test(s)) {
+                if (tokens[i] === 'WEB-DLRip') return 'WEB-DL';
+                if (tokens[i] === '4K') return '2160p';
+                return tokens[i].toUpperCase();
+            }
+        }
+        return '';
+    }
+
+    // Type label strictly from real data: serial section (incl. /serial-hd/),
+    // film sections, or an explicit type word. '' when undetermined (no chip).
+    function kindLabel(item) {
+        if (item.serial) return 'Серіал';
+        var url = String(item.itemUrl || '');
+        if (/\/(hd|webrips|film)\//i.test(url)) return 'Фільм';
+        if (/фильм|фільм|film/i.test(String(item.type || ''))) return 'Фільм';
+        return '';
+    }
+
     // External rating data (value, age rating, release status) from TMDB via
     // the Lampa core TMDB integration: the key comes from Lampa's own TMDB
     // settings (Lampa.TMDB.key()) and requests go through Lampa.TMDB.api()
@@ -525,7 +553,7 @@
                 title: cardTitle,
                 year: (cardTitle.match(/\b(19|20)\d{2}\b/) || [])[0] || '',
                 type: cardType,
-                serial: /\/serial\//i.test(cardHref) || /сериал/i.test(cardTitle + ' ' + cardType),
+                serial: /\/serial(?:-[\w]+)?\//i.test(cardHref) || /сериал/i.test(cardTitle + ' ' + cardType),
                 size: '',
                 magnet: '',
                 fileUrl: '',
@@ -787,16 +815,19 @@
 
         this.appendCard = function (item) {
             var title = stripYear(item.title);
-            var card = L.Template.js('card', { title: title, release_year: item.year || '' });
+            var year = item.year || '';
+            // The year line must never repeat a year the title already shows.
+            if (year && new RegExp('\\b' + year + '\\b').test(title)) year = '';
+            var card = L.Template.js('card', { title: title, release_year: year });
             card.find('.card__title').text(title);
 
-            // The small line below the title only carries what is absent from
-            // the poster (quality/size of fallback rows).
+            // The line under the title always stays in the DOM (reserved row):
+            // it carries the year, or the quality/size of fallback rows, or
+            // nothing — so every card keeps the same grid geometry.
             var meta = [];
             if (item.type && !item.poster) meta.push(item.type);
             if (item.size) meta.push(item.size);
             if (meta.length) card.find('.card__age').text(meta.join(' • '));
-            else card.find('.card__age').remove();
 
             if (item.poster) {
                 var img = card.find('.card__img');
@@ -804,20 +835,24 @@
                 img.onerror = function () { this.src = './img/img_broken.svg'; };
             }
 
-            // NUM parity: type badge top-left, quality badge bottom-left (only
-            // a real quality token; the type itself is the top-left badge).
-            var kind = document.createElement('div');
-            kind.addClass('udx-kind');
-            kind.text(item.serial ? 'Серіал' : 'Фільм');
-            card.find('.card__view').append(kind);
+            // One type chip per card, strictly inside the poster (top-left);
+            // only rendered when the type is determined from real data.
+            var kindText = kindLabel(item);
+            if (kindText) {
+                var kind = document.createElement('div');
+                kind.addClass('udx-kind');
+                kind.text(kindText);
+                card.find('.card__view').append(kind);
+            }
 
-            var qm = String(item.type || '').match(/\b(WEB-DL|Rip|BDRip|HDRip|HDTVRip|DVRip|CamRip|4K|2160p|1080p|720p)\b/i);
-            if (qm) {
+            // One quality chip per card (bottom-left), a single real token.
+            var q = qualityToken(item.type);
+            if (q) {
                 var chip = document.createElement('div');
                 chip.addClass('udx-chip');
                 var qs = document.createElement('span');
                 qs.addClass('udx-chip__quality');
-                qs.text(qm[0].toUpperCase());
+                qs.text(q);
                 chip.append(qs);
                 card.find('.card__view').append(chip);
             }

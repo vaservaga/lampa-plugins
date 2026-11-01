@@ -41,7 +41,7 @@ function check(name, cond, extra) {
 }
 
 // ---------- 1. static scan: no executable torrent launch left in the source ----------
-for (const token of [/(?:L\.)?Torrent\.start/, /MagnetUri/, /playRelease/]) {
+for (const token of [/(?:L\.)?Torrent\.start/, /MagnetUri/, /playRelease/, /chooseFile/, /hover:long/]) {
     check('static: source has no ' + token, !token.test(src));
 }
 
@@ -223,6 +223,15 @@ const L = {
             const ch = makeEl('div'); ch.classes.add(cls); c.children.push(ch);
         });
         const img = makeEl('img'); img.classes.add('card__img'); c.children.push(img);
+        // Mirror the real Template.js replaceVars(): substitute {title} /
+        // {release_year} into the text nodes (an empty value leaves the
+        // element present with empty text).
+        if (params) {
+            const t = c.children.find((x) => x.classes.has('card__title'));
+            const a = c.children.find((x) => x.classes.has('card__age'));
+            if (t) t.text(params.title !== undefined && params.title !== null ? String(params.title) : '');
+            if (a) a.text(params.release_year !== undefined && params.release_year !== null ? String(params.release_year) : '');
+        }
         L.Template.calls.push(c);
         return c;
     } },
@@ -295,6 +304,57 @@ check('catalog: release_year under the title', L.Template.lastParams && L.Templa
 check('catalog: type badge top-left', card.find('.udx-kind').length === 1 && card.find('.udx-kind').text() === 'Серіал', card.find('.udx-kind').length ? card.find('.udx-kind').text() : 'missing');
 check('catalog: quality chip only for real quality tokens', card.find('.udx-chip').length === 0, String(card.find('.udx-chip').length));
 check('catalog: TMDB rating badge bottom-right', card.find('.udx-rate').length === 1 && card.find('.udx-rate').text() === '8.7', card.find('.udx-rate').length ? card.find('.udx-rate').text() : 'missing');
+
+// ---------- card grid contract: chip containment, single quality, year line, stable title ----------
+console.log('card grid: chip/year/title contracts');
+
+const movieSearch = (t) => TMDB_BASE + 'search/movie?api_key=test-key&query=' + encodeURIComponent(t) + '&language=ru';
+ROUTES.set(movieSearch('Черновик, написанный кровью'), '{"success":true,"results":[]}');
+ROUTES.set(movieSearch('Любитель акул встречает девушку'), '{"success":true,"results":[]}');
+ROUTES.set(movieSearch('Тайны больницы Милосердия'), '{"success":true,"results":[]}');
+ROUTES.set(TMDB_BASE + 'search/tv?api_key=test-key&query=' + encodeURIComponent('Американский заложник') + '&language=ru', '{"success":true,"results":[]}');
+
+function appendItem(o) {
+    cat.appendCard(Object.assign({ title: '', serial: false, type: '', itemUrl: '', poster: '', size: '', year: '' }, o));
+    return L.Template.calls[L.Template.calls.length - 1];
+}
+
+function inPoster(elCard, cls) {
+    const e = elCard.find('.' + cls)[0];
+    const v = elCard.find('.card__view')[0];
+    return !!(e && v && e._parent === v);
+}
+
+// real /hd/ film row: long title with (YYYY), raw quality "WEB-DL/WEB-DLRip"
+const filmCard = appendItem({ title: 'Черновик, написанный кровью (2024)', serial: false, itemUrl: 'https://045.ultradox.click/hd/x-1.html', poster: 'https://045.ultradox.click/upload/a.jpg', type: 'WEB-DL/WEB-DLRip', year: '2024' });
+check('grid: exactly one .udx-kind ("Фільм")', filmCard.find('.udx-kind').length === 1 && filmCard.find('.udx-kind').text() === 'Фільм', filmCard.find('.udx-kind').length + ':' + (filmCard.find('.udx-kind')[0] ? filmCard.find('.udx-kind')[0].text() : ''));
+check('grid: kind chip is a child of .card__view (poster container)', inPoster(filmCard, 'udx-kind'), 'not in poster container');
+check('grid: at most one quality chip with a single token (no slash/repeats)', filmCard.find('.udx-chip').length === 1 && filmCard.find('.udx-chip__quality').length === 1 && filmCard.find('.udx-chip__quality').text() === 'WEB-DL', filmCard.find('.udx-chip').length + ':' + filmCard.find('.udx-chip__quality').text());
+check('grid: quality chip is a child of .card__view (poster container)', inPoster(filmCard, 'udx-chip'), 'not in poster container');
+check('grid: year rendered at most once across title+age line', (function () { const t = filmCard.find('.card__title').text() + ' ' + filmCard.find('.card__age').text(); return (t.match(/\b(19|20)\d{2}\b/g) || []).length <= 1; })(), 'year count > 1');
+check('grid: age line present and holds the year', filmCard.find('.card__age').length === 1 && filmCard.find('.card__age').text() === '2024', filmCard.find('.card__age').text());
+
+// /serial-hd/ series: title has no (YYYY) -> no fabricated year, reserved empty line
+const serialCard = appendItem({ title: 'Американский заложник (1 сезон)', serial: true, itemUrl: 'https://045.ultradox.click/serial-hd/56755-zhivoj-2-sezon.html', poster: 'https://045.ultradox.click/upload/b.jpg', type: 'WEB-DL/WEB-DLRip' });
+check('grid: /serial-hd/ item labeled "Серіал"', serialCard.find('.udx-kind').length === 1 && serialCard.find('.udx-kind').text() === 'Серіал', serialCard.find('.udx-kind').length + ':' + (serialCard.find('.udx-kind')[0] ? serialCard.find('.udx-kind')[0].text() : ''));
+check('grid: no year in data -> empty reserved age row (not removed)', serialCard.find('.card__age').length === 1 && serialCard.find('.card__age').text() === '', String(serialCard.find('.card__age').length) + ':' + JSON.stringify(serialCard.find('.card__age').text()));
+check('grid: no fabricated year anywhere on the card', !/\b(19|20)\d{2}\b/.test(serialCard.find('.card__title').text() + ' ' + serialCard.find('.card__age').text()), 'year found');
+
+// undetermined type -> no kind chip; quality still a single real token
+const unknownCard = appendItem({ title: 'Тайны больницы Милосердия', itemUrl: 'https://045.ultradox.click/page/1/', type: 'HDTVRip 1080p' });
+check('grid: undetermined type -> no kind chip', unknownCard.find('.udx-kind').length === 0, String(unknownCard.find('.udx-kind').length));
+check('grid: quality token HDTVRIP (single, upper)', unknownCard.find('.udx-chip__quality').length === 1 && unknownCard.find('.udx-chip__quality').text() === 'HDTVRIP', unknownCard.find('.udx-chip__quality').text());
+
+// /film/ item without a type word: label from the section, no quality chip
+const sharkCard = appendItem({ title: 'Любитель акул встречает девушку', itemUrl: 'https://045.ultradox.click/film/l-1.html', poster: 'https://045.ultradox.click/upload/c.jpg' });
+check('grid: /film/ item labeled "Фільм" without a type word', sharkCard.find('.udx-kind').length === 1 && sharkCard.find('.udx-kind').text() === 'Фільм', sharkCard.find('.udx-kind').length + ':' + (sharkCard.find('.udx-kind')[0] ? sharkCard.find('.udx-kind')[0].text() : ''));
+check('grid: no quality in data -> no quality chip', sharkCard.find('.udx-chip').length === 0, String(sharkCard.find('.udx-chip').length));
+
+// static CSS contract (the plugin owns its card geometry; core CSS untouched)
+check('css: .card__view self-contained (position:relative + overflow:hidden)', /\.udx-content \.card__view\{[^}]*position:relative[^}]*overflow:hidden/.test(src), 'missing containment rule');
+check('css: title clamped to two lines with a reserved title area', /\.udx-content \.card__title\{[^}]*-webkit-line-clamp:2[^}]*min-height:2\.5em/.test(src), 'missing clamp rule');
+check('css: year/age line reserved on every card', /\.udx-content \.card__age\{[^}]*min-height:1\.4em/.test(src), 'missing reserved line rule');
+check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 
 // ---------- 2/3/4. FullPage: detail build + series release selection ----------
 console.log('fullpage: series detail + release selection');
