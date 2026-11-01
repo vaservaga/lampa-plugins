@@ -9,9 +9,11 @@
  * bottom-right and the year under the title; category buttons in the head
  * (simple-button); full detail page (validated backdrop, poster left, meta,
  * TMDB rating line, overview) with a release selector. Ratings come from TMDB
- * through the Lampa core TMDB integration (Lampa.TMDB.key()/api()); the key
- * lives in Lampa's own TMDB settings, never in this plugin. Torrent/TorrServer
- * playback is a later stage, not wired here.
+ * through the Lampa core TMDB integration (Lampa.TMDB.key()/api()); an
+ * optional per-device key override 'udx_tmdb_key' (developer console) wins
+ * over the shared core key, which TMDB rate-limits under load (401 bursts are
+ * retried with backoff). No key is ever hardcoded in this plugin.
+ * Torrent/TorrServer playback is a later stage, not wired here.
  */
 (function () {
     'use strict';
@@ -348,8 +350,16 @@
     var tmdbQueue = [];
     var TMDB_MAX_INFLIGHT = 2;
 
+    // Optional per-device override: the shared Lampa core TMDB key gets 401
+    // bursts from TMDB under load. A personal key can be set from the Lampa
+    // developer console (L.Storage.set('udx_tmdb_key', '<key>')); otherwise the
+    // core key is used. The plugin never hardcodes a key.
     function tmdbKey() {
-        try { return window.Lampa.TMDB.key(); } catch (e) { return ''; }
+        try {
+            var own = window.Lampa.Storage.get('udx_tmdb_key', '');
+            if (own) return String(own).trim();
+            return window.Lampa.TMDB.key();
+        } catch (e) { return ''; }
     }
 
     Tmdb.init = function () {
@@ -366,17 +376,29 @@
         try { window.Lampa.Storage.set('udx_tmdb_cache', JSON.stringify(Tmdb.cache || {})); } catch (e) {}
     };
 
+    // One request with retries: TMDB intermittently rejects the shared Lampa
+    // core key with 401 under load, so a transient failure is retried with
+    // backoff before giving up (the storage cache makes re-asking cheap).
     function tmdbGet(path, ok, fail) {
         var L = window.Lampa;
-        var net = new L.Reguest();
-        net.timeout(15000);
-        var url = (L.TMDB.api ? L.TMDB.api(path) : 'https://api.themoviedb.org/3/' + path);
-        net.native(url, function (txt) {
-            var j = null;
-            try { j = JSON.parse(String(txt)); } catch (e) {}
-            if (!j || j.success === false) { fail(); return; }
-            ok(j);
-        }, fail);
+        var tries = 0;
+        var MAX_TRIES = 3;
+        function attempt() {
+            var net = new L.Reguest();
+            net.timeout(15000);
+            var url = (L.TMDB.api ? L.TMDB.api(path) : 'https://api.themoviedb.org/3/' + path);
+            net.native(url, function (txt) {
+                var j = null;
+                try { j = JSON.parse(String(txt)); } catch (e) {}
+                if (!j || j.success === false) { fail(); return; }
+                ok(j);
+            }, function () {
+                tries++;
+                if (tries >= MAX_TRIES) { fail(); return; }
+                setTimeout(attempt, tries * 4000);
+            });
+        }
+        attempt();
     }
 
     function tmdbEnqueue(job) {
