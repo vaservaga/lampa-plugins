@@ -3,6 +3,12 @@
 // Contract test for the Ultradox FullPage (detail page -> release selection)
 // plus a catalog-card smoke test, run against a mocked Lampa environment.
 //
+// The DOM mock follows the real Lampa core (app.min.js): Element.prototype.find
+// returns a SINGLE node (querySelector) or null, Element.prototype.append
+// unwraps jQuery-like collections via child[0], and Template.js returns a raw
+// HTMLElement. The previous harness returned an array-like collection from
+// find(), which masked the poster[0].src TypeError seen on the real Shield.
+//
 // Verifies:
 //   1. Static scan of the plugin source: no Torrent.start / MagnetUri /
 //      playRelease tokens remain (no executable playback path left).
@@ -45,7 +51,14 @@ for (const token of [/(?:L\.)?Torrent\.start/, /MagnetUri/, /playRelease/, /choo
     check('static: source has no ' + token, !token.test(src));
 }
 
-// ---------- minimal DOM ----------
+// ---------- DOM contract, modeled on the real Lampa core (app.min.js) ----------
+// Lampa patches raw DOM nodes:
+//   Element.prototype.append = (child) =>
+//       Array.isArray-ish child ? each appendChild : appendChild(child instanceof jQuery ? child[0] : child)
+//   Element.prototype.find = (query) => this.querySelector(query)   // SINGLE node or null
+//   Template.js(name) returns a RAW HTMLElement (cloneNode), not a jQuery object.
+// The plugin therefore must treat node.find(sel) as a single element; the old
+// harness returned an array-like collection here, which masked the poster[0] bug.
 function makeEl(tag) {
     const el = {
         tagName: String(tag).toUpperCase(),
@@ -57,15 +70,11 @@ function makeEl(tag) {
         _parent: null,
         _setParent(p) { el._parent = p; },
         text(v) { if (v === undefined) return el._text; el._text = String(v); return el; },
-        append(...k) {
-            for (const x of k) {
-                if (Array.isArray(x)) { // $() queries unwrap to their elements
-                    for (const y of x) { if (y && y._setParent) y._setParent(el); el.children.push(y); }
-                } else {
-                    if (x && x._setParent) x._setParent(el);
-                    el.children.push(x);
-                }
-            }
+        append(child) {
+            const put = (c) => { if (c && c._setParent) c._setParent(el); el.children.push(c); };
+            if (child && child._q) put(child[0]);              // jQuery-like -> appendChild(child[0])
+            else if (Array.isArray(child)) child.forEach(put); // native array branch
+            else put(child);
             return el;
         },
         empty() { el.children.length = 0; return el; },
@@ -81,23 +90,44 @@ function makeEl(tag) {
         removeClass(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.delete(x)); return el; },
         on(ev, fn) { (el.handlers[ev] || (el.handlers[ev] = [])).push(fn); return el; },
         css(o) { Object.assign(el.style, o); return el; },
+        // Lampa Element.prototype.find == querySelector: first matching
+        // descendant in document order, or null.
         find(sel) {
             const cls = String(sel).replace(/^\./, '');
-            const out = [];
+            let hit = null;
             (function walk(node) {
+                if (hit) return;
                 for (const c of node.children || []) {
-                    if (c && c.classes && c.classes.has(cls)) out.push(c);
-                    if (c && c.children) walk(c);
+                    if (!hit && c && c.classes && c.classes.has(cls)) hit = c;
+                    if (!hit && c && c.children) walk(c);
                 }
             })(el);
-            return asQuery(out);
+            return hit;
         }
     };
     return el;
 }
 
+// All matches in a subtree (assertion helper; the plugin itself never needs it).
+function findAll(node, cls) {
+    const out = [];
+    (function walk(n) {
+        for (const c of n.children || []) {
+            if (c && c.classes && c.classes.has(cls)) out.push(c);
+            if (c && c.children) walk(c);
+        }
+    })(node);
+    return out;
+}
+
+// Null-safe text of a single-node find result.
+const txt = (n, sel) => { const e = n.find(sel); return e ? e.text() : ''; };
+
+// jQuery-like collection ($(...) results). Lampa's Element.prototype.append
+// unwraps such a collection via child[0]; the _q flag models that check.
 function asQuery(list) {
     const q = list.slice();
+    q._q = true;
     q.append = (...k) => { list.forEach((e) => e.append(...k)); return q; };
     q.text = (v) => { if (v === undefined) return list.map((e) => e.text()).join(''); list.forEach((e) => e.text(v)); return q; };
     q.addClass = (c) => { list.forEach((e) => e.addClass(c)); return q; };
@@ -192,6 +222,7 @@ ROUTES.set(TMDB_BASE + 'search/tv?api_key=test-key&query=Show%20Name&language=ru
 ROUTES.set(TMDB_BASE + 'search/tv?api_key=test-key&query=Show%20Name&language=ru', JSON.stringify({ success: true, results: [{ id: 1, name: 'Show Name', first_air_date: '2021-01-15', vote_average: 8.7 }] }));
 ROUTES.set(TMDB_BASE + 'search/movie?api_key=test-key&query=Great%20Movie&language=ru', JSON.stringify({ success: true, results: [{ id: 2, title: 'Great Movie', release_date: '2023-05-10', vote_average: 7.9 }] }));
 ROUTES.set(TMDB_BASE + 'search/movie?api_key=test-key&query=Missing&language=ru', JSON.stringify({ success: true, results: [] }));
+ROUTES.set(TMDB_BASE + 'search/movie?api_key=test-key&query=No%20Fanart&language=ru', JSON.stringify({ success: true, results: [] }));
 ROUTES.set(TMDB_BASE + 'tv/1?api_key=test-key&language=ru', JSON.stringify({ success: true, status: 'Returning Series', release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'TV-14' }] }] } }));
 ROUTES.set(TMDB_BASE + 'movie/2?api_key=test-key&language=ru', JSON.stringify({ success: true, status: 'Released', release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG-13' }] }] } }));
 
@@ -301,9 +332,9 @@ check('catalog: no Torrent.start', L.Torrent.calls === 0);
 
 // ---------- NUM-parity card: badges + year + rating ----------
 check('catalog: release_year under the title', L.Template.lastParams && L.Template.lastParams.release_year === '2021', JSON.stringify(L.Template.lastParams));
-check('catalog: type badge top-left', card.find('.udx-kind').length === 1 && card.find('.udx-kind').text() === 'Серіал', card.find('.udx-kind').length ? card.find('.udx-kind').text() : 'missing');
-check('catalog: quality chip only for real quality tokens', card.find('.udx-chip').length === 0, String(card.find('.udx-chip').length));
-check('catalog: TMDB rating badge bottom-right', card.find('.udx-rate').length === 1 && card.find('.udx-rate').text() === '8.7', card.find('.udx-rate').length ? card.find('.udx-rate').text() : 'missing');
+check('catalog: type badge top-left', findAll(card, 'udx-kind').length === 1 && card.find('.udx-kind').text() === 'Серіал', findAll(card, 'udx-kind').length + ':' + txt(card, '.udx-kind'));
+check('catalog: quality chip only for real quality tokens', card.find('.udx-chip') === null, String(card.find('.udx-chip')));
+check('catalog: TMDB rating badge bottom-right', findAll(card, 'udx-rate').length === 1 && card.find('.udx-rate').text() === '8.7', findAll(card, 'udx-rate').length + ':' + txt(card, '.udx-rate'));
 
 // ---------- card grid contract: chip containment, single quality, year line, stable title ----------
 console.log('card grid: chip/year/title contracts');
@@ -320,35 +351,35 @@ function appendItem(o) {
 }
 
 function inPoster(elCard, cls) {
-    const e = elCard.find('.' + cls)[0];
-    const v = elCard.find('.card__view')[0];
+    const e = elCard.find('.' + cls);
+    const v = elCard.find('.card__view');
     return !!(e && v && e._parent === v);
 }
 
 // real /hd/ film row: long title with (YYYY), raw quality "WEB-DL/WEB-DLRip"
 const filmCard = appendItem({ title: 'Черновик, написанный кровью (2024)', serial: false, itemUrl: 'https://045.ultradox.click/hd/x-1.html', poster: 'https://045.ultradox.click/upload/a.jpg', type: 'WEB-DL/WEB-DLRip', year: '2024' });
-check('grid: exactly one .udx-kind ("Фільм")', filmCard.find('.udx-kind').length === 1 && filmCard.find('.udx-kind').text() === 'Фільм', filmCard.find('.udx-kind').length + ':' + (filmCard.find('.udx-kind')[0] ? filmCard.find('.udx-kind')[0].text() : ''));
+check('grid: exactly one .udx-kind ("Фільм")', findAll(filmCard, 'udx-kind').length === 1 && filmCard.find('.udx-kind').text() === 'Фільм', findAll(filmCard, 'udx-kind').length + ':' + txt(filmCard, '.udx-kind'));
 check('grid: kind chip is a child of .card__view (poster container)', inPoster(filmCard, 'udx-kind'), 'not in poster container');
-check('grid: at most one quality chip with a single token (no slash/repeats)', filmCard.find('.udx-chip').length === 1 && filmCard.find('.udx-chip__quality').length === 1 && filmCard.find('.udx-chip__quality').text() === 'WEB-DL', filmCard.find('.udx-chip').length + ':' + filmCard.find('.udx-chip__quality').text());
+check('grid: at most one quality chip with a single token (no slash/repeats)', findAll(filmCard, 'udx-chip').length === 1 && findAll(filmCard, 'udx-chip__quality').length === 1 && filmCard.find('.udx-chip__quality').text() === 'WEB-DL', findAll(filmCard, 'udx-chip').length + ':' + txt(filmCard, '.udx-chip__quality'));
 check('grid: quality chip is a child of .card__view (poster container)', inPoster(filmCard, 'udx-chip'), 'not in poster container');
 check('grid: year rendered at most once across title+age line', (function () { const t = filmCard.find('.card__title').text() + ' ' + filmCard.find('.card__age').text(); return (t.match(/\b(19|20)\d{2}\b/g) || []).length <= 1; })(), 'year count > 1');
-check('grid: age line present and holds the year', filmCard.find('.card__age').length === 1 && filmCard.find('.card__age').text() === '2024', filmCard.find('.card__age').text());
+check('grid: age line present and holds the year', findAll(filmCard, 'card__age').length === 1 && filmCard.find('.card__age').text() === '2024', txt(filmCard, '.card__age'));
 
 // /serial-hd/ series: title has no (YYYY) -> no fabricated year, reserved empty line
 const serialCard = appendItem({ title: 'Американский заложник (1 сезон)', serial: true, itemUrl: 'https://045.ultradox.click/serial-hd/56755-zhivoj-2-sezon.html', poster: 'https://045.ultradox.click/upload/b.jpg', type: 'WEB-DL/WEB-DLRip' });
-check('grid: /serial-hd/ item labeled "Серіал"', serialCard.find('.udx-kind').length === 1 && serialCard.find('.udx-kind').text() === 'Серіал', serialCard.find('.udx-kind').length + ':' + (serialCard.find('.udx-kind')[0] ? serialCard.find('.udx-kind')[0].text() : ''));
-check('grid: no year in data -> empty reserved age row (not removed)', serialCard.find('.card__age').length === 1 && serialCard.find('.card__age').text() === '', String(serialCard.find('.card__age').length) + ':' + JSON.stringify(serialCard.find('.card__age').text()));
+check('grid: /serial-hd/ item labeled "Серіал"', findAll(serialCard, 'udx-kind').length === 1 && serialCard.find('.udx-kind').text() === 'Серіал', findAll(serialCard, 'udx-kind').length + ':' + txt(serialCard, '.udx-kind'));
+check('grid: no year in data -> empty reserved age row (not removed)', findAll(serialCard, 'card__age').length === 1 && serialCard.find('.card__age').text() === '', String(findAll(serialCard, 'card__age').length) + ':' + JSON.stringify(txt(serialCard, '.card__age')));
 check('grid: no fabricated year anywhere on the card', !/\b(19|20)\d{2}\b/.test(serialCard.find('.card__title').text() + ' ' + serialCard.find('.card__age').text()), 'year found');
 
 // undetermined type -> no kind chip; quality still a single real token
 const unknownCard = appendItem({ title: 'Тайны больницы Милосердия', itemUrl: 'https://045.ultradox.click/page/1/', type: 'HDTVRip 1080p' });
-check('grid: undetermined type -> no kind chip', unknownCard.find('.udx-kind').length === 0, String(unknownCard.find('.udx-kind').length));
-check('grid: quality token HDTVRIP (single, upper)', unknownCard.find('.udx-chip__quality').length === 1 && unknownCard.find('.udx-chip__quality').text() === 'HDTVRIP', unknownCard.find('.udx-chip__quality').text());
+check('grid: undetermined type -> no kind chip', unknownCard.find('.udx-kind') === null, String(unknownCard.find('.udx-kind')));
+check('grid: quality token HDTVRIP (single, upper)', findAll(unknownCard, 'udx-chip__quality').length === 1 && unknownCard.find('.udx-chip__quality').text() === 'HDTVRIP', txt(unknownCard, '.udx-chip__quality'));
 
 // /film/ item without a type word: label from the section, no quality chip
 const sharkCard = appendItem({ title: 'Любитель акул встречает девушку', itemUrl: 'https://045.ultradox.click/film/l-1.html', poster: 'https://045.ultradox.click/upload/c.jpg' });
-check('grid: /film/ item labeled "Фільм" without a type word', sharkCard.find('.udx-kind').length === 1 && sharkCard.find('.udx-kind').text() === 'Фільм', sharkCard.find('.udx-kind').length + ':' + (sharkCard.find('.udx-kind')[0] ? sharkCard.find('.udx-kind')[0].text() : ''));
-check('grid: no quality in data -> no quality chip', sharkCard.find('.udx-chip').length === 0, String(sharkCard.find('.udx-chip').length));
+check('grid: /film/ item labeled "Фільм" without a type word', findAll(sharkCard, 'udx-kind').length === 1 && sharkCard.find('.udx-kind').text() === 'Фільм', findAll(sharkCard, 'udx-kind').length + ':' + txt(sharkCard, '.udx-kind'));
+check('grid: no quality in data -> no quality chip', sharkCard.find('.udx-chip') === null, String(sharkCard.find('.udx-chip')));
 
 // static CSS contract (the plugin owns its card geometry; core CSS untouched)
 check('css: .card__view self-contained (position:relative + overflow:hidden)', /\.udx-content \.card__view\{[^}]*position:relative[^}]*overflow:hidden/.test(src), 'missing containment rule');
@@ -357,20 +388,27 @@ check('css: year/age line reserved on every card', /\.udx-content \.card__age\{[
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 
 // ---------- 2/3/4. FullPage: detail build + series release selection ----------
+// The exact Shield crash case: an item WITH a poster (item.poster truthy), so
+// build() took the poster branch that crashed on poster[0].src.
 console.log('fullpage: series detail + release selection');
 const FP = L.Component.get('ultradox_full');
 const series = new FP({ item: { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: 'https://045.ultradox.click/upload/show.jpg' } });
 series.activity = { loader() {}, toggle() {} };
-series.create();
+let buildErr = null;
+try { series.create(); } catch (e) { buildErr = e; }
+check('fullpage: build() completed without TypeError (Shield crash case)', buildErr === null, buildErr && buildErr.constructor.name + ': ' + buildErr.message);
 
 const sh = series.render();
-check('fullpage: title text (year suffix stripped)', sh.find('.udxf__title').text() === 'Show Name', sh.find('.udxf__title').text());
-check('fullpage: backdrop image set', sh.find('.udxf__backdrop')[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/show-fanart.jpg")');
-check('fullpage: backdrop visible', sh.find('.udxf__backdrop')[0].classes.has('udxf__backdrop--on'));
-check('fullpage: top line', sh.find('.udxf__top').text() === 'США • 2021', sh.find('.udxf__top').text());
-check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', sh.find('.udxf__line').text());
+check('fullpage: title text (year suffix stripped)', sh.find('.udxf__title').text() === 'Show Name', txt(sh, '.udxf__title'));
+check('fullpage: exactly one backdrop element', findAll(sh, 'udxf__backdrop').length === 1, String(findAll(sh, 'udxf__backdrop').length));
+check('fullpage: backdrop image set', sh.find('.udxf__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/show-fanart.jpg")', sh.find('.udxf__backdrop') ? sh.find('.udxf__backdrop').style.backgroundImage : 'no backdrop element');
+check('fullpage: backdrop visible', sh.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
+check('fullpage: poster src equals the expected URL', sh.find('.udxf__poster') && sh.find('.udxf__poster').src === 'https://045.ultradox.click/upload/show.jpg', sh.find('.udxf__poster') ? sh.find('.udxf__poster').src : 'no poster element');
+check('fullpage: top line', sh.find('.udxf__top').text() === 'США • 2021', txt(sh, '.udxf__top'));
+check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', txt(sh, '.udxf__line'));
 check('fullpage: overview (technical tail cut)', sh.find('.udxf__overview').text() === 'Детективний серіал про агентку.');
-check('fullpage: TMDB rating line (value + cert + status)', sh.find('.udxf__rating').length === 1 && sh.find('.udxf__rating').text() === 'TMDB 8.7 • TV-14 • Returning Series', sh.find('.udxf__rating').length ? sh.find('.udxf__rating').text() : 'missing');
+check('fullpage: watch button present with label', sh.find('.udx-f__play') !== null && sh.find('.udx-f__play').text() === 'Дивитися', txt(sh, '.udx-f__play'));
+check('fullpage: TMDB rating line (value + cert + status)', findAll(sh, 'udxf__rating').length === 1 && sh.find('.udxf__rating').text() === 'TMDB 8.7 • TV-14 • Returning Series', txt(sh, '.udxf__rating'));
 
 series.showReleases();
 let sel = L.Select.last;
@@ -400,9 +438,10 @@ film.activity = { loader() {}, toggle() {} };
 film.create();
 
 const fm = film.render();
-check('fullpage(film): top line', fm.find('.udxf__top').text() === 'Франція • 2023', fm.find('.udxf__top').text());
+check('fullpage(film): top line', fm.find('.udxf__top').text() === 'Франція • 2023', txt(fm, '.udxf__top'));
 check('fullpage(film): overview', fm.find('.udxf__overview').text() === 'Епічна історія космічної одесьи.');
-check('fullpage(film): TMDB rating line', fm.find('.udxf__rating').length === 1 && fm.find('.udxf__rating').text() === 'TMDB 7.9 • PG-13 • Released', fm.find('.udxf__rating').length ? fm.find('.udxf__rating').text() : 'missing');
+check('fullpage(film): no poster -> element removed (no undefined src)', findAll(fm, 'udxf__poster').length === 0, String(findAll(fm, 'udxf__poster').length));
+check('fullpage(film): TMDB rating line', findAll(fm, 'udxf__rating').length === 1 && fm.find('.udxf__rating').text() === 'TMDB 7.9 • PG-13 • Released', txt(fm, '.udxf__rating'));
 
 film.showReleases();
 sel = L.Select.last;
@@ -416,6 +455,32 @@ check('fullpage(film): select closes selector (content toggle)', (L.Controller.t
 check('fullpage(film): confirmation shown', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'));
 check('fullpage(film): did not start a torrent', L.Torrent.calls === 0);
 
+// ---------- FullPage: missing backdrop -> stable neutral fallback ----------
+console.log('fullpage: missing backdrop fallback');
+const NOBG_URL = 'https://045.ultradox.click/film/no-fanart-2020/';
+ROUTES.set(NOBG_URL,
+    '<html><head></head><body><ul>' +
+    '<li><span>Жанр:</span> Трилер</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> Німеччина</li>' +
+    '<li><span>Год:</span> 2020</li>' +
+    '</ul>' +
+    '<a href="magnet:?xt=urn:btih:beefcafebeefcafebeefcafebeefcafebeefcafe&amp;dn=No.Fanart.2020.mkv"></a>' +
+    '</body></html>');
+const nobg = new FP({ item: { title: 'No Fanart (2020)', serial: false, itemUrl: NOBG_URL, poster: '' } });
+nobg.activity = { loader() {}, toggle() {} };
+let nobgErr = null;
+try { nobg.create(); } catch (e) { nobgErr = e; }
+const nf = nobg.render();
+check('fullpage(no backdrop): build() did not throw', nobgErr === null, nobgErr && nobgErr.constructor.name + ': ' + nobgErr.message);
+check('fullpage(no backdrop): element present but stays off (neutral fallback)', nf.find('.udxf__backdrop') !== null && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--on') && nf.find('.udxf__backdrop').style.backgroundImage === undefined);
+check('fullpage(no backdrop): no undefined/broken image left', (function () {
+    const imgs = [];
+    (function walk(n) { for (const c of n.children || []) { if (c && c.tagName === 'IMG') imgs.push(c); if (c && c.children) walk(c); } })(nf);
+    return imgs.every((i) => typeof i.src === 'string' && i.src.length > 0);
+})());
+check('fullpage(no backdrop): detail still shows title and meta', nf.find('.udxf__title').text() === 'No Fanart' && nf.find('.udxf__line').text() === 'Трилер', txt(nf, '.udxf__line'));
+check('fullpage(no backdrop): no torrent started', L.Torrent.calls === 0);
+
 // ---------- empty detail: no releases -> noty, selector untouched ----------
 console.log('fullpage: empty detail');
 const missing = new FP({ item: { title: 'Missing (1999)', serial: false, itemUrl: 'https://045.ultradox.click/serial/missing-1999/', poster: '' } });
@@ -424,7 +489,7 @@ missing.create();
 const selBefore = L.Select.last;
 missing.showReleases();
 check('fullpage: no releases -> noty, no new selector', L.Select.last === selBefore && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_link'));
-check('fullpage: no TMDB match -> rating line hidden', missing.render().find('.udxf__rating').length === 0, String(missing.render().find('.udxf__rating').length));
+check('fullpage: no TMDB match -> rating line hidden', missing.render().find('.udxf__rating') === null, String(missing.render().find('.udxf__rating')));
 
 // ---------- TMDB cache: a repeated work must not refetch ----------
 console.log('tmdb cache: repeated work does not refetch');
@@ -434,7 +499,7 @@ series2.activity = { loader() {}, toggle() {} };
 series2.create();
 const tmdbFetchesAfter = fetches.filter((u) => u.indexOf('https://api.themoviedb.org/') === 0).length;
 check('tmdb: repeated work uses cache (no new requests)', tmdbFetchesAfter === tmdbFetchesBefore, tmdbFetchesBefore + ' -> ' + tmdbFetchesAfter);
-check('tmdb: repeated detail rating line still correct', series2.render().find('.udxf__rating').text() === 'TMDB 8.7 • TV-14 • Returning Series', series2.render().find('.udxf__rating').text());
+check('tmdb: repeated detail rating line still correct', txt(series2.render(), '.udxf__rating') === 'TMDB 8.7 • TV-14 • Returning Series', txt(series2.render(), '.udxf__rating'));
 
 // ---------- 6. network: public mirrors only ----------
 check('network: only public mirrors + TMDB API requested', fetches.every((u) => MIRRORS.some((m) => u.indexOf(m) === 0) || u.indexOf('https://api.themoviedb.org/') === 0), JSON.stringify(fetches));

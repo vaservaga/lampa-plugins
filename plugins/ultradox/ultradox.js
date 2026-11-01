@@ -984,11 +984,13 @@
                 playBtn.text(L.Lang.translate('ultradox_watch'));
                 var self = this;
                 playBtn.on('hover:enter', function () { self.showReleases(); });
+                // Lampa's Element.prototype.find returns a single node
+                // (querySelector), not a collection: use it directly, guard null.
                 var poster = html.find('.udxf__poster');
-                if (item.poster) {
-                    poster[0].src = item.poster;
-                    poster[0].onerror = function () { this.src = './img/img_broken.svg'; };
-                } else {
+                if (item.poster && poster) {
+                    poster.src = item.poster;
+                    poster.onerror = function () { this.src = './img/img_broken.svg'; };
+                } else if (poster) {
                     poster.remove();
                 }
                 L.Layer.update(html);
@@ -1002,8 +1004,8 @@
             var d = detail || {};
 
             var bg = html.find('.udxf__backdrop');
-            if (d.backdrop) {
-                bg[0].style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
+            if (d.backdrop && bg) {
+                bg.style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
                 bg.addClass('udxf__backdrop--on');
             }
 
