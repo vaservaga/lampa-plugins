@@ -32,6 +32,7 @@
     ];
 
     var PAGE = 20;
+    var MAX_PAGE = 30;
     var goodBase = null;
 
     var ICON_MENU = '<svg width="38" height="31" viewBox="0 0 38 31" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8-4-1-7-4-7-9V3h6v9c0 4 3 6 7 6s7-2 7-6V3z" fill="currentColor"/><path d="M22 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8V3z" fill="currentColor" opacity="0.55"/></svg>';
@@ -47,7 +48,7 @@
 
     var STYLE_HTML = '<style id="ultradox-style">' +
         '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
-        '.udx-backdrop{position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.93),rgba(6,28,41,.60)),#061c29 center/cover no-repeat;opacity:0;transition:opacity .25s ease,background-image .25s ease;}' +
+        '.udx-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.93),rgba(6,28,41,.60)),#061c29 center/cover no-repeat;opacity:0;transition:opacity .25s ease;}' +
         '.udx-content__head{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;padding:14px 20px;background:linear-gradient(rgba(0,0,0,.55),transparent);}' +
         '.udx-content__cats{display:flex;align-items:center;}' +
         '.udx-cat{flex-shrink:0;}' +
@@ -161,17 +162,18 @@
         launch();
     }
 
-    function loadList(path, ok, err) {
+    function loadList(path, pageNo, ok, err) {
         var order = MIRRORS.slice();
         if (goodBase && order.indexOf(goodBase) !== -1) {
             order.splice(order.indexOf(goodBase), 1);
             order.unshift(goodBase);
         }
+        var rel = pageNo > 1 ? path + 'page/' + pageNo + '/' : path;
         var i = 0;
         (function next() {
             if (i >= order.length) { if (err) err(); return; }
             var base = order[i++];
-            fetchText(base + path, function (html) {
+            fetchText(base + rel, function (html) {
                 var items = parse(html, base);
                 if (items.length) {
                     goodBase = base;
@@ -214,6 +216,35 @@
     function parse(html, base) {
         var out = [];
         if (!html) return out;
+
+        // Category pages are a paginated card grid ("top__slider_div__item"). Cards are
+        // the browsable catalog and carry posters, so they are the primary source.
+        // The legacy "<tr> + magnet" table on these pages is a separate "latest
+        // releases" widget, so it is used only as a fallback for sources without cards.
+        var cards = /<div\s+class="top__slider_div__item"[^>]*>\s*<a\s+href="([^"]+)"[^>]*>\s*<img\s+src="([^"]+)"[^>]*>\s*<\/a>\s*<span>([\s\S]*?)<\/span>[\s\S]*?<span\s+class="short-quality">([\s\S]*?)<\/span>[\s\S]*?<\/div>\s*<\/div>/g;
+        var cm;
+        while ((cm = cards.exec(html))) {
+            var cardTitle = strip(cm[3]);
+            if (!cardTitle) continue;
+            var cardType = strip(cm[4]);
+            var cardHref = decode(cm[1]);
+            out.push({
+                title: cardTitle,
+                year: (cardTitle.match(/\b(19|20)\d{2}\b/) || [])[0] || '',
+                type: cardType,
+                serial: /\/serial\//i.test(cardHref) || /сериал/i.test(cardTitle + ' ' + cardType),
+                size: '',
+                magnet: '',
+                fileUrl: '',
+                itemUrl: base + cardHref,
+                playUrl: '',
+                imdb: '',
+                kp: ''
+            });
+        }
+        if (out.length) return out;
+
+        // Fallback: legacy table rows with embedded magnets (no detail fetch needed).
         var rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) || [];
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
@@ -253,31 +284,6 @@
                 playUrl: tplay ? tplay[1] : '',
                 imdb: timdb ? timdb[1] : '',
                 kp: tkp ? tkp[1] : ''
-            });
-        }
-        if (out.length) return out;
-
-        // Current UltraDox category pages use card blocks, not legacy table rows.
-        // Detail pages still provide magnets through fetchRealMagnets().
-        var cards = /<div\s+class="top__slider_div__item"[^>]*>\s*<a\s+href="([^"]+)"[^>]*>\s*<img\s+src="([^"]+)"[^>]*>\s*<\/a>\s*<span>([\s\S]*?)<\/span>[\s\S]*?<span\s+class="short-quality">([\s\S]*?)<\/span>[\s\S]*?<\/div>\s*<\/div>/g;
-        var cm;
-        while ((cm = cards.exec(html))) {
-            var cardTitle = strip(cm[3]);
-            if (!cardTitle) continue;
-            var cardType = strip(cm[4]);
-            var cardHref = decode(cm[1]);
-            out.push({
-                title: cardTitle,
-                year: (cardTitle.match(/\b(19|20)\d{2}\b/) || [])[0] || '',
-                type: cardType,
-                serial: /\/serial\//i.test(cardHref) || /сериал/i.test(cardTitle + ' ' + cardType),
-                size: '',
-                magnet: '',
-                fileUrl: '',
-                itemUrl: base + cardHref,
-                playUrl: '',
-                imdb: '',
-                kp: ''
             });
         }
         return out;
@@ -342,7 +348,8 @@
 
     function Component(object) {
         var L = window.Lampa;
-        var items = [], page = 0, catId = null;
+        var items = [], rendered = 0, catId = null, catPath = null;
+        var seen = {}, serverPage = 1, fetching = false, consecutiveEmpty = 0;
         var last = null, scroll = null, grid = null, built = false, catBtns = [], loadToken = 0;
         var html = document.createElement('div');
 
@@ -359,19 +366,15 @@
         this.load = function (categoryId) {
             var c = catBy(categoryId);
             catId = c.id;
-            var token = ++loadToken;
-            var self = this;
-            loadList(c.path, function (data) {
-                filterRussianProductions(data, function (filtered) {
-                    if (token !== loadToken) return;
-                    items = filtered;
-                    self.build();
-                });
-            }, function () {
-                if (token !== loadToken) return;
-                items = [];
-                self.build();
-            });
+            catPath = c.path;
+            ++loadToken;
+            items = [];
+            rendered = 0;
+            seen = {};
+            serverPage = 1;
+            fetching = false;
+            consecutiveEmpty = 0;
+            this.build();
         };
 
         this.build = function () {
@@ -382,12 +385,15 @@
                 html.append($(CONTENT_HTML));
 
                 scroll = new Lampa.Scroll({ mask: true, over: true });
-                scroll.onEnd = (function () { this.next(); }).bind(this);
+                scroll.onEnd = (function () { this.loadMore(); }).bind(this);
 
                 grid = document.createElement('div');
                 grid.addClass('category-full');
                 scroll.append(grid);
                 html.find('.udx-content__list').append(scroll.render(true));
+
+                // Bound the scroll viewport so focus can scroll the grid (record pattern).
+                scroll.minus(html.find('.udx-content__head'));
 
                 this.buildCats();
                 L.Layer.update(html);
@@ -423,37 +429,88 @@
 
         this.selectCat = function (c) {
             if (c.id == catId) return;
-            items = [];
             if (this.activity) this.activity.loader(true);
             this.load(c.id);
         };
 
         this.display = function () {
-            page = 0;
             last = null;
+            rendered = 0;
             if (grid) grid.empty();
             if (scroll) scroll.reset();
-
-            if (!items.length) {
-                var em = document.createElement('div');
-                em.addClass('udx-empty');
-                em.text(L.Lang.translate('ultradox_empty'));
-                grid.append(em);
-            } else {
-                this.next();
-            }
+            var backdrop = html.find('.udx-backdrop');
+            if (backdrop && backdrop.length && typeof backdrop.css === 'function') backdrop.css('opacity', '0');
 
             if (this.activity) this.activity.toggle();
+            this.fill();
         };
 
-        this.next = function () {
-            var start = page * PAGE;
-            if (start >= items.length) return;
-            var slice = items.slice(start, start + PAGE);
+        // Append every loaded-but-not-yet-shown item, then top up with more server
+        // pages until the first screen is filled. Scrolling further (scroll.onEnd)
+        // keeps loading page by page.
+        this.fill = function () {
             var self = this;
-            slice.forEach(function (item) { self.appendCard(item); });
-            page++;
+            while (rendered < items.length) self.appendCard(items[rendered++]);
             if (scroll) L.Layer.visible(scroll.render(true));
+            if (items.length < PAGE) self.loadMore();
+        };
+
+        // Fetch one more server page, dedup by itemUrl, apply the country filter and
+        // append the new items. Guards: single in-flight fetch, hard page cap, and a
+        // stop after two consecutive pages that add nothing new.
+        this.loadMore = function () {
+            if (fetching) return;
+            if (serverPage > MAX_PAGE || consecutiveEmpty >= 2) {
+                if (!items.length) this.showEmpty();
+                return;
+            }
+            var self = this, token = loadToken, pg = serverPage;
+            fetching = true;
+            if (this.activity) this.activity.loader(true);
+            loadList(catPath, pg, function (raw) {
+                if (token !== loadToken) { fetching = false; return; }
+                serverPage = pg + 1;
+                var fresh = [];
+                for (var i = 0; i < raw.length; i++) {
+                    var it = raw[i];
+                    if (it.itemUrl && seen[it.itemUrl]) continue;
+                    if (it.itemUrl) seen[it.itemUrl] = true;
+                    fresh.push(it);
+                }
+                if (!fresh.length) {
+                    fetching = false;
+                    if (self.activity) self.activity.loader(false);
+                    consecutiveEmpty++;
+                    if (!items.length && (serverPage > MAX_PAGE || consecutiveEmpty >= 2)) self.showEmpty();
+                    else self.fill();
+                    return;
+                }
+                filterRussianProductions(fresh, function (kept) {
+                    if (token !== loadToken) { fetching = false; return; }
+                    fetching = false;
+                    if (self.activity) self.activity.loader(false);
+                    if (kept.length) { consecutiveEmpty = 0; for (var k = 0; k < kept.length; k++) items.push(kept[k]); }
+                    else consecutiveEmpty++;
+                    if (!items.length && (serverPage > MAX_PAGE || consecutiveEmpty >= 2)) self.showEmpty();
+                    else self.fill();
+                });
+            }, function () {
+                if (token !== loadToken) { fetching = false; return; }
+                serverPage = pg + 1;
+                fetching = false;
+                if (self.activity) self.activity.loader(false);
+                consecutiveEmpty++;
+                if (!items.length && (serverPage > MAX_PAGE || consecutiveEmpty >= 2)) self.showEmpty();
+                else self.fill();
+            });
+        };
+
+        this.showEmpty = function () {
+            if (!grid) return;
+            var em = document.createElement('div');
+            em.addClass('udx-empty');
+            em.text(L.Lang.translate('ultradox_empty'));
+            grid.append(em);
         };
 
         this.appendCard = function (item) {
@@ -501,7 +558,7 @@
 
             card.on('hover:focus', function () {
                 last = card;
-                if (scroll) scroll.update(card, true);
+                if (scroll) scroll.update(card);
                 if (item.poster) {
                     var backdrop = html.find('.udx-backdrop');
                     if (backdrop && backdrop.length && typeof backdrop.css === 'function') {
