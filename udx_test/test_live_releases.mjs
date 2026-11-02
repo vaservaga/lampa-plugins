@@ -1,12 +1,25 @@
 // udx_test/test_live_releases.mjs
 //
-// LIVE check of the Ultradox online release data-flow against the real
-// Ultradox pages (no fixtures, no simulation). The plugin source is executed
-// with a mocked Lampa environment whose L.Reguest performs REAL https
-// requests, so the tested path is exactly:
-//   detail fetch -> parseDetail -> parseMagnets -> release list -> "Дивитися"
-//   -> L.Select list (label/size/magnet as data) -> select closes the list,
-//   shows "Реліз вибрано" and never starts a torrent.
+// LIVE check of the Ultradox online data-flow against the real Ultradox
+// pages (no fixtures, no simulation). The plugin source is executed with a
+// mocked Lampa environment whose L.Reguest performs REAL https requests.
+//
+// Part 1 - live card-list check: the catalog component loads the real
+// /serial/ and /hd/ list pages; the card model comes ONLY from that list
+// HTML (the per-item country detail fetch is stubbed to its fail-safe, i.e.
+// zero detail HTTP requests on the wire - the year is never sourced from a
+// detail page). Per card it verifies: exactly one type badge ("Серіал" /
+// "Фільм") inside the poster container, no "Фільм" text on a serial card,
+// quality chip single-token, poster pinned, focus/enter handlers intact, and
+// the year contract: the model year equals what the list title really
+// carries - shown exactly once when present, .card__age removed entirely
+// when absent (no fabricated year).
+//
+// Part 2 - detail/release flow (unchanged contract):
+//   detail fetch -> parseDetail -> parseMagnets -> release list -> action strip
+//   (quality selector + "Торенти", both open the same selector) -> L.Select
+//   list (label/size/magnet as data) -> select closes the list, shows
+//   "Реліз вибрано", updates the quality label and never starts a torrent.
 //
 // Control pages (verified live before wiring them in):
 //   serial: /serial-hd/56755-zhivoj-2-sezon.html      (Vivant S02, 3 magnets)
@@ -42,14 +55,22 @@ const TOKENS = [
     ['playRelease', /playRelease/],
     ['chooseFile', /chooseFile/],
     ['run (call)', /\brun\s*\(/],
-    ['hover:long', /hover:long/]
+    ['hover:long', /hover:long/],
+    ['window.Lampa.TMDB', /window\.Lampa\.TMDB/],
+    ['L.TMDB', /L\.TMDB/],
+    ['Tmdb.', /Tmdb\./],
+    ['tmdbKey', /tmdbKey/],
+    ['tmdbGet', /tmdbGet/],
+    ['api.themoviedb.org', /api\.themoviedb\.org/],
+    ['api_key=', /api_key=/]
 ];
 for (const [name, re] of TOKENS) {
     const hits = src.split('\n').filter((l) => re.test(l));
     check('static: ' + name + ' absent from source', hits.length === 0, JSON.stringify(hits));
 }
 
-// ---------- minimal DOM (same shape as test_fullpage.mjs) ----------
+// ---------- minimal DOM (same contract as test_fullpage.mjs and the real
+// Lampa core: Element.prototype.find returns a SINGLE node or null) ----------
 function makeEl(tag) {
     const el = {
         tagName: String(tag).toUpperCase(),
@@ -85,16 +106,19 @@ function makeEl(tag) {
         removeClass(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.delete(x)); return el; },
         on(ev, fn) { (el.handlers[ev] || (el.handlers[ev] = [])).push(fn); return el; },
         css(o) { Object.assign(el.style, o); return el; },
+        // Lampa Element.prototype.find == querySelector: first matching
+        // descendant in document order, or null.
         find(sel) {
             const cls = String(sel).replace(/^\./, '');
-            const out = [];
+            let hit = null;
             (function walk(node) {
+                if (hit) return;
                 for (const c of node.children || []) {
-                    if (c && c.classes && c.classes.has(cls)) out.push(c);
-                    if (c && c.children) walk(c);
+                    if (!hit && c && c.classes && c.classes.has(cls)) hit = c;
+                    if (!hit && c && c.children) walk(c);
                 }
             })(el);
-            return asQuery(out);
+            return hit;
         }
     };
     return el;
@@ -140,8 +164,38 @@ function parseHtml(html) {
     return root.children;
 }
 
+// All matches in a subtree (assertion helper; mirrors test_fullpage.mjs).
+function findAll(node, cls) {
+    const out = [];
+    (function walk(n) {
+        for (const c of n.children || []) {
+            if (c && c.classes && c.classes.has(cls)) out.push(c);
+            if (c && c.children) walk(c);
+        }
+    })(node);
+    return out;
+}
+
+// Full subtree text (assertion helper).
+function allText(node) {
+    let out = node._text || '';
+    for (const c of node.children || []) out += ' ' + allText(c);
+    return out;
+}
+
+// The badge must be a direct child of the poster container (.card__view).
+function inPoster(card, cls) {
+    const e = findAll(card, cls)[0];
+    const v = findAll(card, 'card__view')[0];
+    return !!(e && v && e._parent === v);
+}
+
+// Null-safe text of a single-node find result.
+const txt = (n, sel) => { const e = n.find(sel); return e ? e.text() : ''; };
+
 // ---------- real https fetch (what Lampa.Reguest does server-side) ----------
 const fetchErrors = [];
+const fetchedUrls = [];
 function realFetch(url, timeoutMs) {
     return new Promise((resolve, reject) => {
         let settled = false;
@@ -168,6 +222,14 @@ function realFetch(url, timeoutMs) {
     });
 }
 
+// Card-list phase switch: while true, anything that is not a list page
+// (detail pages) fails instantly through the plugin's fail-safe path, so the
+// list check makes ZERO detail HTTP requests (the year must come from the
+// list data, never from a per-card detail fetch).
+let stubDetailPages = false;
+let stubbedDetailCount = 0;
+const LIST_URL_RE = /^https:\/\/(045\.ultradox\.click|010\.ultadox\.space)\/(serial|hd|webrips)(\/page\/\d+)?\/$/;
+
 // ---------- Lampa mock ----------
 const L = {
     Lang: {
@@ -188,7 +250,24 @@ const L = {
         update() {}
         destroy() {}
     },
-    Template: { js() { return makeEl('card'); } },
+    // Mirror the real Template.js contract: a raw card element with the
+    // title/age/view children and {title}/{release_year} substitution
+    // (empty value leaves the element present with empty text).
+    Template: { calls: [], js(name, params) {
+        const c = makeEl('card');
+        ['card__title', 'card__age', 'card__view'].forEach((cls) => {
+            const ch = makeEl('div'); ch.classes.add(cls); ch._setParent(c); c.children.push(ch);
+        });
+        const img = makeEl('img'); img.classes.add('card__img'); img._setParent(c); c.children.push(img);
+        if (params) {
+            const t = c.children.find((x) => x.classes.has('card__title'));
+            const a = c.children.find((x) => x.classes.has('card__age'));
+            if (t) t.text(params.title !== undefined && params.title !== null ? String(params.title) : '');
+            if (a) a.text(params.release_year !== undefined && params.release_year !== null ? String(params.release_year) : '');
+        }
+        this.calls.push(c);
+        return c;
+    } },
     Activity: { push() {}, active() { return null; }, backward() {}, toggle() {}, loader() {} },
     Controller: {
         toggles: {},
@@ -206,18 +285,23 @@ const L = {
         get(k, d) { const v = this._s[k]; return v === undefined ? d : v; },
         set(k, v) { this._s[k] = String(v); }
     },
-    // No TMDB key in this harness: ratings stay hidden, the release flow
-    // under test does not depend on TMDB.
-    TMDB: {
-        key() { return ''; },
-        api(u) { return 'https://api.themoviedb.org/3/' + u; }
-    },
+    // Guard: any access to the core metadata object throws AND is counted;
+    // the test passes only while the counter stays at zero.
+    TMDB: { touches: 0, key() { this.touches++; throw new Error('core metadata key access is forbidden in this stage'); }, api(u) { this.touches++; throw new Error('core metadata api access is forbidden in this stage'); } },
     // Guard: any call to Torrent.start throws AND is counted; the test passes
     // only while the counter stays at zero.
     Torrent: { calls: 0, start() { this.calls++; throw new Error('L.Torrent.start is forbidden in this stage'); } },
     Reguest: class {
         timeout() {}
         native(url, ok, err) {
+            fetchedUrls.push(url);
+            if (stubDetailPages && !LIST_URL_RE.test(url)) {
+                // Card-list phase: the per-item country detail fetch takes its
+                // fail-safe path (item kept). No detail HTTP request is made.
+                stubbedDetailCount++;
+                err(new Error('stubbed: no per-card detail fetch in the card-list phase'));
+                return;
+            }
             realFetch(url, 25000).then(
                 (txt) => ok(txt),
                 (e) => { fetchErrors.push({ url: url, error: e.message }); err(e); }
@@ -262,7 +346,97 @@ async function waitForBuild(loaderState, timeoutMs) {
     return false;
 }
 
+// Live card-list check: real list page -> plugin parse() -> card model ->
+// rendered card DOM. The country detail fetch per item is stubbed to its
+// fail-safe (zero detail requests), so every asserted value is sourced from
+// the list HTML alone.
+async function runLiveList(label, category, expectedKind) {
+    console.log('live list: ' + label + ' (category ' + category + ')');
+    const CompCtor = L.Component.get('ultradox');
+    const comp = new CompCtor({ category: category });
+    comp.activity = { loader() {}, toggle() {} };
+    const pairs = [];
+    const origAppend = comp.appendCard.bind(comp);
+    comp.appendCard = (item) => {
+        origAppend(item);
+        pairs.push({ item: item, card: L.Template.calls[L.Template.calls.length - 1] });
+    };
+    const fetchErrorsBefore = fetchErrors.length;
+    stubDetailPages = true;
+    comp.create();
+    const t0 = Date.now();
+    let last = 0;
+    let stableSince = 0;
+    while (Date.now() - t0 < 60000) {
+        await sleep(150);
+        const n = pairs.length;
+        if (n > 0 && n !== last) { last = n; stableSince = Date.now(); }
+        if (n > 0 && n === last && Date.now() - stableSince > 1200) break;
+        if (n >= 60) break;
+    }
+    stubDetailPages = false;
+    if (pairs.length === 0) {
+        const failed = fetchErrors.slice(fetchErrorsBefore);
+        const why = failed.length ? failed[failed.length - 1].url + ' -> ' + failed[failed.length - 1].error : 'no cards rendered within 60s';
+        console.log('NOT RUN: ' + label + ' live list check (' + why + ')');
+        process.exitCode = 2;
+        return;
+    }
+
+    const badBadge = [], badInside = [], badYearModel = [], badYearDom = [], badAgeAbsent = [], badChip = [], badPoster = [], badNav = [], badFilmText = [];
+    let withYear = 0;
+    for (let i = 0; i < pairs.length; i++) {
+        const { item, card } = pairs[i];
+        const kinds = findAll(card, 'udx-kind');
+        if (kinds.length !== 1) badBadge.push(i);
+        else if (kinds[0].text() !== expectedKind) badBadge.push(i + ':' + kinds[0].text());
+        if (!inPoster(card, 'udx-kind')) badInside.push(i);
+        // The only place the plugin gets a list year: the 4-digit year inside
+        // the list title itself. The model must mirror exactly that.
+        const yearFromList = (item.title.match(/\b(19|20)\d{2}\b/) || [])[0] || '';
+        if (item.year !== yearFromList) badYearModel.push(i + ':' + item.title);
+        const age = findAll(card, 'card__age');
+        if (yearFromList) {
+            withYear++;
+            const title = findAll(card, 'card__title')[0];
+            const t = (title ? title.text() : '') + ' ' + (age.length === 1 ? age[0].text() : '');
+            const hits = t.match(/\b(19|20)\d{2}\b/g) || [];
+            if (hits.length !== 1 || age.length !== 1 || age[0].text() !== yearFromList) badYearDom.push(i + ':' + item.title);
+        } else if (age.length !== 0) {
+            badAgeAbsent.push(i + ':' + item.title);
+        }
+        const chips = findAll(card, 'udx-chip');
+        if (chips.length > 1) badChip.push(i);
+        else if (chips.length === 1) {
+            const q = findAll(card, 'udx-chip__quality');
+            if (q.length !== 1 || !/^[A-Z0-9-]+$/.test(q[0].text())) badChip.push(i + ':' + (q[0] ? q[0].text() : ''));
+        }
+        const img = findAll(card, 'card__img')[0];
+        if (!img) badPoster.push(i);
+        else if (item.poster && img.src !== item.poster) badPoster.push(i + ':' + img.src);
+        if (!card.handlers['hover:enter'] || !card.handlers['hover:focus']) badNav.push(i);
+        if (expectedKind === 'Серіал' && /Фільм/.test(allText(card))) badFilmText.push(i);
+    }
+
+    check(label + ': every card has exactly one "' + expectedKind + '" badge', badBadge.length === 0, badBadge.join(','));
+    check(label + ': badge sits inside the poster container (.card__view)', badInside.length === 0, badInside.join(','));
+    check(label + ': card model year mirrors the list title data exactly', badYearModel.length === 0, badYearModel.join(','));
+    check(label + ': year shown exactly once when the list data carries it', badYearDom.length === 0, badYearDom.join(','));
+    check(label + ': .card__age absent when the list data has no year (no fabricated year)', badAgeAbsent.length === 0, badAgeAbsent.join(','));
+    check(label + ': quality chip is a single token (or absent)', badChip.length === 0, badChip.join(','));
+    check(label + ': poster pinned to the verified public origin', badPoster.length === 0, badPoster.join(','));
+    check(label + ': focus/enter handlers intact on every card', badNav.length === 0, badNav.join(','));
+    if (expectedKind === 'Серіал') {
+        check('serial-list: no card carries "Фільм" text', badFilmText.length === 0, badFilmText.join(','));
+    }
+    console.log('  data: cards=' + pairs.length + ' withYear=' + withYear + ' withoutYear=' + (pairs.length - withYear) + ' stubbedDetailFetches=' + stubbedDetailCount);
+    console.log('  sample: ' + pairs.slice(0, 3).map((p) => JSON.stringify({ title: p.item.title, year: p.item.year, serial: !!p.item.serial, quality: p.item.type })).join(' | '));
+}
+
 async function main() {
+    await runLiveList('serial-list', 'serial', 'Серіал');
+    await runLiveList('movie-list', 'hd', 'Фільм');
+
     for (const ctrl of CONTROLS) {
         console.log('live: ' + ctrl.kind + ' ' + ctrl.item.itemUrl);
         const fp = new FP({ item: ctrl.item });
@@ -287,14 +461,18 @@ async function main() {
             continue;
         }
 
-        // "Дивитися": press the real play button (hover:enter), not showReleases()
+        // Action strip: press the real "Торенти" control (hover:enter), not showReleases()
         const root = fp.render();
-        const playBtns = root.find('.udx-f__play');
-        check(ctrl.kind + ': play button ("Дивитися") present', playBtns.length === 1, String(playBtns.length));
-        const btn = playBtns[0];
-        check(ctrl.kind + ': play button label', btn && btn.text() === L.Lang.translate('ultradox_watch'), btn && btn.text());
+        const qBtns = root.find('.udxf__act--quality');
+        const tBtns = root.find('.udxf__act--torrents');
+        check(ctrl.kind + ': old single "Дивитися" button gone', root.find('.udx-f__play') === null && findAll(root, 'udx-f__play').length === 0, String(findAll(root, 'udx-f__play').length));
+        check(ctrl.kind + ': exactly one quality selector in the strip', findAll(root, 'udxf__act--quality').length === 1, String(findAll(root, 'udxf__act--quality').length));
+        check(ctrl.kind + ': exactly one "Торенти" button in the strip', findAll(root, 'udxf__act--torrents').length === 1, String(findAll(root, 'udxf__act--torrents').length));
+        const btn = tBtns;
+        check(ctrl.kind + ': "Торенти" button label', btn !== null && txt(btn, '.udxf__act__label') === L.Lang.translate('ultradox_torrents'), btn ? txt(btn, '.udxf__act__label') : 'no button');
+        check(ctrl.kind + ': quality selector starts with the placeholder label', qBtns !== null && txt(qBtns, '.udxf__act__label') === L.Lang.translate('ultradox_quality_pick'), qBtns ? txt(qBtns, '.udxf__act__label') : 'no button');
         if (!btn || !btn.handlers['hover:enter']) {
-            console.log('NOT RUN: ' + ctrl.kind + ' play button handler missing');
+            console.log('NOT RUN: ' + ctrl.kind + ' action-strip handler missing');
             process.exitCode = 2;
             continue;
         }
@@ -331,8 +509,12 @@ async function main() {
         check(ctrl.kind + ': selection closes the list (content toggle)', (L.Controller.toggles.content || 0) === togglesBefore + 1);
         check(ctrl.kind + ': selection shows "Реліз вибрано"', L.Noty.msgs.slice(notiesBeforeSel).pop() === L.Lang.translate('ultradox_release_selected'), JSON.stringify(L.Noty.msgs.slice(notiesBeforeSel)));
         check(ctrl.kind + ': selection did not start a torrent', L.Torrent.calls === 0, String(L.Torrent.calls));
+        const qLab = qBtns ? txt(qBtns, '.udxf__act__label') : '';
+        check(ctrl.kind + ': selected quality rendered on the left button (real value, not the placeholder)', typeof qLab === 'string' && qLab.length > 0 && qLab !== L.Lang.translate('ultradox_quality_pick'), JSON.stringify(qLab));
     }
 
+    check('metadata: the core metadata object was never touched', L.TMDB.touches === 0, String(L.TMDB.touches));
+    check('metadata: every request went to the verified public mirrors (no external metadata service)', fetchedUrls.every((u) => /^https:\/\/(045\.ultradox\.click|010\.ultadox\.space)\//.test(u)), JSON.stringify(fetchedUrls.slice(0, 8)));
     check('torrent: L.Torrent.start counter is zero after all live pages', L.Torrent.calls === 0, String(L.Torrent.calls));
     if (process.exitCode === 2) {
         console.log('NOT RUN: live pages were not fully verifiable (see reasons above)');
