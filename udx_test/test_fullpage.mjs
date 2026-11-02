@@ -442,6 +442,7 @@ check('fullpage(film): top line', fm.find('.udxf__top').text() === 'Франці
 check('fullpage(film): overview', fm.find('.udxf__overview').text() === 'Епічна історія космічної одесьи.');
 check('fullpage(film): no poster -> element removed (no undefined src)', findAll(fm, 'udxf__poster').length === 0, String(findAll(fm, 'udxf__poster').length));
 check('fullpage(film): TMDB rating line', findAll(fm, 'udxf__rating').length === 1 && fm.find('.udxf__rating').text() === 'TMDB 7.9 • PG-13 • Released', txt(fm, '.udxf__rating'));
+check('fullpage(film): valid backdrop set exactly once (no duplicate node)', findAll(fm, 'udxf__backdrop').length === 1 && fm.find('.udxf__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/movie-fanart.jpg")' && fm.find('.udxf__backdrop').classes.has('udxf__backdrop--on'), fm.find('.udxf__backdrop') ? fm.find('.udxf__backdrop').style.backgroundImage : 'no backdrop element');
 
 film.showReleases();
 sel = L.Select.last;
@@ -480,6 +481,40 @@ check('fullpage(no backdrop): no undefined/broken image left', (function () {
 })());
 check('fullpage(no backdrop): detail still shows title and meta', nf.find('.udxf__title').text() === 'No Fanart' && nf.find('.udxf__line').text() === 'Трилер', txt(nf, '.udxf__line'));
 check('fullpage(no backdrop): no torrent started', L.Torrent.calls === 0);
+
+// ---------- FullPage: confirmed pixhost "Picture removed" placeholder (real Shield case) ----------
+// The live detail page of "Любитель акул встречает девушку" carries this og:image;
+// the host answers 302 -> https://pixhost.cc/image/removed.png ("Picture removed"),
+// which the old URL-only check accepted and stretched over the whole screen.
+console.log('fullpage: pixhost removed-image placeholder rejected');
+const SHARK_URL = 'https://045.ultradox.click/nerufilm/58717-ljubitel-akul-vstrechaet-devushku-2025.html';
+ROUTES.set(SHARK_URL,
+    '<html><head>' +
+    '<meta name="description" content="Детектив про любителля акул.">' +
+    '<meta property="og:image" content="https://t3.pixhost.cc/6852/796602997_shark-boy-meets-girl-2025-pk-web-dlrip-avi_20261101_110746-311.jpg">' +
+    '</head><body><ul>' +
+    '<li><span>Жанр:</span> Детектив</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 2025</li>' +
+    '</ul>' +
+    '<a href="magnet:?xt=urn:btih:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef&amp;dn=Shark.Boy.Meets.Girl.2025.WEB-DLRip.mkv&amp;xl=7340032000"></a>' +
+    '</body></html>');
+const shark = new FP({ item: { title: 'Любитель акул встречает девушку (2025)', serial: false, itemUrl: SHARK_URL, poster: 'https://045.ultradox.click/upload/c.jpg' } });
+shark.activity = { loader() {}, toggle() {} };
+let sharkErr = null;
+try { shark.create(); } catch (e) { sharkErr = e; }
+const sp = shark.render();
+check('fullpage(pixhost): build() did not throw', sharkErr === null, sharkErr && sharkErr.constructor.name + ': ' + sharkErr.message);
+check('fullpage(pixhost): placeholder URL not applied to .udxf__backdrop', sp.find('.udxf__backdrop') !== null && sp.find('.udxf__backdrop').style.backgroundImage === undefined, sp.find('.udxf__backdrop') ? String(sp.find('.udxf__backdrop').style.backgroundImage) : 'no backdrop element');
+check('fullpage(pixhost): backdrop stays off (neutral gradient fallback)', !sp.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
+check('fullpage(pixhost): exactly one backdrop element (no second node)', findAll(sp, 'udxf__backdrop').length === 1, String(findAll(sp, 'udxf__backdrop').length));
+check('fullpage(pixhost): poster kept', sp.find('.udxf__poster') && sp.find('.udxf__poster').src === 'https://045.ultradox.click/upload/c.jpg', sp.find('.udxf__poster') ? sp.find('.udxf__poster').src : 'no poster element');
+check('fullpage(pixhost): title kept', txt(sp, '.udxf__title') === 'Любитель акул встречает девушку', txt(sp, '.udxf__title'));
+check('fullpage(pixhost): overview kept', txt(sp, '.udxf__overview') === 'Детектив про любителля акул.', txt(sp, '.udxf__overview'));
+check('fullpage(pixhost): watch button kept', sp.find('.udx-f__play') !== null && sp.find('.udx-f__play').text() === 'Дивитися', txt(sp, '.udx-f__play'));
+shark.showReleases();
+sel = L.Select.last;
+check('fullpage(pixhost): release listed without execution', sel && sel.items.length === 1 && /^magnet:\?xt=urn:btih:deadbeef/.test(sel.items[0].id.magnet) && L.Torrent.calls === 0, sel && JSON.stringify(sel.items.map((i) => i.title)));
 
 // ---------- empty detail: no releases -> noty, selector untouched ----------
 console.log('fullpage: empty detail');

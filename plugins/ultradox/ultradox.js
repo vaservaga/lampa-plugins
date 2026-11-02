@@ -230,10 +230,16 @@
 
     // The og:image of a release page is usually the wide fanart, but for some
     // titles it is a rating badge (Kinopoisk/IMDB gif). Only accept a real photo.
+    // This source's og:image uploads sit on the pixhost.cc CDN and resolve to
+    // its "Picture removed" placeholder (302 -> pixhost.cc/image/removed.png),
+    // so that host family is rejected for the full-screen backdrop; posters are
+    // unaffected (they stay pinned to POSTER_ORIGIN).
     function validBackdrop(url) {
         if (!url || !/^https?:/i.test(url)) return '';
         if (/\/rating\/|imdb\/pic|kinopoisk\.ru/i.test(url)) return '';
         if (!/\.(jpe?g|png|webp)(\?|$)/i.test(url)) return '';
+        var host = url.match(/^https?:\/\/([^\/?#]+)/i);
+        if (host && /(^|\.)pixhost\.cc$/i.test(host[1])) return '';
         return url;
     }
 
