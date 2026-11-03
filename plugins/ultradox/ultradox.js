@@ -145,13 +145,23 @@
         '.udx-cat{flex-shrink:0;}' +
         '.udx-cat__label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
         '.udx-cat.udx-active{background-color:#fff;color:#000;}' +
-        '.udx-content__list{position:relative;z-index:1;padding-top:80px;}' +
+        // The first row starts close under the category tabs (NUM reference
+        // leaves only a small band); the deep core 80px + 2.5em mask padding
+        // read as a large empty block above the posters.
+        '.udx-content__list{position:relative;z-index:1;padding-top:20px;}' +
+        '.udx-content .scroll--mask .scroll__content{padding-top:1em;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
+        // Row width: five equal cells filling the whole line (the core 12.75em
+        // cards leave a large empty band on the right; the NUM reference fills
+        // the row edge to edge). The core 0.5em side paddings become the gap.
+        '.udx-content .category-full .card{width:20%;flex-shrink:0;}' +
         // Poster-to-title gap: the core .card__view carries a 1em
         // margin-bottom; tighten it so the title sits close to the poster
         // (one compact scale for all three category tabs).
         '.udx-content .card__view{position:relative;overflow:hidden;margin-bottom:0.35em;}' +
-        '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:0.9em;line-height:1.2em;font-weight:600;color:#fff;}' +
+        // NUM reference title: one scale up, regular weight (the earlier 0.9em
+        // semibold read smaller and heavier than the reference grid).
+        '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.2em;font-weight:400;color:#fff;}' +
         // Year line dimmed like the NUM reference grid (white title, gray year).
         '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.8em;line-height:1.3em;color:rgba(255,255,255,.5);}' +
         // Catalog-addition date (latest release upload date, real data): shown
