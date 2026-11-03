@@ -152,10 +152,17 @@
         // (one compact scale for all three category tabs).
         '.udx-content .card__view{position:relative;overflow:hidden;margin-bottom:0.35em;}' +
         '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:0.9em;line-height:1.2em;font-weight:600;color:#fff;}' +
-        '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.8em;line-height:1.3em;color:#fff;}' +
+        // Year line dimmed like the NUM reference grid (white title, gray year).
+        '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.8em;line-height:1.3em;color:rgba(255,255,255,.5);}' +
         // Catalog-addition date (latest release upload date, real data): shown
-        // dimmed after the release year so the two dates stay distinct.
-        '.udx-content .card__age .udx-ad{color:rgba(255,255,255,.55);}' +
+        // after the release year, dimmer still, so the two dates stay distinct.
+        '.udx-content .card__age .udx-ad{color:rgba(255,255,255,.45);}' +
+        // NUM reference focus: one green ring around the WHOLE card (the core
+        // white ring hugs the poster only). The card-level green ring replaces
+        // it; the core poster rings are suppressed to avoid a double frame.
+        '.udx-content .card.focus::after{content:"";position:absolute;top:-0.5em;left:-0.5em;right:-0.5em;bottom:-0.5em;border:0.3em solid #57F570;border-radius:1.4em;z-index:-1;pointer-events:none;}' +
+        '.udx-content .card.hover::after{content:"";position:absolute;top:-0.5em;left:-0.5em;right:-0.5em;bottom:-0.5em;border:0.3em solid rgba(87,245,112,.5);border-radius:1.4em;z-index:-1;pointer-events:none;}' +
+        '.udx-content .card.focus .card__view::after,.udx-content .card.hover .card__view::after{border:none;}' +
         // Glass top panel on Ultradox screens only (the .udx-glass class is
         // toggled on the core .head by the activity listener): a dark
         // translucent surface + soft backdrop blur; on WebViews without
