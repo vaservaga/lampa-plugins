@@ -7,7 +7,13 @@
  * UI (Phase 5, NUM parity): core card grid (.category-full + Template 'card')
  * with the type badge top-left, quality badge bottom-left and the year under
  * the title; category buttons in the head (simple-button); full detail page
- * (validated backdrop, poster left, meta, overview) with exactly two actions:
+ * in the NUM reference layout 1:1 (validated backdrop, large poster on the
+ * left, meta block: country • year, large title, original title, rating
+ * badge, runtime • genre line, seasons, exactly two action pills - left
+ * "Онлайн" primary gradient, right "TorrServer" dark glass; below them a
+ * full-width "Детально" details strip with the complete overview, director
+ * and the full cast - no text truncation - inside a scroll viewport) with
+ * exactly two actions:
  *   left  "Онлайн"    -> ultradox_torrents: the item's real releases
  *                        (NUM-style: the item's info card on the left, the
  *                        item's real rows on the right - quality • size
@@ -75,27 +81,39 @@
             '<div class="udx-content__list"></div>' +
         '</div>';
 
+    // NUM 1:1 detail layout: the backdrop + veil sit under a scroll viewport
+    // (.udxf__slot); the scroll content is built separately (ZONE_HTML) so the
+    // same node is never parented twice - the top zone (poster + meta block
+    // with the two action pills) and the full-width details strip below it.
     var DETAIL_HTML =
         '<div class="udxf">' +
             '<div class="udxf__backdrop" aria-hidden="true"></div>' +
             '<div class="udxf__gradient" aria-hidden="true"></div>' +
-            '<div class="udxf__body">' +
+            '<div class="udxf__slot"></div>' +
+        '</div>';
+
+    var ZONE_HTML =
+        '<div class="udxf__content">' +
+            '<div class="udxf__zone">' +
                 '<img class="udxf__poster" alt="">' +
                 '<div class="udxf__meta">' +
                     '<div class="udxf__top"></div>' +
                     '<div class="udxf__title"></div>' +
-                    '<div class="udxf__rate hide"></div>' +
                     '<div class="udxf__orig hide"></div>' +
+                    '<div class="udxf__rate hide"></div>' +
                     '<div class="udxf__line"></div>' +
                     '<div class="udxf__seasons hide"></div>' +
-                    '<div class="udxf__overview"></div>' +
-                    '<div class="udxf__fact udxf__fact--director"></div>' +
-                    '<div class="udxf__fact udxf__fact--cast"></div>' +
                     '<div class="udxf__actions">' +
                         '<div class="simple-button selector udxf__act udxf__act--online">' + ICON_ONLINE + '<span class="udxf__act__label udxf__olab"></span></div>' +
                         '<div class="simple-button selector udxf__act udxf__act--torrents">' + ICON_RELEASES + '<span class="udxf__act__label udxf__tlab"></span></div>' +
                     '</div>' +
                 '</div>' +
+            '</div>' +
+            '<div class="udxf__details">' +
+                '<div class="udxf__details-head"></div>' +
+                '<div class="udxf__overview"></div>' +
+                '<div class="udxf__fact udxf__fact--director"></div>' +
+                '<div class="udxf__fact udxf__fact--cast"></div>' +
             '</div>' +
         '</div>';
 
@@ -137,7 +155,10 @@
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxf__backdrop--on{opacity:1;}' +
-        '.udxf__backdrop--poster{opacity:1;transform:scale(1.1);filter:blur(22px) brightness(.72) saturate(.82);}' +
+        // Poster-as-backdrop fallback: the raw poster art, zoomed to cover
+        // (no blur - the artwork stays readable as NUM backdrops do), all
+        // darkening comes from the zone veil (.udxf--poster state).
+        '.udxf__backdrop--poster{opacity:1;transform:scale(1.15);filter:brightness(.55) saturate(.9);}' +
         // Valid-backdrop veil (NUM-style): dark text zone on the left, the
         // scene stays clearly visible toward the right, soft bottom fade.
         '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.82),rgba(6,28,41,.42) 46%,rgba(6,28,41,.06) 82%),linear-gradient(to top,rgba(6,28,41,.58),rgba(6,28,41,0) 46%);}' +
@@ -147,13 +168,21 @@
         // right and the top - no layer is opaque, so the image stays visible
         // as atmosphere on the right.
         '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(6,28,41,.84),rgba(6,28,41,.52) 46%,rgba(6,28,41,0) 78%),linear-gradient(to top,rgba(6,28,41,.62),rgba(6,28,41,0) 44%);}' +
-        '.udxf__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 6% 0 5%;box-sizing:border-box;}' +
-        '.udxf__poster{flex-shrink:0;width:12em;border-radius:.5em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
-        '.udxf__meta{margin-left:2.2em;min-width:0;max-width:62%;}' +
-        '.udxf__top{font-size:1.05em;color:#cdd8e4;letter-spacing:.03em;}' +
-        '.udxf__title{font-size:2.1em;font-weight:700;line-height:1.15;color:#fff;margin-top:.35em;}' +
-        '.udxf__line{font-size:1.05em;color:#9fb2c4;margin-top:.9em;}' +
-        '.udxf__overview{font-size:1.05em;line-height:1.4;color:#e7eef5;margin-top:1em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}' +
+        // NUM reference geometry (measured from the NUM detail screen): the
+        // poster is large (~22em wide at the 1080p root font), the title is a
+        // display size (3em), the meta block sits to the right of the poster,
+        // and the "Детально" strip spans the full width below both.
+        '.udxf__slot{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;}' +
+        '.udxf__content{min-height:100%;}' +
+        '.udxf__zone{display:flex;align-items:center;min-height:36em;padding:10% 6% 3% 5%;box-sizing:border-box;}' +
+        '.udxf__poster{flex-shrink:0;width:22em;border-radius:.55em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
+        '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
+        '.udxf__top{font-size:1.2em;color:#cdd8e4;letter-spacing:.03em;}' +
+        '.udxf__title{font-size:3em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
+        '.udxf__orig{font-size:1.4em;line-height:1.35;color:#dbe7f2;margin-top:.5em;}' +
+        '.udxf__line{font-size:1.1em;color:#9fb2c4;margin-top:.9em;}' +
+        // Full overview - no line clamp (the page scrolls when it is long).
+        '.udxf__overview{font-size:1.15em;line-height:1.55;color:#e7eef5;margin-top:.9em;}' +
         // Compact horizontal action strip, ~62px tall at the 1080p root font
         // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
         // columns. NUM reference design: left action = primary green-blue
@@ -167,7 +196,11 @@
         '.udxf__act--torrents{background:rgba(9,29,43,.62);border:1px solid rgba(255,255,255,.24);color:#dbe7f2;}' +
         '.udxf__act--torrents.focus{transform:translateY(-.1em);box-shadow:0 .3em .8em rgba(0,0,0,.38),0 0 0 .22em rgba(255,255,255,.16);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
-        '.udxf__fact{font-size:1.05em;line-height:1.45;color:#9fb2c4;margin-top:.8em;}' +
+        // Full-width details strip under the top zone: heading, the complete
+        // overview, director and the full cast (wrapped, never truncated).
+        '.udxf__details{padding:0 6% 6% 5%;}' +
+        '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:1.2em;}' +
+        '.udxf__fact{font-size:1.1em;line-height:1.55;color:#cdd8e4;margin-top:1em;}' +
         // TMDB enrichment slots: hidden until a real value arrives (best-effort,
         // the page never waits for them and keeps working without any of them).
         '.udxf .hide{display:none;}' +
@@ -180,7 +213,7 @@
         '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxl__backdrop--on{opacity:1;}' +
-        '.udxl__backdrop--poster{opacity:1;transform:scale(1.1);filter:blur(22px) brightness(.72) saturate(.82);}' +
+        '.udxl__backdrop--poster{opacity:1;transform:scale(1.15);filter:brightness(.55) saturate(.9);}' +
         // List-screen veil (NUM-style): dark card zone on the left, the
         // backdrop stays visible behind the rows on the right.
         '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.78),rgba(6,28,41,.34) 55%,rgba(6,28,41,.08) 85%),linear-gradient(to top,rgba(6,28,41,.50),rgba(6,28,41,0) 46%);}' +
@@ -189,7 +222,9 @@
         '.udxl__poster{width:100%;border-radius:.5em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
         '.udxl__title{font-size:1.25em;font-weight:700;line-height:1.25;color:#fff;text-align:center;}' +
         '.udxl__meta{font-size:.95em;line-height:1.45;color:#9fb2c4;text-align:center;}' +
-        '.udxl__list{flex:1 1 auto;min-width:0;height:86%;position:relative;}' +
+        // Rows form a bounded block beside the info card (NUM list
+        // proportion), not full-width strips.
+        '.udxl__list{flex:0 1 auto;width:64%;max-width:54em;min-width:0;height:86%;position:relative;}' +
         '.udxl__rows{width:100%;}' +
         // Row: main+sub stack on the left, an optional right-aligned quality
         // cell (online rows) on the right - the NUM reference layout.
@@ -213,10 +248,10 @@
             ultradox_no_online: { uk: 'Немає онлайн-джерела', ru: 'Нет онлайн-источника', en: 'No online source', be: 'Няма анлайн-крыніцы' },
             ultradox_online_unavailable: { uk: 'Онлайн-джерело недоступне', ru: 'Онлайн-источник недоступен', en: 'Online source unavailable', be: 'Анлайн-крыніца недаступная' },
             ultradox_torrserver: { uk: 'TorrServer', ru: 'TorrServer', en: 'TorrServer', be: 'TorrServer' },
-            ultradox_rating: { uk: 'Рейтинг', ru: 'Рейтинг', en: 'Rating', be: 'Рэйтынг' },
             ultradox_seasons: { uk: 'Сезонів', ru: 'Сезонов', en: 'Seasons', be: 'Сезонаў' },
             ultradox_director: { uk: 'Режисер', ru: 'Режиссёр', en: 'Director', be: 'Рэжысёр' },
-            ultradox_cast: { uk: 'У ролях', ru: 'В ролях', en: 'Starring', be: 'У ролях' }
+            ultradox_cast: { uk: 'У ролях', ru: 'В ролях', en: 'Starring', be: 'У ролях' },
+            ultradox_details: { uk: 'Детально', ru: 'Детали', en: 'Details', be: 'Дэталі' }
         });
 
         L.Manifest.plugins = {
@@ -1024,10 +1059,15 @@
         };
     }
 
-    // Full release page (catalog -> OK): backdrop only from the film's own
-    // fanart (without one, the poster doubles as a zone-veiled backdrop),
-    // poster on the left, metadata + overview on the right, and a compact
-    // action strip with exactly two actions:
+    // Full release page (catalog -> OK): the NUM reference layout 1:1 -
+    // backdrop only from the film's own fanart (without one, the raw poster
+    // art doubles as a zone-veiled backdrop, zoomed to cover, no blur), a
+    // large poster on the left, the meta block on the right (country • year,
+    // large title, original title, rating badge, runtime • genre line,
+    // seasons) with the two action pills below it, and the full-width
+    // "Детально" details strip (complete overview, director, full cast -
+    // nothing clamped or truncated) inside a scroll viewport, with exactly
+    // two actions:
     //   left  "Онлайн"    -> opens the ultradox_torrents page: the item's real
     //                        releases (NUM-style: info card left, quality •
     //                        size rows with the upload date right); the
@@ -1050,6 +1090,7 @@
         var tmdbSeasons = 0;
         var enrichToken = 0;
         var udxRoot = null;
+        var scroll = null;
         var html = document.createElement('div');
 
         this.create = function () {
@@ -1082,22 +1123,32 @@
                 built = true;
                 html.append($(DETAIL_HTML));
                 udxRoot = html.find('.udxf');
+                // Scroll viewport inside the slot: the zone + details strip
+                // are one content node (the page grows when the overview or
+                // the cast is long - no text is ever clamped).
+                var content = document.createElement('div');
+                content.addClass('udxf__content');
+                content.append($(ZONE_HTML));
+                scroll = new Lampa.Scroll({ mask: true, over: true });
+                scroll.append(content);
+                html.find('.udxf__slot').append(scroll.render(true));
                 onlineBtn = html.find('.udxf__act--online');
                 torrentsBtn = html.find('.udxf__act--torrents');
                 // Left action: opens the dedicated release-list page.
                 // Right action: opens the core torrents search page.
                 // hover:focus remembers the last touched action so the page
                 // refocuses exactly there (start() falls back to the online
-                // button while nothing has been focused yet).
+                // button while nothing has been focused yet) and keeps it
+                // visible inside the scroll viewport.
                 var self = this;
                 if (onlineBtn) {
                     onlineBtn.find('.udxf__olab').text(L.Lang.translate('ultradox_online'));
-                    onlineBtn.on('hover:focus', function () { lastAct = onlineBtn; });
+                    onlineBtn.on('hover:focus', function () { lastAct = onlineBtn; if (scroll) scroll.update(onlineBtn); });
                     onlineBtn.on('hover:enter', function () { self.openReleaseList(); });
                 }
                 if (torrentsBtn) {
                     torrentsBtn.find('.udxf__tlab').text(L.Lang.translate('ultradox_torrserver'));
-                    torrentsBtn.on('hover:focus', function () { lastAct = torrentsBtn; });
+                    torrentsBtn.on('hover:focus', function () { lastAct = torrentsBtn; if (scroll) scroll.update(torrentsBtn); });
                     torrentsBtn.on('hover:enter', function () { self.openTorrents(); });
                 }
                 // Lampa's Element.prototype.find returns a single node
@@ -1168,15 +1219,16 @@
             if (d.translation) line.push(d.translation);
             slotShow('.udxf__line', line.length ? line.join(' • ') : '');
 
+            // "Детально" heading of the details strip (always visible, NUM
+            // reference) and the complete overview (no line clamp).
+            slotShow('.udxf__details-head', L.Lang.translate('ultradox_details'));
             slotShow('.udxf__overview', d.overview || '');
             slotShow('.udxf__fact--director', d.director ? L.Lang.translate('ultradox_director') + ': ' + d.director : '');
 
+            // Full cast list: every name the page carries, wrapped - no name
+            // cap and no ellipsis truncation.
             var castNames = d.cast ? String(d.cast).split(',').map(function (n) { return n.replace(/\s+/g, ' ').trim(); }).filter(function (n) { return n; }) : [];
-            var castShown = '';
-            if (castNames.length) {
-                castShown = castNames.slice(0, 5).join(', ');
-                if (castNames.length > 5) castShown += ' …';
-            }
+            var castShown = castNames.join(', ');
             slotShow('.udxf__fact--cast', castShown ? L.Lang.translate('ultradox_cast') + ': ' + castShown : '');
 
             // TMDB enrichment slots: hidden here; the enrichment (if it runs)
@@ -1284,8 +1336,10 @@
         this.applyTmdb = function (meta) {
             if (!udxRoot) return;
             var d = meta.data || {};
+            // Rating badge in the NUM reference format: value + source mark
+            // ("8.1 TMDB"), no word prefix.
             if (typeof d.vote_average === 'number' && d.vote_average > 0) {
-                slotShow('.udxf__rate', L.Lang.translate('ultradox_rating') + ': ' + (Math.round(d.vote_average * 10) / 10).toFixed(1));
+                slotShow('.udxf__rate', (Math.round(d.vote_average * 10) / 10).toFixed(1) + ' TMDB');
             }
             var ot = String(d.original_title || '');
             var shown = stripYear(String(item.title || ''));
@@ -1326,8 +1380,10 @@
         this.stop = function () {};
 
         this.destroy = function () {
+            if (scroll) scroll.destroy();
             html.remove();
             built = false;
+            scroll = null;
             onlineBtn = null; torrentsBtn = null; udxRoot = null;
             lastAct = null;
             tmdbSeasons = 0;

@@ -17,8 +17,13 @@
 //      L.Torrent.start (after an explicit user pick) and L.Player.play (the
 //      online route); TMDB is reached only through the core integration
 //      (window.Lampa.TMDB.api).
-//   2. The detail page builds from the fetched page: backdrop, title, metadata
-//      lines, overview; the real release list keeps label/size/magnet as UI data.
+//   2. The detail page builds from the fetched page in the NUM reference
+//      layout 1:1: backdrop, the large poster on the left, the meta block
+//      (top line, large title, original title, rating badge, runtime • genre
+//      line, seasons), the two action pills, then the full-width "Детально"
+//      details strip with the complete overview, director and the FULL cast
+//      (no name cap, no ellipsis, no line clamp) inside a scroll viewport;
+//      the real release list keeps label/size/magnet as UI data.
 //   3. The "Онлайн" press opens the dedicated full-page release list; an
 //      explicit row pick there runs the standard TorrServer flow
 //      (L.Torrent.start with the picked release's MagnetUri/Size). The
@@ -571,7 +576,7 @@ check('css: title clamped to two lines with a reserved title area', /\.udx-conte
 check('css: age line keeps its reserved height when present', /\.udx-content \.card__age\{[^}]*min-height:1\.4em/.test(src), 'missing reserved line rule');
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 check('css: .udx-kind pinned inside the poster (left/top 10px, no negative offset) and clipped to it', /\.udx-kind\{position:absolute;left:10px;top:10px;[^}]*max-width:calc\(100% - 20px\);[^}]*overflow:hidden;[^}]*white-space:nowrap/.test(src), 'missing .udx-kind containment rule');
-check('css: poster fallback modifier scales + blurs the backdrop node', /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.1\)[^}]*filter:blur\(22px\)[^}]*brightness\(\.72\)[^}]*saturate\(\.82\)/.test(src), 'missing .udxf__backdrop--poster rule');
+check('css: poster fallback zooms the raw poster to cover (no blur - the artwork stays readable, NUM-style)', /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.15\)[^}]*filter:brightness\(\.55\)[^}]*saturate\(\.9\)/.test(src) && src.indexOf('blur(22px)') === -1, 'missing .udxf__backdrop--poster rule');
 check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
 check('css: single permanent veil overlay (left+bottom gradients)', /\.udx-bg__veil\{[^}]*z-index:1[^}]*linear-gradient\(90deg,rgba\(6,28,41,\.78\),rgba\(6,28,41,\.30\) 60%\),linear-gradient\(to top,rgba\(6,28,41,\.70\),rgba\(6,28,41,0\) 42%\)/.test(src), 'missing .udx-bg__veil rule');
 check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(6,28,41,\.84\),rgba\(6,28,41,\.52\) 46%,rgba\(6,28,41,0\) 78%\),linear-gradient\(to top,rgba\(6,28,41,\.62\),rgba\(6,28,41,0\) 44%\);}/.test(src), 'missing .udxf--poster veil rule');
@@ -678,7 +683,7 @@ check('fullpage: top line', sh.find('.udxf__top').text() === 'США • 2021', 
 check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', txt(sh, '.udxf__line'));
 check('fullpage: overview (technical tail cut)', sh.find('.udxf__overview').text() === 'Детективний серіал про агентку.');
 check('fullpage: director line with the exact source value', txt(sh, '.udxf__fact--director') === 'Режисер: Кацуо Фукудзава, Акико Като, Ёхэй Миядзаки', txt(sh, '.udxf__fact--director'));
-check('fullpage: cast line truncated to 5 names + neat ellipsis', txt(sh, '.udxf__fact--cast') === 'У ролях: Сакай Масато, Абэ Хироси, Никайдо Фуми, Ниномия Кадзунари, Тори Мацузака …', txt(sh, '.udxf__fact--cast'));
+check('fullpage: cast line shows every name (full list, no cap, no ellipsis truncation)', txt(sh, '.udxf__fact--cast') === 'У ролях: Сакай Масато, Абэ Хироси, Никайдо Фуми, Ниномия Кадзунари, Тори Мацузака, Рё Рюсэй, Кенто Хаяси, Рин Таканаси, Рей Дан, Кодзи Якушо', txt(sh, '.udxf__fact--cast'));
 check('fullpage: fact rows rendered exactly once each', findAll(sh, 'udxf__fact--director').length === 1 && findAll(sh, 'udxf__fact--cast').length === 1, findAll(sh, 'udxf__fact--director').length + ':' + findAll(sh, 'udxf__fact--cast').length);
 // ---------- detail action strip: two controls, one shared select path ----------
 check('fullpage: old single "Дивитися" button removed', sh.find('.udx-f__play') === null && findAll(sh, 'udx-f__play').length === 0, String(findAll(sh, 'udx-f__play').length));
@@ -692,7 +697,8 @@ check('fullpage: "TorrServer" button label', tBtn !== null && txt(tBtn, '.udxf__
 check('fullpage: both controls wired to hover:enter exactly once', oBtn && tBtn && oBtn.handlers['hover:enter'].length === 1 && tBtn.handlers['hover:enter'].length === 1, JSON.stringify({ o: oBtn && oBtn.handlers['hover:enter'] && oBtn.handlers['hover:enter'].length, t: tBtn && tBtn.handlers['hover:enter'] && tBtn.handlers['hover:enter'].length }));
 // TMDB enrichment (core integration answers 'ok'): the hidden slots are
 // revealed with confirmed values; the page never waits for them.
-check('fullpage: TMDB rating revealed through the core integration', (function () { const e = sh.find('.udxf__rate'); return !!e && !e.classes.has('hide') && e.text() === L.Lang.translate('ultradox_rating') + ': 8.1'; })(), txt(sh, '.udxf__rate'));
+check('fullpage: TMDB rating revealed through the core integration (NUM badge format "value TMDB")', (function () { const e = sh.find('.udxf__rate'); return !!e && !e.classes.has('hide') && e.text() === '8.1 TMDB'; })(), txt(sh, '.udxf__rate'));
+check('fullpage: the details strip carries the "Детально" heading (NUM reference)', sh.find('.udxf__details-head') !== null && txt(sh, '.udxf__details-head') === L.Lang.translate('ultradox_details'), txt(sh, '.udxf__details-head'));
 check('fullpage: TMDB original title revealed', (function () { const e = sh.find('.udxf__orig'); return !!e && !e.classes.has('hide') && e.text() === 'Dokka'; })(), txt(sh, '.udxf__orig'));
 check('fullpage: TMDB seasons revealed (series)', (function () { const e = sh.find('.udxf__seasons'); return !!e && !e.classes.has('hide') && e.text() === L.Lang.translate('ultradox_seasons') + ': 4'; })(), txt(sh, '.udxf__seasons'));
 check('fullpage: enrichment used the core door exactly 3 times (find + detail + credits)', L.TMDB.touches === 3, String(L.TMDB.touches));
@@ -834,7 +840,7 @@ const fm = film.render();
 check('fullpage(film): top line', fm.find('.udxf__top').text() === 'Франція • 2023', txt(fm, '.udxf__top'));
 check('fullpage(film): overview', fm.find('.udxf__overview').text() === 'Епічна історія космічної одесьи.');
 check('fullpage(film): director line (single name, no ellipsis)', txt(fm, '.udxf__fact--director') === 'Режисер: Мар Олид', txt(fm, '.udxf__fact--director'));
-check('fullpage(film): cast line truncated to 5 names + neat ellipsis', txt(fm, '.udxf__fact--cast') === 'У ролях: Кира Миро, Сальва Рейна, Луна Фульхенсио, Ян Кортегосо, Адриана Биде …', txt(fm, '.udxf__fact--cast'));
+check('fullpage(film): cast line shows every name (no cap, no ellipsis truncation)', txt(fm, '.udxf__fact--cast') === 'У ролях: Кира Миро, Сальва Рейна, Луна Фульхенсио, Ян Кортегосо, Адриана Биде, Антонио Пагудо, Марта Хазас', txt(fm, '.udxf__fact--cast'));
 check('fullpage(film): page rating gif produces no rating text (no value in HTML)', !/рейтинг/i.test(allText(fm)), allText(fm).slice(0, 160));
 check('fullpage(film): no poster -> element removed (no undefined src)', findAll(fm, 'udxf__poster').length === 0, String(findAll(fm, 'udxf__poster').length));
 check('fullpage(film): no imdb id -> enrichment slots stay hidden', (function () { const r = fm.find('.udxf__rate'); const o = fm.find('.udxf__orig'); const s = fm.find('.udxf__seasons'); return !!(r && o && s) && r.classes.has('hide') && o.classes.has('hide') && s.classes.has('hide') && r.text() === '' && o.text() === '' && s.text() === ''; })(), JSON.stringify([txt(fm, '.udxf__rate'), txt(fm, '.udxf__orig'), txt(fm, '.udxf__seasons')]));
