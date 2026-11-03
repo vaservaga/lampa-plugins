@@ -10,7 +10,8 @@
  * in the NUM reference layout 1:1 (validated backdrop, large poster on the
  * left, meta block: country • year, large title, original title, rating
  * badge, runtime • genre line, seasons, exactly two action pills - left
- * "Онлайн" primary gradient, right "TorrServer" dark glass; below them a
+ * "Онлайн", right "TorrServer" - both on the native Lampa button surface
+ * (core glass + the focus invert); below them a
  * full-width "Детально" details strip with the complete overview, director
  * and the full cast - no text truncation - inside a scroll viewport) with
  * exactly two actions:
@@ -135,24 +136,24 @@
         '</div>';
 
     var STYLE_HTML = '<style id="ultradox-style">' +
-        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
+        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
         '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
-        '.udx-bg__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.78),rgba(6,28,41,.30) 60%),linear-gradient(to top,rgba(6,28,41,.70),rgba(6,28,41,0) 42%);}' +
+        '.udx-bg__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
         '.udx-content__head{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;padding:14px 20px;background:linear-gradient(rgba(0,0,0,.55),transparent);}' +
         '.udx-content__cats{display:flex;align-items:center;}' +
         '.udx-cat{flex-shrink:0;}' +
         '.udx-cat__label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
         '.udx-cat.udx-active{background-color:#fff;color:#000;}' +
         '.udx-content__list{position:relative;z-index:1;padding-top:80px;}' +
-        '.udx-empty{width:100%;text-align:center;padding:5em 0;color:#9aa4b2;font-size:1.5em;}' +
+        '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         '.udx-content .card__view{position:relative;overflow:hidden;}' +
         '.udx-content .card__title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
-        '.udx-content .card__age{min-height:1.4em;font-size:0.85em;line-height:1.4em;color:#9aa4b2;}' +
+        '.udx-content .card__age{min-height:1.4em;font-size:0.85em;line-height:1.4em;color:#fff;}' +
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
-        '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:rgba(255,255,255,0.88);color:#14202a;}' +
-        '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
+        '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
+        '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxf__backdrop--on{opacity:1;}' +
         // Poster-as-backdrop fallback: a small poster stretched full-screen
@@ -161,13 +162,13 @@
         '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.5) saturate(.88);}' +
         // Valid-backdrop veil (NUM-style): dark text zone on the left, the
         // scene stays clearly visible toward the right, soft bottom fade.
-        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.82),rgba(6,28,41,.42) 46%,rgba(6,28,41,.06) 82%),linear-gradient(to top,rgba(6,28,41,.58),rgba(6,28,41,0) 46%);}' +
+        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.42) 46%,rgba(0,0,0,.06) 82%),linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0) 46%);}' +
         // Poster-fallback state (.udxf--poster on the root): the poster doubles
         // as the backdrop, so the veil darkens the left text zone and the bottom
         // rows (title/overview/actions) and fades to clear artwork toward the
         // right and the top - no layer is opaque, so the image stays visible
         // as atmosphere on the right.
-        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(6,28,41,.86),rgba(6,28,41,.58) 46%,rgba(6,28,41,.1) 80%),linear-gradient(to top,rgba(6,28,41,.66),rgba(6,28,41,0) 46%);}' +
+        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(0,0,0,.86),rgba(0,0,0,.58) 46%,rgba(0,0,0,.1) 80%),linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0) 46%);}' +
         // NUM reference geometry (measured from the NUM detail screen): the
         // poster is large (~22em wide at the 1080p root font), the title is a
         // display size (3em), the meta block sits to the right of the poster,
@@ -179,68 +180,80 @@
         '.udxf__slot .scroll{position:relative;height:100%;overflow:hidden;}' +
         '.udxf__content{min-height:100%;}' +
         '.udxf__zone{display:flex;align-items:center;min-height:36em;padding:10% 6% 3% 5%;box-sizing:border-box;}' +
-        '.udxf__poster{flex-shrink:0;width:22em;border-radius:.55em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
+        '.udxf__poster{flex-shrink:0;width:22em;border-radius:1em;background:#3E3E3E;}' +
         '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
-        '.udxf__top{font-size:1.2em;color:#cdd8e4;letter-spacing:.03em;}' +
+        '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
         '.udxf__title{font-size:3em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
-        '.udxf__orig{font-size:1.4em;line-height:1.35;color:#dbe7f2;margin-top:.5em;}' +
-        '.udxf__line{font-size:1.1em;color:#9fb2c4;margin-top:.9em;}' +
+        '.udxf__orig{font-size:1.4em;line-height:1.35;color:rgba(255,255,255,.6);margin-top:.5em;}' +
+        '.udxf__line{font-size:1.1em;color:rgba(255,255,255,.5);margin-top:.9em;}' +
         // Full overview - no line clamp (the page scrolls when it is long).
-        '.udxf__overview{font-size:1.15em;line-height:1.55;color:#e7eef5;margin-top:.9em;}' +
+        '.udxf__overview{font-size:1.15em;line-height:1.55;color:#fff;margin-top:.9em;}' +
         // Compact horizontal action strip, ~62px tall at the 1080p root font
         // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
-        // columns. NUM reference design: left action = primary green-blue
-        // gradient pill, right action = secondary dark glass pill.
+        // columns. Native Lampa button surface (core values): the
+        // .full-start__button / .simple-button glass rgba(0,0,0,.3) at rest and
+        // the .simple-button.focus invert (#fff/#000) on focus - no gradient,
+        // no custom glow; the currentColor icons follow the text on invert.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:1.6em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1.05em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        '.udxf__act--online{background:linear-gradient(120deg,#1fc26d 0%,#2e6bf0 100%);border:1px solid rgba(255,255,255,.20);color:#fff;}' +
-        '.udxf__act--online.focus{transform:translateY(-.1em);box-shadow:0 .4em .9em rgba(0,0,0,.42),0 0 0 .22em rgba(56,197,255,.30);}' +
-        '.udxf__act--torrents{background:rgba(9,29,43,.62);border:1px solid rgba(255,255,255,.24);color:#dbe7f2;}' +
-        '.udxf__act--torrents.focus{transform:translateY(-.1em);box-shadow:0 .3em .8em rgba(0,0,0,.38),0 0 0 .22em rgba(255,255,255,.16);}' +
-        '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
+        // Both pills carry the same native Lampa glass (the core detail-page
+        // buttons .full-start__button are indistinguishable at rest; the label
+        // and the icon mark the role), radius 1em per the core pill scale.
+        '.udxf__act--online{background:rgba(0,0,0,.3);color:#fff;}' +
+        // Native Lampa focus for buttons (the core .simple-button.focus
+        // pattern, declared here so a remote core-CSS change cannot alter it):
+        // full invert, transform-free, zero layout shift.
+        '.udxf__act.focus{background-color:#fff;color:#000;}' +
+        '.udxf__act--torrents{background:rgba(0,0,0,.3);color:#fff;}' +
+        '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // Full-width details strip under the top zone: heading, the complete
         // overview, director and the full cast (wrapped, never truncated).
         '.udxf__details{padding:0 6% 6% 5%;}' +
         '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:1.2em;}' +
-        '.udxf__fact{font-size:1.1em;line-height:1.55;color:#cdd8e4;margin-top:1em;}' +
-        // Focus target: the whole strip receives the down-navigation focus; a
-        // soft glass highlight marks it (the core focus ring is suppressed).
-        '.udxf__details.focus{background:rgba(9,29,43,.5);box-shadow:inset 0 0 0 1px rgba(56,197,255,.22);border-radius:.8em;outline:none;}' +
+        '.udxf__fact{font-size:1.1em;line-height:1.55;color:rgba(255,255,255,.6);margin-top:1em;}' +
+        // Focus target: the whole strip receives the down-navigation focus;
+        // the native Lampa row ring marks it (the .online.focus
+        // box-shadow pattern, confirmed in the core CSS).
+        '.udxf__details.focus{box-shadow:0 0 0 .2em #fff;}' +
         // TMDB enrichment slots: hidden until a real value arrives (best-effort,
         // the page never waits for them and keeps working without any of them).
         '.udxf .hide{display:none;}' +
-        // Rating as a NUM-style badge chip (the text format is a test
-        // contract: "Рейтинг: X").
-        '.udxf__rate{display:inline-flex;align-items:baseline;background:rgba(6,20,32,.55);border:1px solid rgba(255,255,255,.18);padding:.3em .8em;border-radius:.6em;font-size:1em;font-weight:700;color:#ffd66b;margin-top:.8em;}' +
-        '.udxf__orig{font-size:1em;color:#9fb2c4;margin-top:.3em;}' +
-        '.udxf__seasons{font-size:1.05em;color:#9fb2c4;margin-top:.8em;}' +
+        // Rating as a compact badge chip (the text format is a test contract:
+        // "X.X TMDB"); the surface is the core .full-start__rate glass.
+        '.udxf__rate{display:inline-flex;align-items:baseline;background:rgba(0,0,0,.3);padding:.3em .8em;border-radius:.3em;font-size:1em;font-weight:700;color:#fff;margin-top:.8em;}' +
+        '.udxf__orig{font-size:1em;color:rgba(255,255,255,.5);margin-top:.3em;}' +
+        '.udxf__seasons{font-size:1.05em;color:rgba(255,255,255,.5);margin-top:.8em;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
-        '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
+        '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxl__backdrop--on{opacity:1;}' +
         '.udxl__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.5) saturate(.88);}' +
         // List-screen veil (NUM-style): dark card zone on the left, the
         // backdrop stays visible behind the rows on the right.
-        '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.78),rgba(6,28,41,.34) 55%,rgba(6,28,41,.08) 85%),linear-gradient(to top,rgba(6,28,41,.50),rgba(6,28,41,0) 46%);}' +
+        '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.34) 55%,rgba(0,0,0,.08) 85%),linear-gradient(to top,rgba(0,0,0,.50),rgba(0,0,0,0) 46%);}' +
         '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 5%;box-sizing:border-box;gap:2em;}' +
         '.udxl__card{flex:0 0 auto;width:11em;display:flex;flex-direction:column;align-items:center;gap:.7em;}' +
-        '.udxl__poster{width:100%;border-radius:.5em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
+        '.udxl__poster{width:100%;border-radius:1em;background:#3E3E3E;}' +
         '.udxl__title{font-size:1.25em;font-weight:700;line-height:1.25;color:#fff;text-align:center;}' +
-        '.udxl__meta{font-size:.95em;line-height:1.45;color:#9fb2c4;text-align:center;}' +
+        '.udxl__meta{font-size:.95em;line-height:1.45;color:rgba(255,255,255,.5);text-align:center;}' +
         // Rows form a bounded block beside the info card (NUM list
         // proportion), not full-width strips.
         '.udxl__list{flex:0 1 auto;width:64%;max-width:54em;min-width:0;height:86%;position:relative;}' +
         '.udxl__rows{width:100%;}' +
         // Row: main+sub stack on the left, an optional right-aligned quality
-        // cell (online rows) on the right - the NUM reference layout.
-        '.udxl__row{display:flex;align-items:center;gap:1.2em;width:100%;margin:.5em 0;padding:.65em 1.1em;border-radius:.9em;background:rgba(8,18,28,.55);border:1px solid rgba(255,255,255,.12);text-align:left;box-sizing:border-box;}' +
-        '.udxl__row.focus{background:rgba(56,197,255,.14);border-color:rgba(56,197,255,.55);transform:translateX(.15em);}' +
+        // cell (online rows) on the right. Native Lampa row surface (core
+        // .torrent-item / .online values): glass rgba(0,0,0,.3), radius .3em,
+        // no border; the focus is the confirmed .online.focus white ring
+        // (the background is restated so the core .simple-button.focus invert
+        // never turns the row solid white).
+        '.udxl__row{display:flex;align-items:center;gap:1.2em;width:100%;margin:.5em 0;padding:.65em 1.1em;border-radius:.3em;background:rgba(0,0,0,.3);text-align:left;box-sizing:border-box;}' +
+        '.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #fff;}' +
         '.udxl__row__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}' +
         '.udxl__row__main{font-size:1.05em;font-weight:600;line-height:1.35;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-        '.udxl__row__sub{font-size:.9em;line-height:1.35;color:#9fb2c4;margin-top:.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
-        '.udxl__row__q{flex:0 0 auto;font-size:.95em;font-weight:700;line-height:1.4;color:#cdd8e4;white-space:nowrap;}' +
+        '.udxl__row__sub{font-size:.9em;line-height:1.35;color:rgba(255,255,255,.5);margin-top:.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+        '.udxl__row__q{flex:0 0 auto;font-size:.95em;font-weight:700;line-height:1.4;color:#fff;white-space:nowrap;}' +
         '</style>';
 
     function boot() {
