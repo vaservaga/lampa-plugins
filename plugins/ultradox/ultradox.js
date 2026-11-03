@@ -149,7 +149,7 @@
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         '.udx-content .card__view{position:relative;overflow:hidden;}' +
         '.udx-content .card__title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
-        '.udx-content .card__age{min-height:1.4em;margin-top:0.2em;font-size:0.85em;line-height:1.4em;color:#fff;}' +
+        '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.85em;line-height:1.4em;color:#fff;}' +
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
@@ -180,7 +180,7 @@
         '.udxf__slot .scroll{position:relative;height:100%;overflow:hidden;}' +
         '.udxf__content{min-height:100%;}' +
         '.udxf__zone{display:flex;align-items:center;min-height:36em;padding:10% 6% 3% 5%;box-sizing:border-box;}' +
-        '.udxf__poster{flex-shrink:0;width:22em;border-radius:1em;background:#3E3E3E;}' +
+        '.udxf__poster{flex-shrink:0;width:22em;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
         '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
         '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
         '.udxf__title{font-size:3em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
@@ -213,15 +213,20 @@
         // speckles) to every card__view. Hide it inside our grid so a card
         // keeps exactly one type badge - ours.
         '.udx-content .card__view .content-label{display:none !important;}' +
+        // That plugin (and the core chip for quality) position their labels
+        // off-card (left:-0.8em -> letters clipped at the card corners).
+        // Reposition them inside the poster on every card of Lampa.
+        '.card__view>.content-label{left:10px!important;top:10px!important;}' +
+        '.card__view>.card__quality{left:10px!important;bottom:10px!important;}' +
         // Full-width details strip under the top zone: heading, the complete
         // overview, director and the full cast (wrapped, never truncated).
         '.udxf__details{padding:0 6% 6% 5%;}' +
         '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:1.2em;}' +
         '.udxf__fact{font-size:1.1em;line-height:1.55;color:rgba(255,255,255,.6);margin-top:1em;}' +
-        // Focus target: the whole strip receives the down-navigation focus;
-        // the native Lampa row ring marks it (the .online.focus
-        // box-shadow pattern, confirmed in the core CSS).
-        '.udxf__details.focus{box-shadow:0 0 0 .2em #fff;}' +
+        // Focus target: the whole strip receives the down-navigation focus
+        // (scroll.update); no visible ring - the full-width white box-shadow
+        // read as two horizontal lines across the screen.
+        '.udxf__details.focus{background:transparent;box-shadow:none;outline:none;}' +
         // TMDB enrichment slots: hidden until a real value arrives (best-effort,
         // the page never waits for them and keeps working without any of them).
         '.udxf .hide{display:none;}' +
@@ -238,11 +243,15 @@
         // List-screen veil (NUM-style): dark card zone on the left, the
         // backdrop stays visible behind the rows on the right.
         '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.34) 55%,rgba(0,0,0,.08) 85%),linear-gradient(to top,rgba(0,0,0,.50),rgba(0,0,0,0) 46%);}' +
-        '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:flex-start;padding:0 5%;box-sizing:border-box;gap:2em;}' +
-        '.udxl__card{flex:0 0 auto;width:11em;display:flex;flex-direction:column;align-items:center;gap:.7em;}' +
-        '.udxl__poster{width:100%;border-radius:1em;background:#3E3E3E;}' +
-        '.udxl__title{font-size:1.25em;font-weight:700;line-height:1.25;color:#fff;text-align:center;}' +
-        '.udxl__meta{font-size:.95em;line-height:1.45;color:rgba(255,255,255,.5);text-align:center;}' +
+        '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 5%;box-sizing:border-box;gap:2em;}' +
+        // The card column is exactly the poster (bigger: 13em); the title and
+        // meta hang below it absolutely, so centering the column in the body
+        // centers the POSTER - the row block (also centered) stays symmetric
+        // to the poster, which sits lower than the first row.
+        '.udxl__card{flex:0 0 auto;width:13em;position:relative;}' +
+        '.udxl__poster{width:100%;border-radius:1em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
+        '.udxl__title{position:absolute;top:100%;left:0;right:0;margin-top:.7em;font-size:1.25em;line-height:1.25;color:#fff;text-align:center;min-height:2.5em;}' +
+        '.udxl__meta{position:absolute;top:calc(100% + 4em);left:0;right:0;font-size:.95em;line-height:1.45;color:rgba(255,255,255,.5);text-align:center;}' +
         // Rows form a bounded block beside the info card (NUM list
         // proportion), not full-width strips.
         '.udxl__list{flex:0 1 auto;width:64%;max-width:54em;min-width:0;height:86%;position:relative;}' +
