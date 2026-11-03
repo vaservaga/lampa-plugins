@@ -35,8 +35,8 @@
 //      counter must equal the number of performed row selections.
 //   5. Catalog card still renders and opens the FullPage on hover:enter; the
 //      old long-press playback trigger (hover:long) is gone; the scroll
-//      viewport is bounded (scroll.minus) and focus drives scroll.update;
-//      cards win over the legacy fallback table rows.
+//      viewport is bounded (flex-bounded list + height:100% scroll) and focus
+//      drives scroll.update; cards win over the legacy fallback table rows.
 //   6. All network fetches go to the public mirrors only (no external metadata
 //      service, no TorrServer/LAN); TMDB traffic goes through the core
 //      integration mock only.
@@ -601,13 +601,15 @@ check('grid: /nerufilm/ item quality chip is a single token (BDRIP)', findAll(ne
 check('css: .card__view self-contained (position:relative + overflow:hidden)', /\.udx-content \.card__view\{[^}]*position:relative[^}]*overflow:hidden/.test(src), 'missing containment rule');
 check('css: title clamped to two lines with a reserved title area', /\.udx-content \.card__title\{[^}]*-webkit-line-clamp:2[^}]*min-height:2\.5em/.test(src), 'missing clamp rule');
 check('css: age line keeps its reserved height when present', /\.udx-content \.card__age\{[^}]*min-height:1\.4em/.test(src), 'missing reserved line rule');
-check('css: poster-to-title gap tightened (card__view margin-bottom 0.35em; the core default is 1em)', /\.udx-content \.card__view\{[^}]*margin-bottom:0\.35em/.test(src), 'missing margin-bottom rule');
+check('css: poster-to-title gap 0.5em (8px at the 16px root font; the 8-12px NUM band at 1920x1080)', /\.udx-content \.card__view\{[^}]*margin-bottom:0\.5em/.test(src), 'missing margin-bottom rule');
 check('css: catalog-addition date is dimmer than the (already dimmed) release year', /\.udx-content \.card__age \.udx-ad\{color:rgba\(255,255,255,\.45\);\}/.test(src), 'missing .udx-ad rule');
 check('css: glass top panel is scoped to the udx-glass class (dark translucent + soft backdrop blur)', /\.head\.udx-glass\{[^}]*background-color:rgba\(10,12,15,\.60\)[^}]*backdrop-filter:blur\(18px\);\}/.test(src) && /\.head\.udx-glass \.head__body\{background-color:transparent;\}/.test(src), 'missing glass head rules');
 check('css: grid row fills the full width with five equal cells (NUM reference, no right band)', /\.udx-content \.category-full \.card\{width:20%;flex-shrink:0;\}/.test(src), 'missing 20% cell rule');
-check('css: first row starts close under the tabs (reduced top gaps)', /\.udx-content__list\{position:relative;z-index:1;padding-top:20px;\}/.test(src) && /\.udx-content \.scroll--mask \.scroll__content\{padding-top:1em;\}/.test(src), 'missing top-gap rules');
+check('css: tab zone is flex flow above the grid (head not an overlay; no poster can be covered by the tabs)', /\.udx-content\{[^}]*display:flex[^}]*flex-direction:column/.test(src) && /\.udx-content__head\{flex:0 0 auto;[^}]*\}/.test(src) && src.indexOf('.udx-content__head{position:absolute') === -1, 'head must stay in flow');
+check('css: grid area is the flex remainder with a bounded scroll viewport (TV scroll driver clamps to offsetHeight)', /\.udx-content__list\{flex:1 1 auto;min-height:0;[^}]*\}/.test(src) && /\.udx-content__list>\.scroll\{height:100%;\}/.test(src), 'list/scroll must stay height-bounded');
+check('css: small clear band between the tab zone and the first poster row', /\.udx-content \.scroll--mask \.scroll__content\{padding-top:0\.75em;\}/.test(src), 'missing mask top-gap rule');
 check('css: card title matches the NUM reference scale and weight (1em regular)', /\.udx-content \.card__title\{[^}]*font-size:1em[^}]*font-weight:400/.test(src), 'missing title scale rule');
-check('css: NUM green focus ring wraps the whole card and suppresses the core poster-only ring', /\.udx-content \.card\.focus::after\{content:"";[^}]*border:0\.3em solid #57F570[^}]*z-index:-1[^}]*\}/.test(src) && /\.udx-content \.card\.focus \.card__view::after,.udx-content \.card\.hover \.card__view::after\{border:none;\}/.test(src), 'missing green card ring');
+check('css: focus is the native core poster ring (NUM DOM: .card__view::after, white; rows stacked without gap - a whole-card ring would reach the next row)', src.indexOf('.udx-content .card.focus::after') === -1 && src.indexOf('.udx-content .card.hover::after') === -1 && src.indexOf('card__view::after{border:none}') === -1, 'custom card-level ring must be gone');
 check('css: year line dimmed like the NUM reference (title stays white)', /\.udx-content \.card__age\{[^}]*color:rgba\(255,255,255,\.5\);\}/.test(src) && /\.udx-content \.card__age \.udx-ad\{color:rgba\(255,255,255,\.45\);\}/.test(src), 'missing dim year color');
 check('boot: head glass follows activity starts and covers all four Ultradox components', src.indexOf("L.Listener.follow('activity'") !== -1 && src.indexOf("var GLASS_COMPONENTS = ['ultradox', 'ultradox_full', 'ultradox_online', 'ultradox_torrents'];") !== -1, 'missing glass activity listener');
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');

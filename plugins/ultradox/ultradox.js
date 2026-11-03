@@ -136,29 +136,37 @@
         '</div>';
 
     var STYLE_HTML = '<style id="ultradox-style">' +
-        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
+        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;display:flex;flex-direction:column;}' +
         '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
         '.udx-bg__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
-        '.udx-content__head{position:absolute;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;padding:14px 20px;background:linear-gradient(rgba(0,0,0,.55),transparent);}' +
+        // The tabs are their own zone above the grid (flex flow, NOT an
+        // overlay): the head keeps its natural height, the grid area is what
+        // remains - no poster can be covered by the tabs and the tab height
+        // cannot affect the card geometry.
+        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:14px 20px;background:linear-gradient(rgba(0,0,0,.55),transparent);}' +
         '.udx-content__cats{display:flex;align-items:center;}' +
         '.udx-cat{flex-shrink:0;}' +
         '.udx-cat__label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
         '.udx-cat.udx-active{background-color:#fff;color:#000;}' +
-        // The first row starts close under the category tabs (NUM reference
-        // leaves only a small band); the deep core 80px + 2.5em mask padding
-        // read as a large empty block above the posters.
-        '.udx-content__list{position:relative;z-index:1;padding-top:20px;}' +
-        '.udx-content .scroll--mask .scroll__content{padding-top:1em;}' +
+        // The grid area is the flex remainder below the tab zone: flex-bounded
+        // and the scroll fills it exactly (invariant: the TV scroll driver
+        // clamps travel to the scroll element's offsetHeight, so the viewport
+        // must stay height-bounded).
+        '.udx-content__list{flex:1 1 auto;min-height:0;position:relative;z-index:1;}' +
+        '.udx-content__list>.scroll{height:100%;}' +
+        // Small clear band between the tab zone and the first poster row
+        // (the core 2.5em mask padding read as a large empty block).
+        '.udx-content .scroll--mask .scroll__content{padding-top:0.75em;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         // Row width: five equal cells filling the whole line (the core 12.75em
         // cards leave a large empty band on the right; the NUM reference fills
         // the row edge to edge). The core 0.5em side paddings become the gap.
         '.udx-content .category-full .card{width:20%;flex-shrink:0;}' +
-        // Poster-to-title gap: the core .card__view carries a 1em
-        // margin-bottom; tighten it so the title sits close to the poster
-        // (one compact scale for all three category tabs).
-        '.udx-content .card__view{position:relative;overflow:hidden;margin-bottom:0.35em;}' +
+        // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
+        // band measured on the NUM reference at 1920x1080); one value for all
+        // three category tabs.
+        '.udx-content .card__view{position:relative;overflow:hidden;margin-bottom:0.5em;}' +
         // NUM reference title: one scale up, regular weight (the earlier 0.9em
         // semibold read smaller and heavier than the reference grid).
         '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.2em;font-weight:400;color:#fff;}' +
@@ -167,12 +175,11 @@
         // Catalog-addition date (latest release upload date, real data): shown
         // after the release year, dimmer still, so the two dates stay distinct.
         '.udx-content .card__age .udx-ad{color:rgba(255,255,255,.45);}' +
-        // NUM reference focus: one green ring around the WHOLE card (the core
-        // white ring hugs the poster only). The card-level green ring replaces
-        // it; the core poster rings are suppressed to avoid a double frame.
-        '.udx-content .card.focus::after{content:"";position:absolute;top:-0.5em;left:-0.5em;right:-0.5em;bottom:-0.5em;border:0.3em solid #57F570;border-radius:1.4em;z-index:-1;pointer-events:none;}' +
-        '.udx-content .card.hover::after{content:"";position:absolute;top:-0.5em;left:-0.5em;right:-0.5em;bottom:-0.5em;border:0.3em solid rgba(87,245,112,.5);border-radius:1.4em;z-index:-1;pointer-events:none;}' +
-        '.udx-content .card.focus .card__view::after,.udx-content .card.hover .card__view::after{border:none;}' +
+        // Focus: the native core ring (app.css .card.focus/.card.hover
+        // .card__view::after - white 0.3em around the poster box ONLY),
+        // exactly as in the NUM DOM. No card-level ring: the grid rows are
+        // stacked without a vertical gap, so a ring around the whole card
+        // (poster + text block) would extend into the next row.
         // Glass top panel on Ultradox screens only (the .udx-glass class is
         // toggled on the core .head by the activity listener): a dark
         // translucent surface + soft backdrop blur; on WebViews without
@@ -877,9 +884,6 @@
                 grid.addClass('category-full');
                 scroll.append(grid);
                 html.find('.udx-content__list').append(scroll.render(true));
-
-                // Bound the scroll viewport so focus can scroll the grid (record pattern).
-                scroll.minus(html.find('.udx-content__head'));
 
                 this.buildCats();
                 L.Layer.update(html);
