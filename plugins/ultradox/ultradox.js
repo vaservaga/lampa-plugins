@@ -138,7 +138,9 @@
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxf__backdrop--on{opacity:1;}' +
         '.udxf__backdrop--poster{opacity:1;transform:scale(1.1);filter:blur(22px) brightness(.72) saturate(.82);}' +
-        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.55),rgba(6,28,41,.88) 72%);}' +
+        // Valid-backdrop veil (NUM-style): dark text zone on the left, the
+        // scene stays clearly visible toward the right, soft bottom fade.
+        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.82),rgba(6,28,41,.42) 46%,rgba(6,28,41,.06) 82%),linear-gradient(to top,rgba(6,28,41,.58),rgba(6,28,41,0) 46%);}' +
         // Poster-fallback state (.udxf--poster on the root): the poster doubles
         // as the backdrop, so the veil darkens the left text zone and the bottom
         // rows (title/overview/actions) and fades to clear artwork toward the
@@ -152,23 +154,26 @@
         '.udxf__title{font-size:2.1em;font-weight:700;line-height:1.15;color:#fff;margin-top:.35em;}' +
         '.udxf__line{font-size:1.05em;color:#9fb2c4;margin-top:.9em;}' +
         '.udxf__overview{font-size:1.05em;line-height:1.4;color:#e7eef5;margin-top:1em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}' +
-        // Compact horizontal action strip: one quality selector + one
-        // "Torrents" button, ~62px tall at the 1080p root font (3.7em of the
-        // 1.05em button font), 1em gap, two-line wrap on narrow columns.
+        // Compact horizontal action strip, ~62px tall at the 1080p root font
+        // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
+        // columns. NUM reference design: left action = primary green-blue
+        // gradient pill, right action = secondary dark glass pill.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:1.6em;}' +
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1.05em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        '.udxf__act--online{background:rgba(9,29,43,.62);border:1px solid rgba(255,255,255,.24);color:#dbe7f2;}' +
-        '.udxf__act--online.focus{border-color:rgba(255,255,255,.55);transform:translateY(-.1em);box-shadow:0 .3em .8em rgba(0,0,0,.38);}' +
-        '.udxf__act--torrents{background:linear-gradient(135deg,#18b7d8 0%,#2e6bf0 100%);border:1px solid rgba(255,255,255,.20);}' +
-        '.udxf__act--torrents.focus{transform:translateY(-.1em);box-shadow:0 .4em .9em rgba(0,0,0,.42),0 0 0 .22em rgba(56,197,255,.28);}' +
+        '.udxf__act--online{background:linear-gradient(120deg,#1fc26d 0%,#2e6bf0 100%);border:1px solid rgba(255,255,255,.20);color:#fff;}' +
+        '.udxf__act--online.focus{transform:translateY(-.1em);box-shadow:0 .4em .9em rgba(0,0,0,.42),0 0 0 .22em rgba(56,197,255,.30);}' +
+        '.udxf__act--torrents{background:rgba(9,29,43,.62);border:1px solid rgba(255,255,255,.24);color:#dbe7f2;}' +
+        '.udxf__act--torrents.focus{transform:translateY(-.1em);box-shadow:0 .3em .8em rgba(0,0,0,.38),0 0 0 .22em rgba(255,255,255,.16);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         '.udxf__fact{font-size:1.05em;line-height:1.45;color:#9fb2c4;margin-top:.8em;}' +
         // TMDB enrichment slots: hidden until a real value arrives (best-effort,
         // the page never waits for them and keeps working without any of them).
         '.udxf .hide{display:none;}' +
-        '.udxf__rate{font-size:1.05em;font-weight:600;color:#ffd66b;margin-top:.6em;}' +
+        // Rating as a NUM-style badge chip (the text format is a test
+        // contract: "Рейтинг: X").
+        '.udxf__rate{display:inline-flex;align-items:baseline;background:rgba(6,20,32,.55);border:1px solid rgba(255,255,255,.18);padding:.3em .8em;border-radius:.6em;font-size:1em;font-weight:700;color:#ffd66b;margin-top:.8em;}' +
         '.udxf__orig{font-size:1em;color:#9fb2c4;margin-top:.3em;}' +
         '.udxf__seasons{font-size:1.05em;color:#9fb2c4;margin-top:.8em;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
@@ -176,7 +181,9 @@
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxl__backdrop--on{opacity:1;}' +
         '.udxl__backdrop--poster{opacity:1;transform:scale(1.1);filter:blur(22px) brightness(.72) saturate(.82);}' +
-        '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.62),rgba(6,28,41,.26) 55%),linear-gradient(to top,rgba(6,28,41,.58),rgba(6,28,41,0) 46%);}' +
+        // List-screen veil (NUM-style): dark card zone on the left, the
+        // backdrop stays visible behind the rows on the right.
+        '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.78),rgba(6,28,41,.34) 55%,rgba(6,28,41,.08) 85%),linear-gradient(to top,rgba(6,28,41,.50),rgba(6,28,41,0) 46%);}' +
         '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 5%;box-sizing:border-box;gap:2em;}' +
         '.udxl__card{flex:0 0 auto;width:11em;display:flex;flex-direction:column;align-items:center;gap:.7em;}' +
         '.udxl__poster{width:100%;border-radius:.5em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
@@ -184,10 +191,14 @@
         '.udxl__meta{font-size:.95em;line-height:1.45;color:#9fb2c4;text-align:center;}' +
         '.udxl__list{flex:1 1 auto;min-width:0;height:86%;position:relative;}' +
         '.udxl__rows{width:100%;}' +
-        '.udxl__row{display:block;width:100%;margin:.5em 0;padding:.65em 1.1em;border-radius:.9em;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);text-align:left;box-sizing:border-box;}' +
+        // Row: main+sub stack on the left, an optional right-aligned quality
+        // cell (online rows) on the right - the NUM reference layout.
+        '.udxl__row{display:flex;align-items:center;gap:1.2em;width:100%;margin:.5em 0;padding:.65em 1.1em;border-radius:.9em;background:rgba(8,18,28,.55);border:1px solid rgba(255,255,255,.12);text-align:left;box-sizing:border-box;}' +
         '.udxl__row.focus{background:rgba(56,197,255,.14);border-color:rgba(56,197,255,.55);transform:translateX(.15em);}' +
+        '.udxl__row__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}' +
         '.udxl__row__main{font-size:1.05em;font-weight:600;line-height:1.35;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxl__row__sub{font-size:.9em;line-height:1.35;color:#9fb2c4;margin-top:.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+        '.udxl__row__q{flex:0 0 auto;font-size:.95em;font-weight:700;line-height:1.4;color:#cdd8e4;white-space:nowrap;}' +
         '</style>';
 
     function boot() {
@@ -1443,12 +1454,16 @@
             lastRow = null;
             var self = this;
 
+            // Online rows carry the item's quality token as the right cell
+            // (NUM-style quality marker): the site lists its embeds without
+            // per-embed labels, so the page-level quality is the honest one.
+            var qTok = mode === 'online' ? releaseQuality((detail && detail.quality) || '') : '';
             var data = mode === 'online'
                 ? rows.map(function (u, i) {
                     var host = (u.match(/^https?:\/\/([^\/?#]+)/i) || [])[1] || '';
                     var t = L.Lang.translate('ultradox_online');
                     if (rows.length > 1) t += ' ' + (i + 1);
-                    return { main: t, sub: host, data: u };
+                    return { main: t, sub: host, q: qTok, data: u };
                 })
                 : releaseRows(detail);
 
@@ -1467,15 +1482,24 @@
         this.appendRow = function (row) {
             var el = document.createElement('div');
             el.addClass('simple-button selector udxl__row');
+            var body = document.createElement('div');
+            body.addClass('udxl__row__body');
             var main = document.createElement('div');
             main.addClass('udxl__row__main');
             main.text(row.main);
-            el.append(main);
+            body.append(main);
             if (row.sub) {
                 var sub = document.createElement('div');
                 sub.addClass('udxl__row__sub');
                 sub.text(row.sub);
-                el.append(sub);
+                body.append(sub);
+            }
+            el.append(body);
+            if (row.q) {
+                var q = document.createElement('div');
+                q.addClass('udxl__row__q');
+                q.text(row.q);
+                el.append(q);
             }
 
             var self = this;

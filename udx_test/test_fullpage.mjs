@@ -61,8 +61,8 @@
 //      in-page empty state.
 //      Both controls share one base geometry (60-64px tall at the 1080p root
 //      font, identical padding/radius/icon container, transform-only focus =
-//      no layout shift) while the roles differ: left secondary dark glass,
-//      right primary turquoise-blue gradient.
+//      no layout shift) while the roles differ (NUM reference design): left
+//      primary green-blue gradient, right secondary dark glass.
 //   10. Backdrop fallbacks: fill() resets the previous image/states first,
 //      then applies exactly one state - a valid backdrop stays a plain url()
 //      with --on and no .udxf--poster; the poster fallback is a plain url()
@@ -714,7 +714,7 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
         return !!r && !/height:/.test(r[1]) && !/padding:/.test(r[1]) && !/border-radius:/.test(r[1]);
     }), JSON.stringify(mods));
     check('strip: focus logic is transform-only for both roles (no layout shift)', /\.udxf__act--online\.focus\{[^}]*transform:translateY\(-\.1em\)[^}]*box-shadow[^}]*\}/.test(src) && /\.udxf__act--torrents\.focus\{[^}]*transform:translateY\(-\.1em\)[^}]*box-shadow[^}]*\}/.test(src), 'missing or shifting focus rule');
-    check('strip: left role is secondary dark glass, right role is primary turquoise-blue gradient', /\.udxf__act--online\{background:rgba\(9,29,43,\.62\);border:1px solid rgba\(255,255,255,\.24\);color:#dbe7f2;\}/.test(src) && /\.udxf__act--torrents\{background:linear-gradient\(135deg,#18b7d8 0%,#2e6bf0 100%\)/.test(src), 'role styles missing');
+    check('strip: left role is primary green-blue gradient, right role is secondary dark glass (NUM design)', /\.udxf__act--online\{background:linear-gradient\(120deg,#1fc26d 0%,#2e6bf0 100%\);border:1px solid rgba\(255,255,255,\.20\);color:#fff;\}/.test(src) && /\.udxf__act--torrents\{background:rgba\(9,29,43,\.62\);border:1px solid rgba\(255,255,255,\.24\);color:#dbe7f2;\}/.test(src), 'role styles missing');
     check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_ONLINE = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
 })();
 
@@ -746,6 +746,7 @@ check('fullpage: list page shows the item info card (title + meta)', txt(lpr, '.
 check('fullpage: list page backdrop is the item fanart', lpr.find('.udxl__backdrop') !== null && lpr.find('.udxl__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/show-fanart.jpg")' && lpr.find('.udxl__backdrop').classes.has('udxl__backdrop--on'), lpr.find('.udxl__backdrop') ? String(lpr.find('.udxl__backdrop').style.backgroundImage) : 'no backdrop element');
 const rowsT = findAll(lpr, 'udxl__row');
 check('fullpage: two real releases listed as quality • size rows', rowsT.length === 2 && rowsT[0].find('.udxl__row__main').text() === 'WEB-DL 1080p • 10 GB' && rowsT[1].find('.udxl__row__main').text() === 'WEB-DL 1080p • 10 GB', rowsT.map((r) => r.find('.udxl__row__main').text()).join('|'));
+check('fullpage: release rows carry no separate quality cell (quality already in the main label)', rowsT.length > 0 && rowsT.every((r) => r.find('.udxl__row__q') === null), rowsT.map((r) => String(r.find('.udxl__row__q'))).join('|'));
 check('fullpage: row focus drives the list scroll (scroll.update)', (function () {
     const before = L.Scroll.last.updateCalls;
     rowsT[0].handlers['hover:focus'].forEach((f) => f());
@@ -813,6 +814,7 @@ lpO.create();
 const lpo = lpO.render();
 const rowsO = findAll(lpo, 'udxl__row');
 check('fullpage: the page lists the site\'s real embed (the #iframe_block-player iframe)', rowsO.length === 1 && rowsO[0].find('.udxl__row__main').text() === L.Lang.translate('ultradox_online') && txt(rowsO[0], '.udxl__row__sub') === 'vid1793313812.sevstar933krop.com', rowsO.map((r) => r.find('.udxl__row__main').text() + ':' + txt(r, '.udxl__row__sub')).join('|'));
+check('fullpage: the online row shows the item quality token in the right cell (NUM-style quality choice)', rowsO.length === 1 && rowsO[0].find('.udxl__row__q') !== null && txt(rowsO[0], '.udxl__row__q') === 'WEB-DL', 'q=' + (rowsO[0] ? txt(rowsO[0], '.udxl__row__q') : 'no row'));
 const oTorr = L.Torrent.calls.length;
 rowsO[0].handlers['hover:enter'].forEach((f) => f());
 check('fullpage: the explicit row pick opens the site embed through Lampa.Player.play exactly once', L.Player.plays.length === playsBeforeOnline + 1, String(L.Player.plays.length - playsBeforeOnline));
