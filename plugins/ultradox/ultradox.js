@@ -4,13 +4,25 @@
  *          Settings -> Plugins -> +  (e.g. https://cdn.jsdelivr.net/gh/vaservaga/lampa-plugins@<commit-sha>/plugins/ultradox/ultradox.js)
  * Requires Lampa already configured to use TorrServer (internal torrclient + TorrServer URL).
  *
- * UI (Phase 3, NUM parity): core card grid (.category-full + Template 'card')
+ * UI (Phase 4, NUM parity): core card grid (.category-full + Template 'card')
  * with the type badge top-left, quality badge bottom-left and the year under
  * the title; category buttons in the head (simple-button); full detail page
- * (validated backdrop, poster left, meta, overview) with a release selector.
- * All displayed data comes from the Ultradox HTML itself; no external
- * metadata services are queried and no key is ever hardcoded in this plugin.
- * Torrent/TorrServer playback is a later stage, not wired here.
+ * (validated backdrop, poster left, meta, overview) with exactly two actions:
+ *   left  "Онлайн"    -> the site's own online route (the #iframe_block-player
+ *                        embed parsed from the detail page) opened through the
+ *                        standard Lampa player call (Lampa.Player.play), the
+ *                        same call the local online sources use;
+ *   right "TorrServer"-> the real release list of the item (quality + size
+ *                        rows via L.Select). Only after the user picks a row
+ *                        the standard Lampa torrent flow runs (L.Torrent.start
+ *                        with MagnetUri/Size, exactly as the earlier
+ *                        Ultradox build used it). No button ever starts a
+ *                        magnet/download/playback on its own.
+ * The base data comes from the Ultradox HTML itself. TMDB enrichment
+ * (rating, original title, seasons) is best-effort through the already
+ * present Lampa core integration only (Lampa.TMDB.api + L.Reguest.silent);
+ * when it is unavailable or fails the detail page keeps working with the
+ * Ultradox data alone. No key is ever hardcoded in this plugin.
  */
 (function () {
     'use strict';
@@ -41,8 +53,8 @@
     var goodBase = null;
 
     var ICON_MENU = '<svg width="38" height="31" viewBox="0 0 38 31" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8-4-1-7-4-7-9V3h6v9c0 4 3 6 7 6s7-2 7-6V3z" fill="currentColor"/><path d="M22 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8V3z" fill="currentColor" opacity="0.55"/></svg>';
-    // Layers pictogram for the quality selector (own minimal mark).
-    var ICON_QUALITY = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3l8 4.4-8 4.4-8-4.4L12 3z" fill="currentColor"/><path d="M4 12.2l8 4.4 8-4.4M4 16.4l8 4.4 8-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+    // Globe mark for the online action (own minimal mark; no play triangle).
+    var ICON_ONLINE = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" stroke="currentColor" stroke-width="1.7"/></svg>';
     // List pictogram for the releases button: a plain list, no play hint.
     var ICON_RELEASES = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.5 5.5h11M8.5 12h11M8.5 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="4.2" cy="5.5" r="1.5" fill="currentColor"/><circle cx="4.2" cy="12" r="1.5" fill="currentColor"/><circle cx="4.2" cy="18.5" r="1.5" fill="currentColor"/></svg>';
 
@@ -66,12 +78,15 @@
                 '<div class="udxf__meta">' +
                     '<div class="udxf__top"></div>' +
                     '<div class="udxf__title"></div>' +
+                    '<div class="udxf__rate hide"></div>' +
+                    '<div class="udxf__orig hide"></div>' +
                     '<div class="udxf__line"></div>' +
+                    '<div class="udxf__seasons hide"></div>' +
                     '<div class="udxf__overview"></div>' +
                     '<div class="udxf__fact udxf__fact--director"></div>' +
                     '<div class="udxf__fact udxf__fact--cast"></div>' +
                     '<div class="udxf__actions">' +
-                        '<div class="simple-button selector udxf__act udxf__act--quality">' + ICON_QUALITY + '<span class="udxf__act__label udxf__qlab"></span></div>' +
+                        '<div class="simple-button selector udxf__act udxf__act--online">' + ICON_ONLINE + '<span class="udxf__act__label udxf__olab"></span></div>' +
                         '<div class="simple-button selector udxf__act udxf__act--torrents">' + ICON_RELEASES + '<span class="udxf__act__label udxf__tlab"></span></div>' +
                     '</div>' +
                 '</div>' +
@@ -101,6 +116,12 @@
         '.udxf__backdrop--on{opacity:1;}' +
         '.udxf__backdrop--poster{opacity:1;transform:scale(1.1);filter:blur(22px) brightness(.72) saturate(.82);}' +
         '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.55),rgba(6,28,41,.88) 72%);}' +
+        // Poster-fallback state (.udxf--poster on the root): the poster doubles
+        // as the backdrop, so the veil darkens the left text zone and the bottom
+        // rows (title/overview/actions) and fades to clear artwork toward the
+        // right and the top - no layer is opaque, so the image stays visible
+        // as atmosphere on the right.
+        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(6,28,41,.84),rgba(6,28,41,.52) 46%,rgba(6,28,41,0) 78%),linear-gradient(to top,rgba(6,28,41,.62),rgba(6,28,41,0) 44%);}' +
         '.udxf__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 6% 0 5%;box-sizing:border-box;}' +
         '.udxf__poster{flex-shrink:0;width:12em;border-radius:.5em;background:#3E3E3E;box-shadow:0 .8em 2em rgba(0,0,0,.55);}' +
         '.udxf__meta{margin-left:2.2em;min-width:0;max-width:62%;}' +
@@ -115,12 +136,18 @@
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1.05em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        '.udxf__act--quality{background:rgba(9,29,43,.62);border:1px solid rgba(255,255,255,.24);color:#dbe7f2;}' +
-        '.udxf__act--quality.focus{border-color:rgba(255,255,255,.55);transform:translateY(-.1em);box-shadow:0 .3em .8em rgba(0,0,0,.38);}' +
+        '.udxf__act--online{background:rgba(9,29,43,.62);border:1px solid rgba(255,255,255,.24);color:#dbe7f2;}' +
+        '.udxf__act--online.focus{border-color:rgba(255,255,255,.55);transform:translateY(-.1em);box-shadow:0 .3em .8em rgba(0,0,0,.38);}' +
         '.udxf__act--torrents{background:linear-gradient(135deg,#18b7d8 0%,#2e6bf0 100%);border:1px solid rgba(255,255,255,.20);}' +
         '.udxf__act--torrents.focus{transform:translateY(-.1em);box-shadow:0 .4em .9em rgba(0,0,0,.42),0 0 0 .22em rgba(56,197,255,.28);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#0f3d1a;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         '.udxf__fact{font-size:1.05em;line-height:1.45;color:#9fb2c4;margin-top:.8em;}' +
+        // TMDB enrichment slots: hidden until a real value arrives (best-effort,
+        // the page never waits for them and keeps working without any of them).
+        '.udxf .hide{display:none;}' +
+        '.udxf__rate{font-size:1.05em;font-weight:600;color:#ffd66b;margin-top:.6em;}' +
+        '.udxf__orig{font-size:1em;color:#9fb2c4;margin-top:.3em;}' +
+        '.udxf__seasons{font-size:1.05em;color:#9fb2c4;margin-top:.8em;}' +
         '</style>';
 
     function boot() {
@@ -131,9 +158,12 @@
             ultradox_title: { uk: 'Ultradox', ru: 'Ultradox', en: 'Ultradox', be: 'Ultradox' },
             ultradox_empty: { uk: 'Нічого не знайдено', ru: 'Ничего не найдено', en: 'Nothing found', be: 'Нічога не знайдзена' },
             ultradox_no_link: { uk: 'Немає посилання на торент', ru: 'Нет ссылки на торрент', en: 'No torrent link', be: 'Няма спасылкі' },
-            ultradox_quality_pick: { uk: 'Вибрати якість', ru: 'Выбрать качество', en: 'Pick quality', be: 'Выбраць якасць' },
-            ultradox_torrents: { uk: 'Торенти', ru: 'Торренты', en: 'Torrents', be: 'Торэнты' },
+            ultradox_online: { uk: 'Онлайн', ru: 'Онлайн', en: 'Online', be: 'Анлайн' },
+            ultradox_no_online: { uk: 'Немає онлайн-джерела', ru: 'Нет онлайн-источника', en: 'No online source', be: 'Няма анлайн-крыніцы' },
+            ultradox_torrserver: { uk: 'TorrServer', ru: 'TorrServer', en: 'TorrServer', be: 'TorrServer' },
             ultradox_release_selected: { uk: 'Реліз вибрано', ru: 'Релиз выбран', en: 'Release selected', be: 'Выбран рэліз' },
+            ultradox_rating: { uk: 'Рейтинг', ru: 'Рейтинг', en: 'Rating', be: 'Рэйтынг' },
+            ultradox_seasons: { uk: 'Сезонів', ru: 'Сезонов', en: 'Seasons', be: 'Сезонаў' },
             ultradox_director: { uk: 'Режисер', ru: 'Режиссёр', en: 'Director', be: 'Рэжысёр' },
             ultradox_cast: { uk: 'У ролях', ru: 'В ролях', en: 'Starring', be: 'У ролях' }
         });
@@ -189,6 +219,29 @@
         net.native(url, ok, err, undefined, { dataType: 'text' });
     }
 
+    // Best-effort TMDB through the already-present Lampa core integration:
+    // Lampa.TMDB.api builds the request URL (auth comes from the Lampa
+    // account/settings, exactly like the core and the tmdb_proxy plugin do);
+    // this plugin never carries a key of its own. Any absence or failure of
+    // that integration is reported to the err callback and silently ignored
+    // by the detail page (it keeps working with the Ultradox data alone).
+    function tmdbAvailable() {
+        try { return !!(window.Lampa && window.Lampa.TMDB && typeof window.Lampa.TMDB.api === 'function'); } catch (e) { return false; }
+    }
+
+    function tmdbLang() {
+        try { var l = window.Lampa.Storage.get('tmdb_lang', 'ru'); return (l ? String(l) : 'ru') || 'ru'; } catch (e) { return 'ru'; }
+    }
+
+    function tmdbJson(path, ok, err) {
+        if (!tmdbAvailable()) { if (err) err(new Error('tmdb unavailable')); return; }
+        var url = '';
+        try { url = window.Lampa.TMDB.api(path); } catch (e) { if (err) err(e); return; }
+        var net = new window.Lampa.Reguest();
+        net.timeout(15000);
+        net.silent(url, ok, err);
+    }
+
     function countryFromDetail(html) {
         var m = (html || '').match(/<li[^>]*itemprop="contributor"[^>]*>\s*<span>\s*Страна:\s*<\/span>\s*([^<]+)/i);
         return m ? strip(m[1]) : '';
@@ -200,7 +253,8 @@
     function parseDetail(html) {
         var out = {
             overview: '', genre: '', country: '', year: '', runtime: '',
-            translation: '', quality: '', director: '', cast: '', imdb: '', backdrop: '', releases: []
+            translation: '', quality: '', director: '', cast: '', imdb: '',
+            backdrop: '', online: '', releases: []
         };
         if (!html) return out;
         function field(re) { var m = html.match(re); return m ? strip(m[1]) : ''; }
@@ -234,6 +288,12 @@
 
         var og = html.match(/og:image" content="([^"]+)"/);
         if (og && validBackdrop(og[1])) out.backdrop = og[1];
+
+        // The site's own online route: the "Смотреть онлайн" embed inside
+        // #iframe_block-player (the trailer tab loads via ajax and has no
+        // iframe src, so the player block is matched explicitly).
+        var pl = html.match(/id="iframe_block-player"[\s\S]{0,600}?<iframe[^>]+src="([^"]+)"/);
+        if (pl) out.online = decode(pl[1]);
 
         var mags = parseMagnets(html);
         for (var i = 0; i < mags.length; i++) {
@@ -839,19 +899,29 @@
         };
     }
 
-    // Full release page (catalog -> OK): backdrop only from the film's own fanart,
-    // poster on the left, metadata + overview on the right, and a compact action
-    // strip (quality selector + "Torrents") whose both controls open the list of
-    // the film's concrete releases; selecting one keeps the choice in memory of
-    // this page and updates the quality label only (playback is a later stage).
-    // No TMDB, no core full component. Back returns to the catalog on the same card.
+    // Full release page (catalog -> OK): backdrop only from the film's own
+    // fanart (without one, the poster doubles as a zone-veiled backdrop),
+    // poster on the left, metadata + overview on the right, and a compact
+    // action strip with exactly two actions:
+    //   left  "Онлайн"    -> the site's own online embed, opened through
+    //                        Lampa.Player.play (the standard online route the
+    //                        local online sources use), or a message when the
+    //                        page has no online source;
+    //   right "TorrServer"-> the real release list (quality • size rows);
+    //                        only after an explicit user pick the standard
+    //                        Lampa torrent flow runs (L.Torrent.start).
+    // TMDB enrichment (rating / original title / seasons) is best-effort via
+    // the core Lampa.TMDB integration; without it the page shows the
+    // Ultradox data alone. Back returns to the catalog on the same card.
     function FullPage(object) {
         var L = window.Lampa;
         var item = object.item || {};
         var detail = null;
         var built = false;
-        var qualityBtn = null, qualityLabel = null, torrentsBtn = null, torrentsLabel = null;
-        var selectedRelease = null;
+        var onlineBtn = null, torrentsBtn = null;
+        var tmdbSeasons = 0;
+        var enrichToken = 0;
+        var udxRoot = null;
         var html = document.createElement('div');
 
         this.create = function () {
@@ -870,7 +940,7 @@
                 detail = parseDetail(raw);
                 self.build();
             }, function () {
-                detail = { overview: '', genre: '', country: '', year: '', runtime: '', translation: '', quality: '', director: '', cast: '', imdb: '', backdrop: '', releases: [] };
+                detail = { overview: '', genre: '', country: '', year: '', runtime: '', translation: '', quality: '', director: '', cast: '', imdb: '', backdrop: '', online: '', releases: [] };
                 self.build();
             });
         };
@@ -881,16 +951,22 @@
             if (!built) {
                 built = true;
                 html.append($(DETAIL_HTML));
-                qualityBtn = html.find('.udxf__act--quality');
+                udxRoot = html.find('.udxf');
+                onlineBtn = html.find('.udxf__act--online');
                 torrentsBtn = html.find('.udxf__act--torrents');
-                qualityLabel = html.find('.udxf__qlab');
-                torrentsLabel = html.find('.udxf__tlab');
-                if (torrentsLabel) torrentsLabel.text(L.Lang.translate('ultradox_torrents'));
-                // One shared path for both controls: opening the release list.
+                // Left action: the site's own online route (no invented URL),
+                // opened through the standard Lampa player call.
                 var self = this;
-                var openReleases = function () { self.showReleases(); };
-                if (qualityBtn) qualityBtn.on('hover:enter', openReleases);
-                if (torrentsBtn) torrentsBtn.on('hover:enter', openReleases);
+                if (onlineBtn) {
+                    onlineBtn.find('.udxf__olab').text(L.Lang.translate('ultradox_online'));
+                    onlineBtn.on('hover:enter', function () { self.playOnline(); });
+                }
+                // Right action: the real release list; the standard Lampa
+                // torrent flow runs only after an explicit user pick.
+                if (torrentsBtn) {
+                    torrentsBtn.find('.udxf__tlab').text(L.Lang.translate('ultradox_torrserver'));
+                    torrentsBtn.on('hover:enter', function () { self.showTorrServer(); });
+                }
                 // Lampa's Element.prototype.find returns a single node
                 // (querySelector), not a collection: use it directly, guard null.
                 var poster = html.find('.udxf__poster');
@@ -904,19 +980,46 @@
             }
 
             this.fill();
+            // Best-effort TMDB enrichment (never blocks or breaks the page):
+            // the slot elements are already present; a missing/failed
+            // integration simply leaves them hidden.
+            this.enrich();
             if (this.activity) this.activity.toggle();
         };
 
         this.fill = function () {
             var d = detail || {};
 
+            // The card poster may double as the backdrop, but only a real
+            // absolute URL from a non-pixhost host: the pixhost family answers
+            // its "Picture removed" placeholder, which must never reach the
+            // full-screen background (the left <img> keeps the raw URL).
+            var posterBackdrop = '';
+            var pstr = item.poster ? String(item.poster) : '';
+            if (/^https?:\/\//i.test(pstr)) {
+                var phost = pstr.match(/^https?:\/\/([^\/?#]+)/i);
+                if (!(phost && /(^|\.)pixhost\.cc$/i.test(phost[1]))) posterBackdrop = pstr;
+            }
+
             var bg = html.find('.udxf__backdrop');
+            // Reset first: the previous page's image and states never survive
+            // a fill(); the branch below applies exactly one state.
+            if (bg) {
+                bg.style.backgroundImage = '';
+                bg.removeClass('udxf__backdrop--on');
+                bg.removeClass('udxf__backdrop--poster');
+            }
+            if (udxRoot) udxRoot.removeClass('udxf--poster');
             if (d.backdrop && bg) {
                 bg.style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
                 bg.addClass('udxf__backdrop--on');
-            } else if (item.poster && bg) {
-                bg.style.backgroundImage = 'linear-gradient(90deg,rgba(6,28,41,.86),rgba(6,28,41,.35) 58%),linear-gradient(to top,rgba(6,28,41,.78),rgba(6,28,41,0) 42%),url("' + item.poster.replace(/"/g, '%22') + '")';
+            } else if (posterBackdrop && bg) {
+                // Poster as backdrop: the plain image only - all darkening
+                // lives in the zone veil (.udxf--poster state), not embedded
+                // into the background-image here.
+                bg.style.backgroundImage = 'url("' + posterBackdrop.replace(/"/g, '%22') + '")';
                 bg.addClass('udxf__backdrop--poster');
+                if (udxRoot) udxRoot.addClass('udxf--poster');
             }
 
             html.find('.udxf__title').text(stripYear(item.title));
@@ -924,65 +1027,173 @@
             var top = [];
             if (d.country) top.push(d.country);
             if (d.year) top.push(d.year);
-            var topEl = html.find('.udxf__top');
-            if (top.length) topEl.text(top.join(' • ')); else topEl.remove();
+            slotShow('.udxf__top', top.length ? top.join(' • ') : '');
 
             var line = [];
             if (d.genre) line.push(d.genre);
             if (d.runtime) line.push(d.runtime);
             if (d.translation) line.push(d.translation);
-            var lineEl = html.find('.udxf__line');
-            if (line.length) lineEl.text(line.join(' • ')); else lineEl.remove();
+            slotShow('.udxf__line', line.length ? line.join(' • ') : '');
 
-            var ov = html.find('.udxf__overview');
-            if (d.overview) ov.text(d.overview); else ov.remove();
-
-            var directorEl = html.find('.udxf__fact--director');
-            if (d.director) directorEl.text(L.Lang.translate('ultradox_director') + ': ' + d.director); else directorEl.remove();
+            slotShow('.udxf__overview', d.overview || '');
+            slotShow('.udxf__fact--director', d.director ? L.Lang.translate('ultradox_director') + ': ' + d.director : '');
 
             var castNames = d.cast ? String(d.cast).split(',').map(function (n) { return n.replace(/\s+/g, ' ').trim(); }).filter(function (n) { return n; }) : [];
-            var castEl = html.find('.udxf__fact--cast');
+            var castShown = '';
             if (castNames.length) {
-                var castShown = castNames.slice(0, 5).join(', ');
+                castShown = castNames.slice(0, 5).join(', ');
                 if (castNames.length > 5) castShown += ' …';
-                castEl.text(L.Lang.translate('ultradox_cast') + ': ' + castShown);
-            } else castEl.remove();
+            }
+            slotShow('.udxf__fact--cast', castShown ? L.Lang.translate('ultradox_cast') + ': ' + castShown : '');
 
-            // The quality label mirrors only the release chosen on this page
-            // (in-memory); the placeholder stays until the first selection.
-            updateQualityLabel();
+            // TMDB enrichment slots: hidden here; the enrichment (if it runs)
+            // reveals them later. The page never waits for any of them.
+            slotShow('.udxf__rate', '');
+            slotShow('.udxf__orig', '');
+            slotShow('.udxf__seasons', '');
         };
 
-        // Left-button label: the normalized quality of the release chosen on
-        // this page, or the placeholder until the first selection. Only the
-        // quality is shown - never a magnet, hash, URL or size.
-        function updateQualityLabel() {
-            if (!qualityLabel) return;
-            var q = (selectedRelease && selectedRelease.label) ? releaseQuality(selectedRelease.label) : '';
-            qualityLabel.text(q || L.Lang.translate('ultradox_quality_pick'));
+        // One show/hide primitive for all optional meta rows: text + visible,
+        // or empty + hidden (the .hide class is the core display:none marker).
+        function slotShow(sel, text) {
+            var e = html.find(sel);
+            if (!e) return;
+            if (text) { e.text(text); e.removeClass('hide'); }
+            else { e.text(''); e.addClass('hide'); }
         }
 
-        this.showReleases = function () {
+        // The page's releases normalized for the lists: a quality token plus
+        // the human size ("quality • size"), with the raw release carried as
+        // the selection payload. Memory only - never an HTTP request.
+        function releaseRows() {
             var rel = (detail && detail.releases) || [];
-            if (!rel.length) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
+            var out = [];
+            for (var i = 0; i < rel.length; i++) {
+                var r = rel[i];
+                var q = releaseQuality(r.label);
+                var t = q || r.label || '';
+                if (t && r.size) t += ' • ' + r.size;
+                else if (!t) t = r.size || '';
+                if (!t) continue;
+                out.push({ q: q, title: t, release: r });
+            }
+            return out;
+        }
+
+        // The single L.Select.show path shared by both strip controls: back
+        // returns focus to the page, select hands the chosen row to a callback.
+        function openSelect(title, items, onSelect) {
             L.Select.show({
-                title: item.title,
-                items: rel.map(function (r) {
-                    var parts = [];
-                    if (r.label) parts.push(r.label);
-                    if (r.size) parts.push(r.size);
-                    return { title: parts.join(' • '), id: r };
-                }),
+                title: title,
+                items: items,
                 onBack: function () { L.Controller.toggle('content'); },
                 onSelect: function (chosen) {
-                    // Informational only: keep the choice in memory of this
-                    // detail page and refresh the quality label. No execution.
-                    if (chosen && chosen.id) selectedRelease = chosen.id;
-                    updateQualityLabel();
                     L.Controller.toggle('content');
-                    L.Noty.show(L.Lang.translate('ultradox_release_selected'));
+                    if (chosen && chosen.id) onSelect(chosen.id);
                 }
             });
+        }
+
+        // Left action "Онлайн": opens the site's own online route - the
+        // #iframe_block-player embed parsed from this item's detail page -
+        // through the standard Lampa player call (the same Lampa.Player.play
+        // the local online sources use). No player URL is invented here; when
+        // the page has no online source a clear message is shown instead.
+        this.playOnline = function () {
+            var u = detail && detail.online;
+            var P = L.Player;
+            if (!u || !P || typeof P.play !== 'function') {
+                L.Noty.show(L.Lang.translate('ultradox_no_online'));
+                return;
+            }
+            L.Player.play({ url: u, title: item.title });
+        };
+
+        // Right action "TorrServer": the real release list of the item as
+        // quality • size rows. The button itself only opens the list - no
+        // magnet, download or playback starts without the user's explicit pick.
+        this.showTorrServer = function () {
+            var rows = releaseRows();
+            if (!rows.length) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
+            var self = this;
+            openSelect(item.title, rows.map(function (r) { return { title: r.title, id: r }; }), function (row) {
+                L.Noty.show(L.Lang.translate('ultradox_release_selected'));
+                self.startTorrServer(row.release);
+            });
+        };
+
+        // Standard Lampa torrent flow, called only after the user picked a
+        // concrete release row above. Same payload shape the earlier Ultradox
+        // build used for TorrServer playback (MagnetUri/Size/Title).
+        this.startTorrServer = function (r) {
+            if (!r || !r.magnet) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
+            var o = {
+                title: item.title,
+                Title: item.title,
+                Tracker: 'Ultradox',
+                size: r.size || '',
+                Size: r.sizeBytes || 0,
+                Seeders: 0,
+                Peers: 0,
+                MagnetUri: r.magnet,
+                Link: ''
+            };
+            var movie = {
+                title: item.title,
+                original_title: item.title,
+                img: item.poster || '',
+                number_of_seasons: item.serial ? (tmdbSeasons || 1) : undefined
+            };
+            L.Torrent.start(o, movie);
+        };
+
+        // Best-effort TMDB enrichment through the core Lampa integration only
+        // (Lampa.TMDB.api builds the authed URL; nothing is hardcoded here).
+        // Every failure is a silent no-op: the detail page keeps the
+        // Ultradox-sourced data and stays fully usable.
+        this.enrich = function () {
+            var imdb = detail && detail.imdb;
+            if (!imdb || !tmdbAvailable()) return;
+            var self = this;
+            var token = ++enrichToken;
+            var lang = tmdbLang();
+            tmdbJson('find/' + imdb + '?external_sources=imdb_id&language=' + lang, function (found) {
+                if (token !== enrichToken || !udxRoot) return;
+                var res = found && found.results;
+                if (!res || !res.length) return;
+                var pick = null;
+                for (var i = 0; i < res.length; i++) {
+                    if (res[i].media_type === 'movie' || res[i].media_type === 'tv') { pick = res[i]; break; }
+                }
+                if (!pick) return;
+                var type = pick.media_type;
+                tmdbJson(type + '/' + pick.id + '?language=' + lang, function (data) {
+                    if (token !== enrichToken || !udxRoot) return;
+                    if (data) self.applyTmdb({ type: type, data: data });
+                });
+                tmdbJson(type + '/' + pick.id + '/credits?language=' + lang, function (cr) {
+                    if (token !== enrichToken || !udxRoot) return;
+                    // Credits arrive too but are not displayed: the site's own
+                    // cast row is the confirmed source and already shown.
+                });
+            }, function () { /* integration missing or request failed: keep Ultradox data */ });
+        };
+
+        // Apply the parts of the TMDB payload that add confirmed data the
+        // site does not carry: rating, original title, season count (series).
+        this.applyTmdb = function (meta) {
+            if (!udxRoot) return;
+            var d = meta.data || {};
+            if (typeof d.vote_average === 'number' && d.vote_average > 0) {
+                slotShow('.udxf__rate', L.Lang.translate('ultradox_rating') + ': ' + (Math.round(d.vote_average * 10) / 10).toFixed(1));
+            }
+            var ot = String(d.original_title || '');
+            var shown = stripYear(String(item.title || ''));
+            if (ot && ot.toLowerCase() !== shown.toLowerCase()) slotShow('.udxf__orig', ot);
+            if (meta.type === 'tv' && typeof d.number_of_seasons === 'number' && d.number_of_seasons > 0) {
+                tmdbSeasons = d.number_of_seasons;
+                slotShow('.udxf__seasons', L.Lang.translate('ultradox_seasons') + ': ' + d.number_of_seasons);
+            }
         };
 
         this.start = function () {
@@ -993,7 +1204,7 @@
                 invisible: true,
                 toggle: function () {
                     L.Controller.collectionSet(html);
-                    L.Controller.collectionFocus(qualityBtn, html);
+                    L.Controller.collectionFocus(onlineBtn, html);
                 },
                 left: function () {
                     if (NavCanMove('left')) NavMove('left');
@@ -1017,8 +1228,9 @@
         this.destroy = function () {
             html.remove();
             built = false;
-            qualityBtn = null; qualityLabel = null; torrentsBtn = null; torrentsLabel = null;
-            selectedRelease = null;
+            onlineBtn = null; torrentsBtn = null; udxRoot = null;
+            tmdbSeasons = 0;
+            enrichToken++;
         };
     }
 

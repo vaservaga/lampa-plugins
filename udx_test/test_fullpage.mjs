@@ -10,30 +10,59 @@
 // find(), which masked the poster[0].src TypeError seen on the real Shield.
 //
 // Verifies:
-//   1. Static scan of the plugin source: no Torrent.start / MagnetUri /
-//      playRelease tokens remain (no executable playback path left) and no
-//      executable external-metadata tokens remain (no core metadata object
-//      access, no external API host, no key parameter, no request helpers).
+//   1. Static scan of the plugin source: no auto-playback tokens remain
+//      (playRelease / chooseFile / hover:long) and no hardcoded TMDB key
+//      material (no external API host, no key parameter, no key helpers).
+//      The standard Lampa flows are present as exactly one call site each:
+//      L.Torrent.start (after an explicit user pick) and L.Player.play (the
+//      online route); TMDB is reached only through the core integration
+//      (window.Lampa.TMDB.api).
 //   2. The detail page builds from the fetched page: backdrop, title, metadata
 //      lines, overview; the real release list keeps label/size/magnet as UI data.
-//   3. Selecting a series release and a film release closes the selector
-//      (content controller toggle) and shows a short confirmation via L.Noty.
-//   4. L.Torrent.start is NEVER called: the mock throws on any call AND a
-//      counter must stay at zero for this test to PASS.
+//   3. Selecting a release closes the selector (content controller toggle),
+//      shows a short confirmation via L.Noty and then runs the standard
+//      TorrServer flow (L.Torrent.start with the picked release's MagnetUri/Size).
+//   4. L.Torrent.start is called ONLY through an explicit user pick: button
+//      presses, catalog navigation and hover events make zero calls; the final
+//      counter must equal the number of performed row selections.
 //   5. Catalog card still renders and opens the FullPage on hover:enter; the
-//      old long-press playback trigger (hover:long) is gone.
+//      old long-press playback trigger (hover:long) is gone; the scroll
+//      viewport is bounded (scroll.minus) and focus drives scroll.update;
+//      cards win over the legacy fallback table rows.
 //   6. All network fetches go to the public mirrors only (no external metadata
-//      service, no TorrServer/LAN); the core metadata object is never touched.
+//      service, no TorrServer/LAN); TMDB traffic goes through the core
+//      integration mock only.
 //   7. NUM-parity card: type badge top-left (.udx-kind), year under the title
 //      (release_year; the age row is removed when there is no year — no empty
 //      row rendered); no rating element is rendered on the card at all.
-//   8. Detail page carries no rating row (no rating markup left); a page
-//      rating GIF without a text value produces no rating text.
-//   9. Detail action strip: the old single "Дивитися" button is gone; exactly
-//      one quality selector + one "Торенти" button; both open the same existing
-//      release selector; a chosen release's normalized quality shows on the left
-//      button (in-memory only); re-opening does not duplicate strip/listeners;
-//      an empty release list keeps the placeholder and shows the existing message.
+//   8. Detail page: TMDB enrichment (rating / original title / seasons)
+//      appears when the core integration answers, stays hidden when it
+//      fails or is absent (the page keeps working with the Ultradox data);
+//      a page rating GIF without a text value produces no rating text.
+//   9. Detail action strip: the old single "Дивитися" button and the old
+//      quality selector are gone; exactly one "Онлайн" + one "TorrServer"
+//      button over one shared builder: "Онлайн" opens the site's own
+//      #iframe_block-player embed through Lampa.Player.play (or a clear
+//      message when the page has no online source), "TorrServer" opens the
+//      release list (quality • size rows) and starts the standard TorrServer
+//      flow only after a row is picked; re-opening does not duplicate
+//      strip/listeners; an empty release list shows the existing messages.
+//      Both controls share one base geometry (60-64px tall at the 1080p root
+//      font, identical padding/radius/icon container, transform-only focus =
+//      no layout shift) while the roles differ: left secondary dark glass,
+//      right primary turquoise-blue gradient.
+//   10. Backdrop fallbacks: fill() resets the previous image/states first,
+//      then applies exactly one state - a valid backdrop stays a plain url()
+//      with --on and no .udxf--poster; the poster fallback is a plain url()
+//      (no embedded gradient, no pixhost "Picture removed" placeholder) with
+//      the .udxf--poster root state (zone veil darkens left+bottom, fades
+//      right, no opaque layer); a pixhost-hosted poster URL never reaches the
+//      background-image (neutral fallback, left <img> untouched); the neutral
+//      case leaves no image and no state classes.
+//   11. Russian-productions filter regression: a live country lookup removes
+//      a "Россия" item, keeps a non-Russian one, keeps items whose detail
+//      fetch fails (fail-safe), and caches successful lookups (a repeat load
+//      re-fetches nothing that was already resolved).
 //
 // Run from the lampa-plugins root:  node udx_test/test_fullpage.mjs
 
@@ -53,13 +82,64 @@ function check(name, cond, extra) {
     console.log((ok ? '  ok  ' : '  FAIL  ') + name + (!ok && extra !== undefined ? '  -> ' + extra : ''));
 }
 
-// ---------- 1. static scan: no executable launch / external-metadata tokens left ----------
-for (const token of [/(?:L\.)?Torrent\.start/, /MagnetUri/, /playRelease/, /chooseFile/, /hover:long/, /window\.Lampa\.TMDB/, /L\.TMDB/, /Tmdb\./, /tmdbKey/, /tmdbGet/, /api\.themoviedb\.org/, /api_key=/]) {
-    check('static: source has no ' + token, !token.test(src));
+// ---------- 1. static scan: no auto-playback / hardcoded-key tokens left ----------
+// Call-site counts are taken from the executable code only: // and /* */
+// comments are stripped (string literals are preserved), so comments that
+// describe the standard flows never count as call sites. An aliased
+// indirection (var P = L.Player; P.play(...)) does NOT satisfy the direct-call
+// contract - exactly one literal L.Player.play( must exist, behind its guard.
+function stripComments(code) {
+    let out = '';
+    let i = 0;
+    let mode = 'code';
+    while (i < code.length) {
+        const c = code.charAt(i);
+        const n = code.charAt(i + 1);
+        if (mode === 'code') {
+            if (c === '/' && n === '/') { mode = 'line'; i += 2; continue; }
+            if (c === '/' && n === '*') { mode = 'block'; i += 2; continue; }
+            if (c === "'" || c === '"' || c === '`') mode = c;
+            out += c; i++; continue;
+        }
+        if (mode === 'line') { if (c === '\n') { mode = 'code'; out += c; } i++; continue; }
+        if (mode === 'block') { if (c === '*' && n === '/') { mode = 'code'; i += 2; continue; } i++; continue; }
+        if (c === '\\') { out += c + n; i += 2; continue; }
+        if (c === mode) mode = 'code';
+        out += c; i++; continue;
+    }
+    return out;
 }
+const codeOnly = stripComments(src);
+const countTok = (re, s) => (s.match(re) || []).length;
+for (const token of [/playRelease/, /chooseFile/, /hover:long/, /Tmdb\./, /tmdbKey/, /tmdbGet/, /api\.themoviedb\.org/, /api_key=/]) {
+    check('static: code has no ' + token, !token.test(codeOnly));
+}
+// The standard Lampa flows are now intentional - each with exactly one REAL
+// call site in the code (comments excluded).
+check('static: exactly one L.Torrent.start call site (standard flow after a user pick)', countTok(/L\.Torrent\.start\(/g, codeOnly) === 1, String(countTok(/L\.Torrent\.start\(/g, codeOnly)));
+check('static: exactly one L.Player.play call site (standard online route)', countTok(/L\.Player\.play\(/g, codeOnly) === 1, String(countTok(/L\.Player\.play\(/g, codeOnly)));
+// The single torrent handoff must live in the release-pick handler, and the
+// single player call must live in the online action - not in a comment, an
+// alias or a stray spot.
+const stDecl = codeOnly.indexOf('this.startTorrServer = function');
+const ttCall = codeOnly.indexOf('L.Torrent.start(');
+const enDecl = codeOnly.indexOf('this.enrich = function');
+check('static: the L.Torrent.start call sits inside startTorrServer (the pick handler)', stDecl !== -1 && ttCall !== -1 && enDecl !== -1 && stDecl < ttCall && ttCall < enDecl, JSON.stringify({ stDecl: stDecl, ttCall: ttCall, enDecl: enDecl }));
+const poDecl = codeOnly.indexOf('this.playOnline = function');
+const plCall = codeOnly.indexOf('L.Player.play(');
+const tsDecl = codeOnly.indexOf('this.showTorrServer = function');
+check('static: the L.Player.play call sits inside playOnline (the online action)', poDecl !== -1 && plCall !== -1 && tsDecl !== -1 && poDecl < plCall && plCall < tsDecl, JSON.stringify({ poDecl: poDecl, plCall: plCall, tsDecl: tsDecl }));
+check('static: playOnline keeps the L.Player availability guard before the direct call', (function () {
+    const zone = codeOnly.slice(poDecl, plCall);
+    return /var P = L\.Player;/.test(zone) && /if\s*\([^)]*!\s*P\b[^)]*\)/.test(zone);
+})(), 'guard missing before the call');
+check('static: MagnetUri payload field present (the TorrServer handoff)', codeOnly.indexOf('MagnetUri') !== -1);
+check('static: TMDB only through the core integration, never a direct host', codeOnly.indexOf('window.Lampa.TMDB') !== -1 && codeOnly.indexOf('api.themoviedb.org') === -1);
+check('static: no raw themoviedb host or key parameter anywhere', codeOnly.indexOf('themoviedb.org') === -1 && codeOnly.indexOf('api_key') === -1);
 check('static: old single "Дивитися" button markup is gone', src.indexOf('.udx-f__play') === -1, '.udx-f__play still in source');
 check('static: old watch lang key removed', src.indexOf('ultradox_watch') === -1, 'ultradox_watch still in source');
-check('static: no play-triangle glyph introduced in the action strip', src.indexOf('polygon') === -1 && /svg/.test(src) && src.indexOf('ICON_QUALITY') !== -1 && src.indexOf('ICON_RELEASES') !== -1, 'unexpected icon markup');
+check('static: old quality selector removed (control + lang key)', src.indexOf('udxf__act--quality') === -1 && src.indexOf('ultradox_quality_pick') === -1, 'quality selector still in source');
+check('static: no play-triangle glyph introduced in the action strip', src.indexOf('polygon') === -1 && /svg/.test(src) && src.indexOf('ICON_ONLINE') !== -1 && src.indexOf('ICON_RELEASES') !== -1, 'unexpected icon markup');
 
 // ---------- DOM contract, modeled on the real Lampa core (app.min.js) ----------
 // Lampa patches raw DOM nodes:
@@ -188,11 +268,20 @@ const MIRRORS = ['https://045.ultradox.click', 'https://010.ultadox.space'];
 const SERIES_URL = 'https://045.ultradox.click/serial/show-name-2021/';
 const FILM_URL = 'https://045.ultradox.click/film/great-movie-2023/';
 
+// The catalog page also carries the legacy "latest releases" table (rows with
+// magnets); the cards are the primary source and must win - the rows only
+// appear when a source has no cards at all.
 const CATALOG_HTML =
     '<html><body>' +
     '<div class="top__slider">' +
     '<div class="top__slider_div__item"><a href="/serial/show-name-2021/"><img src="/upload/show.jpg"></a>' +
     '<span>Show Name (2021)</span><span class="short-quality">Сериал</span></div></div>' +
+    '<table><tr>' +
+    '<td>2026-11-01</td><td>WEB-DL</td>' +
+    '<td><a href="/film/fallback-only-2020/">Fallback Film (2020)</a></td>' +
+    '<td>2 GB</td>' +
+    '<td><a href="magnet:?xt=urn:btih:ffffffffffffffffffffffffffffffffffffffff&amp;dn=Fallback.Film.2020.mkv&amp;xl=1073741824"></a></td>' +
+    '</tr></table>' +
     '</body></html>';
 
 const SERIES_HTML =
@@ -210,6 +299,16 @@ const SERIES_HTML =
     '<li itemprop="actor"><span>В Ролях:</span> Сакай Масато, Абэ Хироси, Никайдо Фуми, Ниномия Кадзунари, Тори Мацузака, Рё Рюсэй, Кенто Хаяси, Рин Таканаси, Рей Дан, Кодзи Якушо</li>' +
     '</ul>' +
     '<img src="https://045.ultradox.click/imdb/pic/15468572.gif">' +
+    // The site's own online route ("Смотреть онлайн" embed), shape mirrors
+    // the live detail page (#iframe_block-player with a single iframe src).
+    '<section class="full-story__player" id="player-block">' +
+    '<div class="full-story_iframe">' +
+    '<div class="full-story_iframe-block" id="iframe_block-player">' +
+    '<iframe src="https://vid1793313812.sevstar933krop.com/movie/a7c3061ee7fefc23786c1356317121b6/iframe?d=ultradox.ru" width="100%" height="480"></iframe>' +
+    '</div>' +
+    '<div class="full-story_iframe-block" id="iframe_block-trailer"><div id="trailerskp-ajax"></div></div>' +
+    '</div>' +
+    '</section>' +
     '<a href="magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&amp;dn=Show.Name.S01.E01.1080p.WEB-DLRip.mkv&amp;xl=10737418240"></a>' +
     '<a href="magnet:?xt=urn:btih:fedcba9876543210fedcba9876543210fedcba98&amp;dn=Show.Name.S01.E02.1080p.WEB-DLRip.mkv&amp;xl=10737418240"></a>' +
     '</body></html>';
@@ -239,6 +338,13 @@ const ROUTES = new Map([
 
 // ---------- Lampa mock ----------
 const fetches = [];
+// Canned TMDB documents (the only metadata source the detail page may use;
+// everything below is served through the L.TMDB.api -> Reguest.silent chain).
+const TMDB_DOCS = new Map([
+    ['find/tt15468572?external_sources=imdb_id&language=ru', { results: [{ media_type: 'tv', id: 15468572 }] }],
+    ['tv/15468572?language=ru', { vote_average: 8.1, original_title: 'Dokka', number_of_seasons: 4 }],
+    ['tv/15468572/credits?language=ru', { cast: [{ name: 'A. Test' }, { name: 'B. Test' }] }]
+]);
 const L = {
     Lang: {
         _dict: {},
@@ -250,12 +356,13 @@ const L = {
     Listener: { follow() {} },
     Layer: { update() {}, visible() {} },
     Scroll: class {
-        constructor() { this.onEnd = null; }
+        static last = null;
+        constructor() { this.onEnd = null; this.minusCalls = 0; this.lastMinus = null; this.updateCalls = 0; this.lastUpdate = null; L.Scroll.last = this; }
         append() {}
         render() { return makeEl('scroll'); }
-        minus() {}
+        minus(el) { this.minusCalls++; this.lastMinus = el; }
         reset() {}
-        update() {}
+        update(el) { this.updateCalls++; this.lastUpdate = el; }
         destroy() {}
     },
     Template: { calls: [], lastParams: null, js(name, params) {
@@ -277,13 +384,15 @@ const L = {
         L.Template.calls.push(c);
         return c;
     } },
-    Activity: { pushes: [], push(a) { this.pushes.push(a); }, active() { return null; }, backward() {}, toggle() {}, loader() {} },
+    Activity: { pushes: [], backwardCalls: 0, push(a) { this.pushes.push(a); }, active() { return null; }, backward() { this.backwardCalls++; }, toggle() {}, loader() {} },
     Controller: {
         toggles: {},
-        add() {},
+        configs: {},
+        focusCalls: [],
+        add(name, cfg) { this.configs[name] = cfg; },
         toggle(n) { this.toggles[n] = (this.toggles[n] || 0) + 1; },
         collectionSet() {},
-        collectionFocus() {},
+        collectionFocus(el, root) { this.focusCalls.push({ el: el, root: root }); },
         own() { return false; },
         collectionAppend() {}
     },
@@ -294,12 +403,20 @@ const L = {
         get(k, d) { const v = this._s[k]; return v === undefined ? d : v; },
         set(k, v) { this._s[k] = String(v); }
     },
-    // Guard: any access to the core metadata object throws AND is counted;
-    // the test passes only while the counter stays at zero.
-    TMDB: { touches: 0, key() { this.touches++; throw new Error('core metadata key access is forbidden in this stage'); }, api(u) { this.touches++; throw new Error('core metadata api access is forbidden in this stage'); } },
-    // Guard: any call to Torrent.start throws AND is counted; the test passes
-    // only while the counter stays at zero.
-    Torrent: { calls: 0, start() { this.calls++; throw new Error('L.Torrent.start is forbidden in this stage'); } },
+    // The core TMDB integration, mode-controlled:
+    //   'ok'    -> api() builds the URL, silent() answers canned docs
+    //   'fail'  -> api() builds the URL, silent() rejects (network failure)
+    //   'throw' -> api() throws (integration missing/broken in the runtime)
+    // touches counts every api() call (the only door the plugin may use).
+    TMDB: { touches: 0, mode: 'ok', api(u) { this.touches++; if (this.mode === 'throw') throw new Error('core TMDB integration unavailable'); return 'https://mock.tmdb.local/3/' + u; } },
+    // Recorder for the standard torrent flow: the plugin may call it, but the
+    // test asserts it happens only after an explicit user row selection and
+    // with the exact payload of the picked release.
+    Torrent: { calls: [], start(o, movie) { this.calls.push({ o: o, movie: movie }); } },
+    // Recorder for the standard online route (Lampa.Player.play), used by the
+    // local online sources; the plugin may call it only with the site's own
+    // #iframe_block-player embed URL.
+    Player: { plays: [], play(entry) { this.plays.push(entry); } },
     Reguest: class {
         timeout() {}
         native(url, ok, err) {
@@ -307,6 +424,14 @@ const L = {
             const h = ROUTES.get(url);
             if (h !== undefined) ok(h);
             else err(new Error('no route: ' + url));
+        }
+        silent(url, ok, err) {
+            if (!/^https:\/\/mock\.tmdb\.local\/3\//.test(url)) { err(new Error('unexpected silent url: ' + url)); return; }
+            const path = url.slice('https://mock.tmdb.local/3/'.length);
+            if (L.TMDB.mode === 'fail') { err(new Error('tmdb request failed')); return; }
+            const doc = TMDB_DOCS.get(path);
+            if (!doc) { err(new Error('no canned tmdb doc for ' + path)); return; }
+            ok(doc);
         }
     }
 };
@@ -349,7 +474,7 @@ check('catalog: hover:focus does not throw', true);
 card.handlers['hover:enter'].forEach((f) => f());
 const pushed = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('catalog: enter opens FullPage with item', pushed && pushed.component === 'ultradox_full' && pushed.item && pushed.item.itemUrl === SERIES_URL);
-check('catalog: no Torrent.start', L.Torrent.calls === 0);
+check('catalog: no Torrent.start', L.Torrent.calls.length === 0, String(L.Torrent.calls.length));
 
 // ---------- NUM-parity card: badges + year + rating ----------
 check('catalog: release_year under the title', L.Template.lastParams && L.Template.lastParams.release_year === '2021', JSON.stringify(L.Template.lastParams));
@@ -424,6 +549,14 @@ check('css: .udx-kind pinned inside the poster (left/top 10px, no negative offse
 check('css: poster fallback modifier scales + blurs the backdrop node', /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.1\)[^}]*filter:blur\(22px\)[^}]*brightness\(\.72\)[^}]*saturate\(\.82\)/.test(src), 'missing .udxf__backdrop--poster rule');
 check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
 check('css: single permanent veil overlay (left+bottom gradients)', /\.udx-bg__veil\{[^}]*z-index:1[^}]*linear-gradient\(90deg,rgba\(6,28,41,\.78\),rgba\(6,28,41,\.30\) 60%\),linear-gradient\(to top,rgba\(6,28,41,\.70\),rgba\(6,28,41,0\) 42%\)/.test(src), 'missing .udx-bg__veil rule');
+check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(6,28,41,\.84\),rgba\(6,28,41,\.52\) 46%,rgba\(6,28,41,0\) 78%\),linear-gradient\(to top,rgba\(6,28,41,\.62\),rgba\(6,28,41,0\) 44%\);}/.test(src), 'missing .udxf--poster veil rule');
+check('css: poster-state veil has no fully opaque layer (the image stays visible)', (function () {
+    const m = src.match(/\.udxf--poster \.udxf__gradient\{([^}]*)\}/);
+    return m && !/rgba\(\d+,\s*\d+,\s*\d+,\s*1(?:\.0)?\)/.test(m[1]) && m[1].indexOf('rgba(6,28,41,0) 78%') !== -1 && m[1].indexOf('rgba(6,28,41,0) 44%') !== -1;
+})(), 'opaque layer or missing fade stop');
+check('css: poster fallback uses the plain url() only (no embedded gradient)', /bg\.style\.backgroundImage = 'url\("'\s*\+\s*posterBackdrop/.test(src) && src.indexOf('rgba(6,28,41,.78),rgba(6,28,41,0) 42%') === -1, 'gradient still embedded in the poster fallback');
+check('css: fill() resets the previous image and all states before applying one', /if \(bg\) \{\s*bg\.style\.backgroundImage = '';\s*bg\.removeClass\('udxf__backdrop--on'\);\s*bg\.removeClass\('udxf__backdrop--poster'\);\s*\}/.test(src) && /if \(udxRoot\) udxRoot\.removeClass\('udxf--poster'\);/.test(src), 'reset-first block missing');
+check('css: a pixhost-hosted poster URL is kept out of the backdrop background', src.indexOf('var posterBackdrop = \'\';') !== -1 && src.indexOf('pixhost\\.cc') !== -1, 'pixhost poster guard missing');
 
 // ---------- catalog dynamic backdrop: two permanent layers + crossfade ----------
 console.log('catalog backdrop: two-layer crossfade');
@@ -495,7 +628,7 @@ check('catbg: failed load does not erase the current background', (function () {
 
 const fetchesBeforeBg = fetches.length;
 card.handlers['hover:focus'].forEach((f) => f());
-check('catbg: hover:focus causes no fetch / loadMore / torrent', fetches.length === fetchesBeforeBg && L.Torrent.calls === 0, String(fetches.length - fetchesBeforeBg) + ' new fetches');
+check('catbg: hover:focus causes no fetch / loadMore / torrent', fetches.length === fetchesBeforeBg && L.Torrent.calls.length === 0, String(fetches.length - fetchesBeforeBg) + ' new fetches');
 
 // ---------- 2/3/4. FullPage: detail build + series release selection ----------
 // The exact Shield crash case: an item WITH a poster (item.poster truthy), so
@@ -514,6 +647,7 @@ check('fullpage: exactly one backdrop element', findAll(sh, 'udxf__backdrop').le
 check('fullpage: backdrop image set', sh.find('.udxf__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/show-fanart.jpg")', sh.find('.udxf__backdrop') ? sh.find('.udxf__backdrop').style.backgroundImage : 'no backdrop element');
 check('fullpage: backdrop visible', sh.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
 check('fullpage: poster fallback not active for a valid backdrop', !sh.find('.udxf__backdrop').classes.has('udxf__backdrop--poster'));
+check('fullpage: no poster state on the root for a valid backdrop', sh.find('.udxf') !== null && !sh.find('.udxf').classes.has('udxf--poster'), String(sh.find('.udxf') && sh.find('.udxf').classes));
 check('fullpage: poster src equals the expected URL', sh.find('.udxf__poster') && sh.find('.udxf__poster').src === 'https://045.ultradox.click/upload/show.jpg', sh.find('.udxf__poster') ? sh.find('.udxf__poster').src : 'no poster element');
 check('fullpage: top line', sh.find('.udxf__top').text() === 'США • 2021', txt(sh, '.udxf__top'));
 check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', txt(sh, '.udxf__line'));
@@ -521,67 +655,106 @@ check('fullpage: overview (technical tail cut)', sh.find('.udxf__overview').text
 check('fullpage: director line with the exact source value', txt(sh, '.udxf__fact--director') === 'Режисер: Кацуо Фукудзава, Акико Като, Ёхэй Миядзаки', txt(sh, '.udxf__fact--director'));
 check('fullpage: cast line truncated to 5 names + neat ellipsis', txt(sh, '.udxf__fact--cast') === 'У ролях: Сакай Масато, Абэ Хироси, Никайдо Фуми, Ниномия Кадзунари, Тори Мацузака …', txt(sh, '.udxf__fact--cast'));
 check('fullpage: fact rows rendered exactly once each', findAll(sh, 'udxf__fact--director').length === 1 && findAll(sh, 'udxf__fact--cast').length === 1, findAll(sh, 'udxf__fact--director').length + ':' + findAll(sh, 'udxf__fact--cast').length);
-// ---------- detail action strip: two controls, one shared path ----------
+// ---------- detail action strip: two controls, one shared select path ----------
 check('fullpage: old single "Дивитися" button removed', sh.find('.udx-f__play') === null && findAll(sh, 'udx-f__play').length === 0, String(findAll(sh, 'udx-f__play').length));
 check('fullpage: exactly one action strip after the facts', findAll(sh, 'udxf__actions').length === 1, String(findAll(sh, 'udxf__actions').length));
-check('fullpage: exactly one quality selector and one "Торенти" button', findAll(sh, 'udxf__act--quality').length === 1 && findAll(sh, 'udxf__act--torrents').length === 1, findAll(sh, 'udxf__act--quality').length + ':' + findAll(sh, 'udxf__act--torrents').length);
-const qBtn = sh.find('.udxf__act--quality');
+check('fullpage: exactly one "Онлайн" and one "TorrServer" button', findAll(sh, 'udxf__act--online').length === 1 && findAll(sh, 'udxf__act--torrents').length === 1, findAll(sh, 'udxf__act--online').length + ':' + findAll(sh, 'udxf__act--torrents').length);
+check('fullpage: old quality selector absent (no control, no lang key)', sh.find('.udxf__act--quality') === null && src.indexOf('ultradox_quality_pick') === -1, String(!!sh.find('.udxf__act--quality')));
+const oBtn = sh.find('.udxf__act--online');
 const tBtn = sh.find('.udxf__act--torrents');
-check('fullpage: quality selector shows the placeholder label first', qBtn !== null && qBtn.find('.udxf__act__label').text() === L.Lang.translate('ultradox_quality_pick'), qBtn ? qBtn.find('.udxf__act__label').text() : 'no button');
-check('fullpage: "Торенти" button label', tBtn !== null && tBtn.find('.udxf__act__label').text() === L.Lang.translate('ultradox_torrents'), tBtn ? tBtn.find('.udxf__act__label').text() : 'no button');
-check('fullpage: both controls wired to hover:enter exactly once', qBtn && tBtn && qBtn.handlers['hover:enter'] && tBtn.handlers['hover:enter'] && qBtn.handlers['hover:enter'].length === 1 && tBtn.handlers['hover:enter'].length === 1, JSON.stringify({ q: qBtn && qBtn.handlers['hover:enter'] && qBtn.handlers['hover:enter'].length, t: tBtn && tBtn.handlers['hover:enter'] && tBtn.handlers['hover:enter'].length }));
-check('fullpage: no rating row in the detail page (no rating markup left)', findAll(sh, 'udxf__rating').length === 0 && sh.find('.udxf__rating') === null, String(findAll(sh, 'udxf__rating').length));
+check('fullpage: "Онлайн" button label', oBtn !== null && txt(oBtn, '.udxf__act__label') === L.Lang.translate('ultradox_online'), oBtn ? txt(oBtn, '.udxf__act__label') : 'no button');
+check('fullpage: "TorrServer" button label', tBtn !== null && txt(tBtn, '.udxf__act__label') === L.Lang.translate('ultradox_torrserver'), tBtn ? txt(tBtn, '.udxf__act__label') : 'no button');
+check('fullpage: both controls wired to hover:enter exactly once', oBtn && tBtn && oBtn.handlers['hover:enter'].length === 1 && tBtn.handlers['hover:enter'].length === 1, JSON.stringify({ o: oBtn && oBtn.handlers['hover:enter'] && oBtn.handlers['hover:enter'].length, t: tBtn && tBtn.handlers['hover:enter'] && tBtn.handlers['hover:enter'].length }));
+// TMDB enrichment (core integration answers 'ok'): the hidden slots are
+// revealed with confirmed values; the page never waits for them.
+check('fullpage: TMDB rating revealed through the core integration', (function () { const e = sh.find('.udxf__rate'); return !!e && !e.classes.has('hide') && e.text() === L.Lang.translate('ultradox_rating') + ': 8.1'; })(), txt(sh, '.udxf__rate'));
+check('fullpage: TMDB original title revealed', (function () { const e = sh.find('.udxf__orig'); return !!e && !e.classes.has('hide') && e.text() === 'Dokka'; })(), txt(sh, '.udxf__orig'));
+check('fullpage: TMDB seasons revealed (series)', (function () { const e = sh.find('.udxf__seasons'); return !!e && !e.classes.has('hide') && e.text() === L.Lang.translate('ultradox_seasons') + ': 4'; })(), txt(sh, '.udxf__seasons'));
+check('fullpage: enrichment used the core door exactly 3 times (find + detail + credits)', L.TMDB.touches === 3, String(L.TMDB.touches));
 
-series.showReleases();
-let sel = L.Select.last;
-check('fullpage: selector titled by item', sel && sel.title === 'Show Name (2021)');
-check('fullpage: two real releases listed', sel && sel.items.length === 2, sel && String(sel.items.length));
-check('fullpage: release 1 label+size as UI data', sel && sel.items[0].title === 'С01.01 WEB-DLRIP 1080P • 10 GB', sel && sel.items[0].title);
-check('fullpage: release 1 magnet kept as UI data', sel && /^magnet:\?xt=urn:btih:0123456789abcdef/.test(sel.items[0].id.magnet));
-check('fullpage: release 2 label+size as UI data', sel && sel.items[1].title === 'С01.02 WEB-DLRIP 1080P • 10 GB', sel && sel.items[1].title);
+// ---------- action group geometry: one shared base, two roles ----------
+// Both controls inherit the single .udxf__act base rule (height/padding/
+// radius/font-size); the role modifiers must not override any of them, so
+// the pair cannot shift layout. At the 1080p root font (16px) the shared
+// 3.7em x 1.05em height lands inside the 60-64px band.
+(function () {
+    const base = src.match(/\.udxf__act\{([^}]*)\}/);
+    const hEm = base && base[1].match(/height:([\d.]+)em/);
+    const fEm = base && base[1].match(/font-size:([\d.]+)em/);
+    const px = hEm && fEm ? parseFloat(hEm[1]) * parseFloat(fEm[1]) * 16 : 0;
+    check('strip: shared base height is in the 60-64px band at the 1080p root font', !!base && px >= 60 && px <= 64, 'height=' + px + 'px');
+    const mods = ['.udxf__act--online', '.udxf__act--torrents'];
+    check('strip: both controls share the base geometry (no height/padding/radius override in the role rules)', mods.every((m) => {
+        const r = src.match(new RegExp(m.replace(/[-.]/g, '\\$&') + '\\{([^}]*)\\}'));
+        return !!r && !/height:/.test(r[1]) && !/padding:/.test(r[1]) && !/border-radius:/.test(r[1]);
+    }), JSON.stringify(mods));
+    check('strip: focus logic is transform-only for both roles (no layout shift)', /\.udxf__act--online\.focus\{[^}]*transform:translateY\(-\.1em\)[^}]*box-shadow[^}]*\}/.test(src) && /\.udxf__act--torrents\.focus\{[^}]*transform:translateY\(-\.1em\)[^}]*box-shadow[^}]*\}/.test(src), 'missing or shifting focus rule');
+    check('strip: left role is secondary dark glass, right role is primary turquoise-blue gradient', /\.udxf__act--online\{background:rgba\(9,29,43,\.62\);border:1px solid rgba\(255,255,255,\.24\);color:#dbe7f2;\}/.test(src) && /\.udxf__act--torrents\{background:linear-gradient\(135deg,#18b7d8 0%,#2e6bf0 100%\)/.test(src), 'role styles missing');
+    check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_ONLINE = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
+})();
 
+// ---------- TorrServer control: real release list, pick-gated handoff ----------
+// The button press ONLY opens the list; the standard Lampa torrent flow runs
+// exclusively after an explicit row selection (header contract 3/4).
+console.log('fullpage: TorrServer release list + pick-gated handoff');
+let picks = 0; // explicit TorrServer row picks performed so far
 let toggles = L.Controller.toggles.content || 0;
-let noties = L.Noty.msgs.length;
-sel.onSelect(sel.items[0]);
-check('fullpage: series select closes selector (content toggle)', (L.Controller.toggles.content || 0) === toggles + 1);
-check('fullpage: series select confirmation shown', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'), L.Noty.msgs[L.Noty.msgs.length - 1]);
-check('fullpage: series select did not start a torrent', L.Torrent.calls === 0);
-check('fullpage: selected quality appears on the left button', qBtn.find('.udxf__act__label').text() === 'WEB-DL 1080p', qBtn.find('.udxf__act__label').text());
-
-series.showReleases();
-toggles = L.Controller.toggles.content || 0;
-noties = L.Noty.msgs.length;
-L.Select.last.onBack();
-check('fullpage: onBack closes selector too', (L.Controller.toggles.content || 0) === toggles + 1 && L.Noty.msgs.length === noties);
-
-// ---------- action strip controls: both open the same existing selector ----------
-console.log('fullpage: action strip controls');
-L.Select.last = null;
-qBtn.handlers['hover:enter'].forEach((f) => f());
-const selFromQuality = L.Select.last;
-check('strip: quality selector opens the existing release selector', !!selFromQuality && selFromQuality.title === 'Show Name (2021)' && selFromQuality.items.length === 2, selFromQuality ? selFromQuality.title + ':' + selFromQuality.items.length : 'no selector');
-selFromQuality.onBack();
-
+const torrentCallsBefore = L.Torrent.calls.length;
+const fetchesBeforeOpen = fetches.length;
 L.Select.last = null;
 tBtn.handlers['hover:enter'].forEach((f) => f());
-const selFromTorrents = L.Select.last;
-check('strip: "Торенти" opens the same selector with the same releases', !!selFromTorrents && selFromTorrents.items.length === selFromQuality.items.length && selFromTorrents.items.every((it, i) => it.id === selFromQuality.items[i].id && it.title === selFromQuality.items[i].title), selFromTorrents ? JSON.stringify(selFromTorrents.items.map((i) => i.title)) : 'no selector');
+let sel = L.Select.last;
+check('fullpage: "TorrServer" opens the item\'s real release list', sel && sel.title === 'Show Name (2021)', sel && sel.title);
+check('fullpage: two real releases listed as quality • size rows', sel && sel.items.length === 2 && sel.items[0].title === 'WEB-DL 1080p • 10 GB' && sel.items[1].title === 'WEB-DL 1080p • 10 GB', sel && JSON.stringify(sel.items.map((i) => i.title)));
+check('fullpage: release rows keep the raw release as inert data', sel && /^magnet:\?xt=urn:btih:0123456789abcdef/.test(sel.items[0].id.release.magnet) && sel.items[0].id.release.sizeBytes === 10737418240 && /^magnet:\?xt=urn:btih:fedcba9876543210/.test(sel.items[1].id.release.magnet), sel && JSON.stringify(sel.items.map((i) => String(i.id.release.magnet).slice(0, 24))));
+check('fullpage: opening the list makes no HTTP request', fetches.length === fetchesBeforeOpen, String(fetches.length - fetchesBeforeOpen) + ' new fetches');
+check('fullpage: opening the list does not start a torrent (pick-gated)', L.Torrent.calls.length === torrentCallsBefore, String(L.Torrent.calls.length - torrentCallsBefore));
 
-// choosing the second release through the list: in-memory choice, label update
-selFromTorrents.onSelect(selFromTorrents.items[1]);
-check('strip: chosen release quality rendered on the left button', qBtn.find('.udxf__act__label').text() === 'WEB-DL 1080p', qBtn.find('.udxf__act__label').text());
-check('strip: selection stays informational (no execution)', L.Torrent.calls === 0);
+toggles = L.Controller.toggles.content || 0;
+sel.onBack();
+check('fullpage: onBack closes the selector too', (L.Controller.toggles.content || 0) === toggles + 1);
+
+// An explicit row pick is the ONLY door into the standard torrent flow.
+toggles = L.Controller.toggles.content || 0;
+L.Select.last = null;
+tBtn.handlers['hover:enter'].forEach((f) => f());
+sel = L.Select.last;
+const notiesBeforePick = L.Noty.msgs.length;
+const tBefore = L.Torrent.calls.length;
+sel.onSelect(sel.items[0]);
+picks++;
+check('fullpage: pick closes the selector (content toggle)', (L.Controller.toggles.content || 0) === toggles + 1);
+check('fullpage: pick shows the "Реліз вибрано" confirmation', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'), L.Noty.msgs[L.Noty.msgs.length - 1]);
+check('fullpage: pick runs the standard TorrServer handoff exactly once', L.Torrent.calls.length === tBefore + 1, String(L.Torrent.calls.length - tBefore));
+(function () {
+    const c = L.Torrent.calls[L.Torrent.calls.length - 1];
+    const r = sel.items[0].id.release;
+    check('fullpage: handoff payload is the picked release (MagnetUri/Size/Title)', c && c.o.MagnetUri === r.magnet && c.o.Size === r.sizeBytes && c.o.title === 'Show Name (2021)' && c.o.Tracker === 'Ultradox' && c.movie.title === 'Show Name (2021)', c && JSON.stringify({ m: String(c.o.MagnetUri).slice(0, 30), s: c.o.Size, t: c.o.title }));
+    check('fullpage: handoff movie carries the TMDB season count (series)', c && c.movie.number_of_seasons === 4, c && String(c.movie.number_of_seasons));
+})();
+check('fullpage: strip labels stay static after a pick (no quality state)', txt(oBtn, '.udxf__act__label') === L.Lang.translate('ultradox_online') && txt(tBtn, '.udxf__act__label') === L.Lang.translate('ultradox_torrserver'), txt(oBtn, '.udxf__act__label') + ' / ' + txt(tBtn, '.udxf__act__label'));
 
 // re-opening through either control must not duplicate strip/controls/listeners
 const stripCount = findAll(sh, 'udxf__actions').length;
-const qCount = findAll(sh, 'udxf__act--quality').length;
+const oCount = findAll(sh, 'udxf__act--online').length;
 const tCount = findAll(sh, 'udxf__act--torrents').length;
-const qHandlers = qBtn.handlers['hover:enter'].length;
+const oHandlers = oBtn.handlers['hover:enter'].length;
 const tHandlers = tBtn.handlers['hover:enter'].length;
-qBtn.handlers['hover:enter'].forEach((f) => f());
+oBtn.handlers['hover:enter'].forEach((f) => f());
 tBtn.handlers['hover:enter'].forEach((f) => f());
-check('strip: re-opening does not duplicate strip, controls or listeners', findAll(sh, 'udxf__actions').length === stripCount && findAll(sh, 'udxf__act--quality').length === qCount && findAll(sh, 'udxf__act--torrents').length === tCount && qBtn.handlers['hover:enter'].length === qHandlers && tBtn.handlers['hover:enter'].length === tHandlers, JSON.stringify({ s: findAll(sh, 'udxf__actions').length, q: qCount, t: tCount, h: [qHandlers, tHandlers] }));
-check('strip: quality label persists across re-opens', qBtn.find('.udxf__act__label').text() === 'WEB-DL 1080p', qBtn.find('.udxf__act__label').text());
+check('strip: re-opening does not duplicate strip, controls or listeners', findAll(sh, 'udxf__actions').length === stripCount && findAll(sh, 'udxf__act--online').length === oCount && findAll(sh, 'udxf__act--torrents').length === tCount && oBtn.handlers['hover:enter'].length === oHandlers && tBtn.handlers['hover:enter'].length === tHandlers, JSON.stringify({ s: findAll(sh, 'udxf__actions').length, o: oCount, t: tCount, h: [oHandlers, tHandlers] }));
+
+// ---------- Online control: the site's own embed through the standard player call ----------
+console.log('fullpage: online route (Lampa.Player.play)');
+const playsBeforeOnline = L.Player.plays.length;
+const fetchesBeforeOnline = fetches.length;
+oBtn.handlers['hover:enter'].forEach((f) => f());
+check('fullpage: "Онлайн" opens the site embed through Lampa.Player.play exactly once', L.Player.plays.length === playsBeforeOnline + 1, String(L.Player.plays.length - playsBeforeOnline));
+check('fullpage: player entry is the parsed #iframe_block-player URL + item title', (function () {
+    const p = L.Player.plays[L.Player.plays.length - 1];
+    return !!p && p.url === 'https://vid1793313812.sevstar933krop.com/movie/a7c3061ee7fefc23786c1356317121b6/iframe?d=ultradox.ru' && p.title === 'Show Name (2021)';
+})(), JSON.stringify(L.Player.plays[L.Player.plays.length - 1]));
+check('fullpage: the online route makes no HTTP request and starts no torrent', fetches.length === fetchesBeforeOnline && L.Torrent.calls.length === tBefore + 1, String(fetches.length - fetchesBeforeOnline) + ' new fetches');
 
 // ---------- 2/3/4. FullPage: film release selection ----------
 console.log('fullpage: film detail + release selection');
@@ -596,20 +769,36 @@ check('fullpage(film): director line (single name, no ellipsis)', txt(fm, '.udxf
 check('fullpage(film): cast line truncated to 5 names + neat ellipsis', txt(fm, '.udxf__fact--cast') === 'У ролях: Кира Миро, Сальва Рейна, Луна Фульхенсио, Ян Кортегосо, Адриана Биде …', txt(fm, '.udxf__fact--cast'));
 check('fullpage(film): page rating gif produces no rating text (no value in HTML)', !/рейтинг/i.test(allText(fm)), allText(fm).slice(0, 160));
 check('fullpage(film): no poster -> element removed (no undefined src)', findAll(fm, 'udxf__poster').length === 0, String(findAll(fm, 'udxf__poster').length));
-check('fullpage(film): no rating row in the detail page (no rating markup left)', findAll(fm, 'udxf__rating').length === 0 && fm.find('.udxf__rating') === null, String(findAll(fm, 'udxf__rating').length));
+check('fullpage(film): no imdb id -> enrichment slots stay hidden', (function () { const r = fm.find('.udxf__rate'); const o = fm.find('.udxf__orig'); const s = fm.find('.udxf__seasons'); return !!(r && o && s) && r.classes.has('hide') && o.classes.has('hide') && s.classes.has('hide') && r.text() === '' && o.text() === '' && s.text() === ''; })(), JSON.stringify([txt(fm, '.udxf__rate'), txt(fm, '.udxf__orig'), txt(fm, '.udxf__seasons')]));
 check('fullpage(film): valid backdrop set exactly once (no duplicate node)', findAll(fm, 'udxf__backdrop').length === 1 && fm.find('.udxf__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/movie-fanart.jpg")' && fm.find('.udxf__backdrop').classes.has('udxf__backdrop--on'), fm.find('.udxf__backdrop') ? fm.find('.udxf__backdrop').style.backgroundImage : 'no backdrop element');
 
-film.showReleases();
+const foBtn = fm.find('.udxf__act--online');
+const ftBtn = fm.find('.udxf__act--torrents');
+check('fullpage(film): action strip present (online + TorrServer)', foBtn !== null && ftBtn !== null, String(!!foBtn) + ':' + String(!!ftBtn));
+const fFetches = fetches.length;
+const fPlays = L.Player.plays.length;
+const fTorr = L.Torrent.calls.length;
+L.Select.last = null;
+ftBtn.handlers['hover:enter'].forEach((f) => f());
 sel = L.Select.last;
-check('fullpage(film): one real release listed', sel && sel.items.length === 1, sel && String(sel.items.length));
-check('fullpage(film): release label+size as UI data', sel && sel.items[0].title === 'WEB-DL 2160P • 20 GB', sel && sel.items[0].title);
-check('fullpage(film): magnet kept as UI data', sel && /^magnet:\?xt=urn:btih:aaaa1111bbbb2222/.test(sel.items[0].id.magnet));
+check('fullpage(film): one real release listed', sel && sel.items.length === 1 && sel.items[0].title === 'WEB-DL 2160p • 20 GB', sel && JSON.stringify(sel.items.map((i) => i.title)));
+check('fullpage(film): raw release kept as inert data', sel && /^magnet:\?xt=urn:btih:aaaa1111bbbb2222/.test(sel.items[0].id.release.magnet) && sel.items[0].id.release.sizeBytes === 21474836480, sel && String(sel.items[0].id && sel.items[0].id.release && sel.items[0].id.release.magnet).slice(0, 40));
+check('fullpage(film): opening the list makes no request and starts nothing', fetches.length === fFetches && L.Torrent.calls.length === fTorr, String(fetches.length - fFetches) + '/' + String(L.Torrent.calls.length - fTorr));
 
 toggles = L.Controller.toggles.content || 0;
 sel.onSelect(sel.items[0]);
-check('fullpage(film): select closes selector (content toggle)', (L.Controller.toggles.content || 0) === toggles + 1);
+picks++;
+check('fullpage(film): pick closes selector (content toggle)', (L.Controller.toggles.content || 0) === toggles + 1);
 check('fullpage(film): confirmation shown', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'));
-check('fullpage(film): did not start a torrent', L.Torrent.calls === 0);
+check('fullpage(film): pick hands off the exact release (MagnetUri/Size)', (function () {
+    const c = L.Torrent.calls[L.Torrent.calls.length - 1];
+    return L.Torrent.calls.length === fTorr + 1 && c.o.MagnetUri === sel.items[0].id.release.magnet && c.o.Size === 21474836480 && c.o.Tracker === 'Ultradox' && c.movie.number_of_seasons === undefined;
+})(), JSON.stringify(L.Torrent.calls[L.Torrent.calls.length - 1] && L.Torrent.calls[L.Torrent.calls.length - 1].o));
+
+// The film page carries no #iframe_block-player embed: a clear message,
+// never an invented URL.
+foBtn.handlers['hover:enter'].forEach((f) => f());
+check('fullpage(film): no online embed -> clear message, no player call', L.Player.plays.length === fPlays && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_online'), JSON.stringify({ plays: L.Player.plays.length, noty: L.Noty.msgs[L.Noty.msgs.length - 1] }));
 
 // ---------- FullPage: missing backdrop -> stable neutral fallback ----------
 console.log('fullpage: missing backdrop fallback');
@@ -624,19 +813,20 @@ ROUTES.set(NOBG_URL,
     '</body></html>');
 const nobg = new FP({ item: { title: 'No Fanart (2020)', serial: false, itemUrl: NOBG_URL, poster: '' } });
 nobg.activity = { loader() {}, toggle() {} };
+const nbgTorr = L.Torrent.calls.length;
 let nobgErr = null;
 try { nobg.create(); } catch (e) { nobgErr = e; }
 const nf = nobg.render();
 check('fullpage(no backdrop): build() did not throw', nobgErr === null, nobgErr && nobgErr.constructor.name + ': ' + nobgErr.message);
-check('fullpage(no backdrop): element present but stays off (neutral fallback)', nf.find('.udxf__backdrop') !== null && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--on') && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && nf.find('.udxf__backdrop').style.backgroundImage === undefined);
+check('fullpage(no backdrop): element present but stays off, image explicitly cleared (neutral fallback)', nf.find('.udxf__backdrop') !== null && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--on') && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && nf.find('.udxf__backdrop').style.backgroundImage === '' && nf.find('.udxf') !== null && !nf.find('.udxf').classes.has('udxf--poster'));
 check('fullpage(no backdrop): no undefined/broken image left', (function () {
     const imgs = [];
     (function walk(n) { for (const c of n.children || []) { if (c && c.tagName === 'IMG') imgs.push(c); if (c && c.children) walk(c); } })(nf);
     return imgs.every((i) => typeof i.src === 'string' && i.src.length > 0);
 })());
 check('fullpage(no backdrop): detail still shows title and meta', nf.find('.udxf__title').text() === 'No Fanart' && nf.find('.udxf__line').text() === 'Трилер', txt(nf, '.udxf__line'));
-check('fullpage(no facts): no fact rows or empty containers rendered', nf.find('.udxf__fact--director') === null && nf.find('.udxf__fact--cast') === null && findAll(nf, 'udxf__fact').length === 0, String(findAll(nf, 'udxf__fact').length));
-check('fullpage(no backdrop): no torrent started', L.Torrent.calls === 0);
+check('fullpage(no facts): fact rows present but hidden and empty (no data)', (function () { const d = nf.find('.udxf__fact--director'); const c = nf.find('.udxf__fact--cast'); return !!(d && c) && d.classes.has('hide') && c.classes.has('hide') && d.text() === '' && c.text() === ''; })(), JSON.stringify([txt(nf, '.udxf__fact--director'), txt(nf, '.udxf__fact--cast')]));
+check('fullpage(no backdrop): no torrent started', L.Torrent.calls.length === nbgTorr, String(L.Torrent.calls.length - nbgTorr));
 
 // ---------- FullPage: confirmed pixhost "Picture removed" placeholder (real Shield case) ----------
 // The live detail page of "Любитель акул встречает девушку" carries this og:image;
@@ -661,52 +851,146 @@ let sharkErr = null;
 try { shark.create(); } catch (e) { sharkErr = e; }
 const sp = shark.render();
 check('fullpage(pixhost): build() did not throw', sharkErr === null, sharkErr && sharkErr.constructor.name + ': ' + sharkErr.message);
-check('fullpage(pixhost): placeholder URL not applied; poster URL set on the same single node', sp.find('.udxf__backdrop') !== null && /url\("https:\/\/045\.ultradox\.click\/upload\/c\.jpg"\)/.test(sp.find('.udxf__backdrop').style.backgroundImage) && sp.find('.udxf__backdrop').style.backgroundImage.indexOf('pixhost') === -1, sp.find('.udxf__backdrop') ? String(sp.find('.udxf__backdrop').style.backgroundImage) : 'no backdrop element');
+check('fullpage(pixhost): visible backgroundImage is the plain poster url (no placeholder text, no embedded gradient)', (function () {
+    const b = sp.find('.udxf__backdrop');
+    return b !== null && b.style.backgroundImage === 'url("https://045.ultradox.click/upload/c.jpg")' && b.style.backgroundImage.indexOf('gradient') === -1 && b.style.backgroundImage.indexOf('Picture removed') === -1;
+})(), sp.find('.udxf__backdrop') ? String(sp.find('.udxf__backdrop').style.backgroundImage) : 'no backdrop element');
 check('fullpage(pixhost): only the poster fallback modifier applied', sp.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && !sp.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
+check('fullpage(pixhost): poster state on the root enables the zone veil', sp.find('.udxf') !== null && sp.find('.udxf').classes.has('udxf--poster'), String(sp.find('.udxf') && sp.find('.udxf').classes));
 check('fullpage(pixhost): exactly one backdrop element (no second node)', findAll(sp, 'udxf__backdrop').length === 1, String(findAll(sp, 'udxf__backdrop').length));
 check('fullpage(pixhost): poster kept', sp.find('.udxf__poster') && sp.find('.udxf__poster').src === 'https://045.ultradox.click/upload/c.jpg', sp.find('.udxf__poster') ? sp.find('.udxf__poster').src : 'no poster element');
 check('fullpage(pixhost): title kept', txt(sp, '.udxf__title') === 'Любитель акул встречает девушку', txt(sp, '.udxf__title'));
 check('fullpage(pixhost): overview kept', txt(sp, '.udxf__overview') === 'Детектив про любителля акул.', txt(sp, '.udxf__overview'));
-check('fullpage(pixhost): action strip kept (quality + "Торенти"), old button gone', sp.find('.udxf__act--quality') !== null && sp.find('.udxf__act--torrents') !== null && sp.find('.udx-f__play') === null, String(!!(sp.find('.udxf__act--quality') && sp.find('.udxf__act--torrents'))));
-shark.showReleases();
+check('fullpage(pixhost): action strip kept (online + TorrServer), old button gone', sp.find('.udxf__act--online') !== null && sp.find('.udxf__act--torrents') !== null && sp.find('.udx-f__play') === null, String(!!(sp.find('.udxf__act--online') && sp.find('.udxf__act--torrents'))));
+const sTorr = L.Torrent.calls.length;
+L.Select.last = null;
+sp.find('.udxf__act--torrents').handlers['hover:enter'].forEach((f) => f());
 sel = L.Select.last;
-check('fullpage(pixhost): release listed without execution', sel && sel.items.length === 1 && /^magnet:\?xt=urn:btih:deadbeef/.test(sel.items[0].id.magnet) && L.Torrent.calls === 0, sel && JSON.stringify(sel.items.map((i) => i.title)));
+check('fullpage(pixhost): release listed without execution (list open never starts a torrent)', sel && sel.items.length === 1 && /^magnet:\?xt=urn:btih:deadbeef/.test(sel.items[0].id.release.magnet) && L.Torrent.calls.length === sTorr, sel && JSON.stringify(sel.items.map((i) => i.title)));
+
+// ---------- FullPage: a pixhost-hosted POSTER must not reach the background ----------
+// The og:image above is rejected for the backdrop; the same host family must
+// also be rejected when it arrives as item.poster - otherwise the full-screen
+// backdrop would render the "Picture removed" placeholder. The left <img> is
+// untouched (it is not the backdrop).
+console.log('fullpage: pixhost poster rejected for the backdrop');
+const PPHOST_URL = 'https://045.ultradox.click/nerufilm/no-fanart-pixhost-poster.html';
+ROUTES.set(PPHOST_URL,
+    '<html><head></head><body><ul>' +
+    '<li><span>Жанр:</span> Драма</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 2024</li>' +
+    '</ul>' +
+    '<a href="magnet:?xt=urn:btih:4444444444444444444444444444444444444444&amp;dn=Pixhost.Poster.2024.WEB-DLRip.mkv&amp;xl=1073741824"></a>' +
+    '</body></html>');
+const pp = new FP({ item: { title: 'Pixhost Poster (2024)', serial: false, itemUrl: PPHOST_URL, poster: 'https://t3.pixhost.cc/6852/removed-placeholder.jpg' } });
+pp.activity = { loader() {}, toggle() {} };
+pp.create();
+const pr = pp.render();
+check('fullpage(pixhost poster): neutral fallback - the pixhost URL stays out of the background-image', (function () {
+    const b = pr.find('.udxf__backdrop');
+    return b !== null && b.style.backgroundImage === '' && !b.classes.has('udxf__backdrop--on') && !b.classes.has('udxf__backdrop--poster') && pr.find('.udxf') !== null && !pr.find('.udxf').classes.has('udxf--poster');
+})(), pr.find('.udxf__backdrop') ? String(pr.find('.udxf__backdrop').style.backgroundImage) + ':' + String(pr.find('.udxf__backdrop').classes) : 'no backdrop element');
+check('fullpage(pixhost poster): the left poster element keeps the raw URL untouched', pr.find('.udxf__poster') && pr.find('.udxf__poster').src === 'https://t3.pixhost.cc/6852/removed-placeholder.jpg', pr.find('.udxf__poster') ? pr.find('.udxf__poster').src : 'no poster element');
+
+// ---------- FullPage: multi-release detail -> every release listed ----------
+// No quality pre-filter in Phase 4: "TorrServer" lists every release of the
+// item; the user just picks the concrete row they want, and that pick (only
+// that pick) drives the standard TorrServer handoff.
+console.log('fullpage: multi-release detail');
+const MULTI_URL = 'https://045.ultradox.click/serial/multi-quality-2022/';
+ROUTES.set(MULTI_URL,
+    '<html><head></head><body><ul>' +
+    '<li><span>Жанр:</span> Кримінал</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 2022</li>' +
+    '</ul>' +
+    '<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111&amp;dn=Multi.Show.S01.E01.1080p.WEB-DLRip.mkv&amp;xl=10737418240"></a>' +
+    '<a href="magnet:?xt=urn:btih:2222222222222222222222222222222222222222&amp;dn=Multi.Show.S01.E02.1080p.WEB-DLRip.mkv&amp;xl=10737418240"></a>' +
+    '<a href="magnet:?xt=urn:btih:3333333333333333333333333333333333333333&amp;dn=Multi.Show.S01.E03.720p.BDRip.mkv&amp;xl=5368709120"></a>' +
+    '</body></html>');
+const multi = new FP({ item: { title: 'Multi Quality (2022)', serial: true, itemUrl: MULTI_URL, poster: '' } });
+multi.activity = { loader() {}, toggle() {} };
+multi.create();
+
+const mTBtn = multi.render().find('.udxf__act--torrents');
+L.Select.last = null;
+mTBtn.handlers['hover:enter'].forEach((f) => f());
+sel = L.Select.last;
+check('multi: "TorrServer" lists every release of the item (3)', sel && sel.items.length === 3 && sel.items.map((i) => i.title).join('|') === 'WEB-DL 1080p • 10 GB|WEB-DL 1080p • 10 GB|BDRIP 720p • 5.0 GB', sel && JSON.stringify(sel.items.map((i) => i.title)));
+check('multi: release rows keep the raw release as inert data', !!sel && sel.items.every((i) => typeof i.id.release.magnet === 'string' && typeof i.id.release.sizeBytes === 'number'), sel && JSON.stringify(sel.items.map((i) => String(i.id.release.magnet).slice(0, 24))));
+
+const mTorr = L.Torrent.calls.length;
+toggles = L.Controller.toggles.content || 0;
+sel.onSelect(sel.items[2]);
+picks++;
+check('multi: picking the 720p row hands off exactly that release', (function () {
+    const c = L.Torrent.calls[L.Torrent.calls.length - 1];
+    const r = sel.items[2].id.release;
+    return L.Torrent.calls.length === mTorr + 1 && /^magnet:\?xt=urn:btih:333333333333/.test(r.magnet) && sel.items[2].id.q === 'BDRIP 720p' && c.o.MagnetUri === r.magnet && c.o.Size === 5368709120 && (L.Controller.toggles.content || 0) === toggles + 1;
+})(), JSON.stringify(L.Torrent.calls[L.Torrent.calls.length - 1] && L.Torrent.calls[L.Torrent.calls.length - 1].o));
+check('multi: pick confirmation shown', L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_release_selected'), L.Noty.msgs[L.Noty.msgs.length - 1]);
 
 // ---------- empty detail: no releases -> noty, selector untouched ----------
 console.log('fullpage: empty detail');
 const missing = new FP({ item: { title: 'Missing (1999)', serial: false, itemUrl: 'https://045.ultradox.click/serial/missing-1999/', poster: '' } });
 missing.activity = { loader() {}, toggle() {} };
 missing.create();
+const missRoot = missing.render();
+const missT = missRoot.find('.udxf__act--torrents');
 const selBefore = L.Select.last;
-missing.showReleases();
-check('fullpage: no releases -> noty, no new selector', L.Select.last === selBefore && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_link'));
-check('fullpage: rating row absent from the detail markup', missing.render().find('.udxf__rating') === null, String(missing.render().find('.udxf__rating')));
-check('fullpage: failed fetch (empty model) -> no fact rows rendered', missing.render().find('.udxf__fact--director') === null && missing.render().find('.udxf__fact--cast') === null, String(findAll(missing.render(), 'udxf__fact').length));
+missT.handlers['hover:enter'].forEach((f) => f());
+check('fullpage: no releases -> noty, no new selector', L.Select.last === selBefore && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_link'), JSON.stringify(L.Noty.msgs.slice(-1)));
+check('fullpage: enrichment slots stay hidden on the empty model', (function () { const r = missRoot.find('.udxf__rate'); return !!r && r.classes.has('hide') && r.text() === ''; })(), String(!!missRoot.find('.udxf__rate')));
+check('fullpage: failed fetch (empty model) -> fact rows hidden and empty', (function () { const d = missing.render().find('.udxf__fact--director'); const c = missing.render().find('.udxf__fact--cast'); return !!(d && c) && d.classes.has('hide') && c.classes.has('hide') && d.text() === '' && c.text() === ''; })(), JSON.stringify([txt(missing.render(), '.udxf__fact--director'), txt(missing.render(), '.udxf__fact--cast')]));
 
-// both strip controls on an empty release list: existing "no link" message,
-// placeholder quality state kept, no selector, no error, no execution
+// both strip controls on an empty release list: the existing clear messages
+// (no online source / no releases), no selector, no error, no execution
 const mRoot = missing.render();
-const mQ = mRoot.find('.udxf__act--quality');
+const mO = mRoot.find('.udxf__act--online');
 const mT = mRoot.find('.udxf__act--torrents');
 let mErr = null;
 try {
     const mNoties = L.Noty.msgs.length;
-    mQ.handlers['hover:enter'].forEach((f) => f());
+    const mPlays = L.Player.plays.length;
+    const mTorr = L.Torrent.calls.length;
+    mO.handlers['hover:enter'].forEach((f) => f());
     mT.handlers['hover:enter'].forEach((f) => f());
-    check('fullpage(empty): both controls show the existing "no link" message', L.Noty.msgs.length === mNoties + 2 && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_link'), String(L.Noty.msgs.length - mNoties));
+    check('fullpage(empty): controls answer with the existing clear messages (no online source / no releases)', L.Noty.msgs.length === mNoties + 2 && L.Noty.msgs[mNoties] === L.Lang.translate('ultradox_no_online') && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_no_link'), JSON.stringify(L.Noty.msgs.slice(mNoties)));
     check('fullpage(empty): no selector opened from the strip', L.Select.last === selBefore, String(!!L.Select.last));
-    check('fullpage(empty): quality state unchanged (placeholder kept)', mQ.find('.udxf__act__label').text() === L.Lang.translate('ultradox_quality_pick'), mQ.find('.udxf__act__label').text());
-    check('fullpage(empty): no torrent started', L.Torrent.calls === 0);
+    check('fullpage(empty): no player call and no torrent started', L.Player.plays.length === mPlays && L.Torrent.calls.length === mTorr, String(L.Player.plays.length - mPlays) + '/' + String(L.Torrent.calls.length - mTorr));
 } catch (e) { mErr = e; }
 check('fullpage(empty): strip controls did not throw', mErr === null, mErr && mErr.constructor.name + ': ' + mErr.message);
+
+// ---------- TMDB enrichment fail-safes: a failing/broken core integration must
+// never break the detail page (best-effort contract) ----------
+console.log('fullpage: TMDB enrichment fail-safes');
+L.TMDB.mode = 'fail';
+const tfFail = new FP({ item: { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: '' } });
+tfFail.activity = { loader() {}, toggle() {} };
+let tfErr = null;
+try { tfFail.create(); } catch (e) { tfErr = e; }
+check('tmdb(fail): a failing core integration does not break the build', tfErr === null && tfFail.render().find('.udxf__title').text() === 'Show Name', tfErr && tfErr.message);
+check('tmdb(fail): enrichment slots stay hidden, page keeps the Ultradox data', (function () { const r = tfFail.render().find('.udxf__rate'); const o = tfFail.render().find('.udxf__orig'); const s = tfFail.render().find('.udxf__seasons'); return !!(r && o && s) && r.classes.has('hide') && o.classes.has('hide') && s.classes.has('hide'); })(), 'slot revealed or missing');
+check('tmdb(fail): the attempt went through the core door exactly once', L.TMDB.touches === 4, String(L.TMDB.touches));
+
+L.TMDB.mode = 'throw';
+const tfThrow = new FP({ item: { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: '' } });
+tfThrow.activity = { loader() {}, toggle() {} };
+let ttErr = null;
+try { tfThrow.create(); } catch (e) { ttErr = e; }
+check('tmdb(throw): a broken (throwing) integration is a silent no-op', ttErr === null && tfThrow.render().find('.udxf__overview').text() === 'Детективний серіал про агентку.', ttErr && ttErr.message);
+check('tmdb(throw): enrichment slots stay hidden', (function () { const r = tfThrow.render().find('.udxf__rate'); return !!r && r.classes.has('hide'); })(), String(!!tfThrow.render().find('.udxf__rate')));
+check('tmdb(throw): the attempt counted, the page unaffected', L.TMDB.touches === 5, String(L.TMDB.touches));
+L.TMDB.mode = 'ok';
 
 // ---------- no external metadata transport: a repeated detail page fetches nothing beyond the mirror ----------
 console.log('metadata: no external metadata transport');
 const series2 = new FP({ item: { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: '' } });
 series2.activity = { loader() {}, toggle() {} };
 series2.create();
-check('metadata: the core metadata object was never touched', L.TMDB.touches === 0, String(L.TMDB.touches));
-check('metadata: repeated detail renders without a rating row', series2.render().find('.udxf__rating') === null, String(series2.render().find('.udxf__rating')));
+check('metadata: repeated detail re-applies the enrichment via the core door (3 more times)', (function () { const e = series2.render().find('.udxf__rate'); return !!e && !e.classes.has('hide') && e.text().indexOf('8.1') !== -1 && L.TMDB.touches === 8; })(), String(L.TMDB.touches) + ':' + txt(series2.render(), '.udxf__rate'));
+check('metadata: repeated detail renders one strip only (no duplication)', findAll(series2.render(), 'udxf__actions').length === 1, String(findAll(series2.render(), 'udxf__actions').length));
 
 // ---------- 6. network: public mirrors only ----------
 check('network: only public mirrors requested (no external metadata service)', fetches.every((u) => MIRRORS.some((m) => u.indexOf(m) === 0)), JSON.stringify(fetches));
@@ -726,6 +1010,7 @@ check('grid: repeated focus keeps the badge inside the poster container', inPost
 check('grid: repeated focus keeps the badge text intact', filmCard.find('.udx-kind').text() === 'Фільм' && serialCard.find('.udx-kind').text() === 'Серіал', txt(filmCard, '.udx-kind') + ':' + txt(serialCard, '.udx-kind'));
 
 // ---------- final verdict ----------
-check('torrent: L.Torrent.start counter is zero', L.Torrent.calls === 0);
+check('torrent: L.Torrent.start counter equals the explicit row picks (' + picks + ')', L.Torrent.calls.length === picks, String(L.Torrent.calls.length));
+check('player: every L.Player.play corresponds to an online press on a page with a real embed (2)', L.Player.plays.length === 2, String(L.Player.plays.length));
 console.log(failures ? 'FAIL (' + failures + ' check(s) failed)' : 'PASS');
 process.exitCode = failures ? 1 : 0;
