@@ -149,7 +149,7 @@
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         '.udx-content .card__view{position:relative;overflow:hidden;}' +
         '.udx-content .card__title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
-        '.udx-content .card__age{min-height:1.4em;font-size:0.85em;line-height:1.4em;color:#fff;}' +
+        '.udx-content .card__age{min-height:1.4em;margin-top:0.2em;font-size:0.85em;line-height:1.4em;color:#fff;}' +
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
@@ -208,6 +208,11 @@
         '.udxf__act.focus{background-color:#fff;color:#000;}' +
         '.udxf__act--torrents{background:rgba(0,0,0,.3);color:#fff;}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
+        // The third-party interface_mod plugin (an Lampa user setting) appends
+        // its own type label (.content-label, left:-0.8em -> clipped corner
+        // speckles) to every card__view. Hide it inside our grid so a card
+        // keeps exactly one type badge - ours.
+        '.udx-content .card__view .content-label{display:none !important;}' +
         // Full-width details strip under the top zone: heading, the complete
         // overview, director and the full cast (wrapped, never truncated).
         '.udxf__details{padding:0 6% 6% 5%;}' +
@@ -233,7 +238,7 @@
         // List-screen veil (NUM-style): dark card zone on the left, the
         // backdrop stays visible behind the rows on the right.
         '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.34) 55%,rgba(0,0,0,.08) 85%),linear-gradient(to top,rgba(0,0,0,.50),rgba(0,0,0,0) 46%);}' +
-        '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 5%;box-sizing:border-box;gap:2em;}' +
+        '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:flex-start;padding:0 5%;box-sizing:border-box;gap:2em;}' +
         '.udxl__card{flex:0 0 auto;width:11em;display:flex;flex-direction:column;align-items:center;gap:.7em;}' +
         '.udxl__poster{width:100%;border-radius:1em;background:#3E3E3E;}' +
         '.udxl__title{font-size:1.25em;font-weight:700;line-height:1.25;color:#fff;text-align:center;}' +
