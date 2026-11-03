@@ -148,7 +148,7 @@
         '.udx-content__list{position:relative;z-index:1;padding-top:80px;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         '.udx-content .card__view{position:relative;overflow:hidden;}' +
-        '.udx-content .card__title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
+        '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
         '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.85em;line-height:1.4em;color:#fff;}' +
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
@@ -980,6 +980,26 @@
             img.src = url;
         }
 
+        // Serials: the list carries no release year (titles end in "(N сезон)"),
+        // so when a card is focused its item page is fetched once and the real
+        // "Год:" field is shown as the year line. Best-effort and silent: a
+        // failed fetch leaves the card as-is; each card fetches at most once.
+        this.enrichYear = function (item, card) {
+            if (item.year || item._yBusy || !item.itemUrl) return;
+            item._yBusy = 1;
+            fetchText(item.itemUrl, function (html) {
+                var y = '';
+                var m = (html || '').match(/<span>Год:<\/span>\s*([^<]+)/i);
+                if (m) y = (strip(m[1]).match(/\b(19|20)\d{2}\b/) || [])[0] || '';
+                if (!y) { item._yBusy = 0; return; }
+                item.year = y;
+                var age = document.createElement('div');
+                age.addClass('card__age');
+                age.text(y);
+                card.append(age);
+            }, function () { item._yBusy = 0; });
+        };
+
         this.appendCard = function (item) {
             var title = stripYear(item.title);
             var year = item.year || '';
@@ -1036,6 +1056,7 @@
                 last = card;
                 if (scroll) scroll.update(card);
                 focusBackdrop(item.poster);
+                self.enrichYear(item, card);
             });
 
             card.on('hover:enter', function () {
