@@ -7,24 +7,23 @@
  * UI (Phase 5, NUM parity): core card grid (.category-full + Template 'card')
  * with the type badge top-left, quality badge bottom-left and the year under
  * the title; category buttons in the head (simple-button); full detail page
- * (validated backdrop, poster left, meta, overview) with exactly two actions,
- * each opening its own dedicated full page (NUM-style: the item's info card
- * on the left, the item's real rows on the right):
- *   left  "Онлайн"    -> ultradox_online: the item's real online embeds,
- *                        probed read-only from its detail page (or a clear
- *                        empty state when the page has none). The standard
- *                        Lampa player call (Lampa.Player.play, the same call
- *                        the local online sources use) runs only from an
- *                        explicit row pick; the pick is probed read-only
- *                        first (a dead embed shows a message, never a black
- *                        screen);
- *   right "TorrServer"-> ultradox_torrents: the item's real releases
- *                        (quality • size rows, upload date from the
- *                        "torrent_N_info" blocks). The standard Lampa torrent
- *                        flow (L.Torrent.start with MagnetUri/Size, exactly
- *                        as the earlier Ultradox build used it) runs only
- *                        after an explicit row pick. No button ever starts a
- *                        magnet/download/playback on its own.
+ * (validated backdrop, poster left, meta, overview) with exactly two actions:
+ *   left  "Онлайн"    -> ultradox_torrents: the item's real releases
+ *                        (NUM-style: the item's info card on the left, the
+ *                        item's real rows on the right - quality • size
+ *                        rows, upload date from the "torrent_N_info"
+ *                        blocks). The standard Lampa torrent flow
+ *                        (L.Torrent.start with MagnetUri/Size, exactly as
+ *                        the earlier Ultradox build used it) runs only
+ *                        after an explicit row pick.
+ *   right "TorrServer"-> the core Lampa torrents search page (component
+ *                        'torrents'): the title (+year) search combination
+ *                        and the item's movie metadata; the result list is
+ *                        rendered by the core from the parser response.
+ * No button ever starts a magnet/download/playback on its own. The
+ * ultradox_online page (the site's real embeds, probed read-only; the
+ * standard Lampa player call runs only from an explicit row pick there)
+ * stays a registered component, driven from its own payload.
  * The base data comes from the Ultradox HTML itself. TMDB enrichment
  * (rating, original title, seasons) is best-effort through the already
  * present Lampa core integration only (Lampa.TMDB.api + L.Reguest.silent);
@@ -1017,16 +1016,16 @@
     // Full release page (catalog -> OK): backdrop only from the film's own
     // fanart (without one, the poster doubles as a zone-veiled backdrop),
     // poster on the left, metadata + overview on the right, and a compact
-    // action strip with exactly two actions, each opening its own dedicated
-    // full page (NUM-style: info card left, real rows right):
-    //   left  "Онлайн"    -> opens the ultradox_online page: the site's real
-    //                        embeds (probed read-only) or a clear empty state;
-    //                        the standard Lampa player call runs only from an
-    //                        explicit row pick there;
-    //   right "TorrServer"-> opens the ultradox_torrents page: the item's real
-    //                        releases (quality • size, upload date); the
+    // action strip with exactly two actions:
+    //   left  "Онлайн"    -> opens the ultradox_torrents page: the item's real
+    //                        releases (NUM-style: info card left, quality •
+    //                        size rows with the upload date right); the
     //                        standard Lampa torrent flow runs only after an
-    //                        explicit row pick there.
+    //                        explicit row pick there;
+    //   right "TorrServer"-> pushes the core Lampa torrents search page
+    //                        (component 'torrents', the title+year search and
+    //                        the item's movie metadata); the result list is
+    //                        rendered by the core from the parser response.
     // TMDB enrichment (rating / original title / seasons) is best-effort via
     // the core Lampa.TMDB integration; without it the page shows the
     // Ultradox data alone. Back returns to the catalog on the same card.
@@ -1074,8 +1073,8 @@
                 udxRoot = html.find('.udxf');
                 onlineBtn = html.find('.udxf__act--online');
                 torrentsBtn = html.find('.udxf__act--torrents');
-                // Left action: opens the dedicated online source page.
-                // Right action: opens the dedicated release-list page.
+                // Left action: opens the dedicated release-list page.
+                // Right action: opens the core torrents search page.
                 // hover:focus remembers the last touched action so the page
                 // refocuses exactly there (start() falls back to the online
                 // button while nothing has been focused yet).
@@ -1083,7 +1082,7 @@
                 if (onlineBtn) {
                     onlineBtn.find('.udxf__olab').text(L.Lang.translate('ultradox_online'));
                     onlineBtn.on('hover:focus', function () { lastAct = onlineBtn; });
-                    onlineBtn.on('hover:enter', function () { self.openOnline(); });
+                    onlineBtn.on('hover:enter', function () { self.openReleaseList(); });
                 }
                 if (torrentsBtn) {
                     torrentsBtn.find('.udxf__tlab').text(L.Lang.translate('ultradox_torrserver'));
@@ -1185,20 +1184,56 @@
             else { e.text(''); e.addClass('hide'); }
         }
 
-        // Left action "Онлайн": opens the dedicated full-page online source
-        // screen. The page lists the site's real embeds (probed read-only) or
-        // a clear empty state; the external player may start only from an
-        // explicit row pick there.
-        this.openOnline = function () {
-            L.Activity.push({ title: item.title, component: 'ultradox_online', item: item, detail: detail, seasons: tmdbSeasons });
+        // Movie metadata for the core torrent screens. The Ultradox card has
+        // no TMDB id: the core derives a storage key from it, which is
+        // harmless. genres stays an empty list so the core's genre branch
+        // remains inert; number_of_seasons=1 marks a serial, which the core
+        // uses to sort results by season/episode.
+        function moviePayload() {
+            var title = stripYear(item.title);
+            var year = item.year || (detail && detail.year) || '';
+            var p = {
+                title: title,
+                original_title: title,
+                img: item.poster || '',
+                release_date: year,
+                genres: [],
+                number_of_seasons: item.serial ? 1 : 0,
+                source: 'ultradox'
+            };
+            if (item.serial) {
+                p.original_name = title;
+                p.first_air_date = year;
+            }
+            return p;
+        }
+
+        // Left action "Онлайн": opens the dedicated full-page release list
+        // (NUM-style: info card left, the item's real releases right). The
+        // standard Lampa torrent flow runs only after an explicit user pick
+        // inside that page.
+        this.openReleaseList = function () {
+            L.Activity.push({ title: item.title, component: 'ultradox_torrents', item: item, detail: detail, seasons: tmdbSeasons });
         };
 
-        // Right action "TorrServer": opens the dedicated full-page release
-        // list (NUM-style: info card left, the item's real releases right).
-        // The standard Lampa torrent flow runs only after an explicit user
-        // pick inside that page.
+        // Right action "TorrServer": the core torrent search screen for this
+        // title. The search string is the simple title+year combination (the
+        // core Torrents callback builds language-ordered combinations of the
+        // same parts); the result list (title/size/seeders) is rendered by
+        // the core from the parser response.
         this.openTorrents = function () {
-            L.Activity.push({ title: item.title, component: 'ultradox_torrents', item: item, detail: detail, seasons: tmdbSeasons });
+            var title = stripYear(item.title);
+            var year = item.year || (detail && detail.year) || '';
+            L.Activity.push({
+                url: '',
+                title: L.Lang.translate('title_torrents'),
+                component: 'torrents',
+                search: year ? (title + ' ' + year) : title,
+                search_one: title,
+                search_two: title,
+                movie: moviePayload(),
+                page: 1
+            });
         };
 
         // Best-effort TMDB enrichment through the core Lampa integration only
@@ -1289,9 +1324,11 @@
         };
     }
 
-    // Dedicated full-page list screens behind the two detail-page actions
-    // (NUM-style: the item's info card on the left, the item's real rows on
-    // the right). Neither variant starts anything by itself:
+    // Dedicated full-page list screens (NUM-style: the item's info card on
+    // the left, the item's real rows on the right). The release-list page is
+    // opened by the detail strip; the online page stays available from its
+    // own payload (no longer a strip route). Neither variant starts anything
+    // by itself:
     //   ultradox_online  -> the item's real online embeds, probed read-only
     //                       from its detail page (or a clear empty state when
     //                       the page has none); the standard Lampa player call

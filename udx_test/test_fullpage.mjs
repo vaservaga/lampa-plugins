@@ -19,10 +19,12 @@
 //      (window.Lampa.TMDB.api).
 //   2. The detail page builds from the fetched page: backdrop, title, metadata
 //      lines, overview; the real release list keeps label/size/magnet as UI data.
-//   3. The "TorrServer" press opens the dedicated full-page release list;
-//      an explicit row pick there runs the standard TorrServer flow
-//      (L.Torrent.start with the picked release's MagnetUri/Size). The press
-//      itself never starts a torrent.
+//   3. The "Онлайн" press opens the dedicated full-page release list; an
+//      explicit row pick there runs the standard TorrServer flow
+//      (L.Torrent.start with the picked release's MagnetUri/Size). The
+//      "TorrServer" press opens the core Lampa torrents search page
+//      (component 'torrents', the title+year search, the item's movie
+//      metadata). A press itself never starts a torrent.
 //   4. L.Torrent.start is called ONLY through an explicit user pick: button
 //      presses, catalog navigation and hover events make zero calls; the final
 //      counter must equal the number of performed row selections.
@@ -43,17 +45,20 @@
 //   9. Detail action strip (Phase 5): the old single "Дивитися" button and
 //      the old quality selector are gone; exactly one "Онлайн" + one
 //      "TorrServer" button over one shared builder, each opening its own
-//      dedicated full page (an Activity push; the press itself starts
-//      nothing and opens no L.Select): "Онлайн" -> the item's real embeds
+//      dedicated page (an Activity push; the press itself starts nothing and
+//      opens no L.Select): "Онлайн" -> the item's real releases (quality •
+//      size rows, upload date when the page carries it) and the standard
+//      TorrServer flow runs only after an explicit row pick; "TorrServer" ->
+//      the core Lampa torrents search page (component 'torrents' with the
+//      title+year search and the item's movie metadata); re-opening does not
+//      duplicate strip/listeners and keeps both routes (release list then
+//      core torrents page). The ultradox_online page (the site's real embeds
 //      listed read-only; the standard Lampa.Player.play runs only from an
-//      explicit row pick, which is probed read-only first (a dead embed shows
-//      the clear "unavailable" message and never starts the player; a page
-//      without an online source shows a clear in-page empty state);
-//      "TorrServer" -> the item's real releases (quality • size rows, upload
-//      date when the page carries it) and the standard TorrServer flow runs
-//      only after an explicit row pick; re-opening does not duplicate
-//      strip/listeners; an empty release list shows the clear in-page empty
-//      state.
+//      explicit row pick, which is probed read-only first - a dead embed
+//      shows the clear "unavailable" message and never starts the player; a
+//      page without an online source shows a clear in-page empty state) is
+//      driven from its own payload; an empty release list shows the clear
+//      in-page empty state.
 //      Both controls share one base geometry (60-64px tall at the 1080p root
 //      font, identical padding/radius/icon container, transform-only focus =
 //      no layout shift) while the roles differ: left secondary dark glass,
@@ -713,18 +718,18 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_ONLINE = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
 })();
 
-// ---------- TorrServer control: dedicated full-page release list, pick-gated handoff ----------
+// ---------- Online control: dedicated full-page release list, pick-gated handoff ----------
 // The button press ONLY pushes the dedicated page (Activity push); the
 // standard Lampa torrent flow runs exclusively after an explicit row
 // selection inside that page (header contract 3/4).
-console.log('fullpage: TorrServer full-page release list + pick-gated handoff');
+console.log('fullpage: online control (release list) + pick-gated handoff');
 let picks = 0; // explicit TorrServer row picks performed so far
 const fetchesBeforeOpen = fetches.length;
 const notiesBeforeOpen = L.Noty.msgs.length;
 L.Select.last = null;
-tBtn.handlers['hover:enter'].forEach((f) => f());
+oBtn.handlers['hover:enter'].forEach((f) => f());
 const pushedT = L.Activity.pushes[L.Activity.pushes.length - 1];
-check('fullpage: "TorrServer" opens the dedicated full-page release list (Activity push, no L.Select)', !!pushedT && pushedT.component === 'ultradox_torrents' && pushedT.item && pushedT.item.itemUrl === SERIES_URL && L.Select.last === null, JSON.stringify(pushedT && pushedT.component));
+check('fullpage: "Онлайн" opens the dedicated full-page release list (Activity push, no L.Select)', !!pushedT && pushedT.component === 'ultradox_torrents' && pushedT.item && pushedT.item.itemUrl === SERIES_URL && L.Select.last === null, JSON.stringify(pushedT && pushedT.component));
 check('fullpage: the page carries the item detail payload (releases inert)', !!pushedT && !!pushedT.detail && pushedT.detail.releases.length === 2 && /^magnet:\?xt=urn:btih:0123456789abcdef/.test(pushedT.detail.releases[0].magnet) && pushedT.detail.releases[0].sizeBytes === 10737418240 && /^magnet:\?xt=urn:btih:fedcba9876543210/.test(pushedT.detail.releases[1].magnet), JSON.stringify(pushedT && pushedT.detail && pushedT.detail.releases.map((r) => String(r.magnet).slice(0, 24))));
 check('fullpage: opening the list makes no HTTP request', fetches.length === fetchesBeforeOpen, String(fetches.length - fetchesBeforeOpen) + ' new fetches');
 check('fullpage: opening the list starts nothing (pick-gated)', L.Torrent.calls.length === 0 && L.Noty.msgs.length === notiesBeforeOpen, String(L.Torrent.calls.length) + '/' + String(L.Noty.msgs.length - notiesBeforeOpen));
@@ -776,21 +781,33 @@ const tHandlers = tBtn.handlers['hover:enter'].length;
 oBtn.handlers['hover:enter'].forEach((f) => f());
 tBtn.handlers['hover:enter'].forEach((f) => f());
 check('strip: re-opening does not duplicate strip, controls or listeners', findAll(sh, 'udxf__actions').length === stripCount && findAll(sh, 'udxf__act--online').length === oCount && findAll(sh, 'udxf__act--torrents').length === tCount && oBtn.handlers['hover:enter'].length === oHandlers && tBtn.handlers['hover:enter'].length === tHandlers, JSON.stringify({ s: findAll(sh, 'udxf__actions').length, o: oCount, t: tCount, h: [oHandlers, tHandlers] }));
+check('strip: re-opening keeps both routes (release list then core torrents page)', (function () {
+    const a = L.Activity.pushes[L.Activity.pushes.length - 2];
+    const b = L.Activity.pushes[L.Activity.pushes.length - 1];
+    return a && b && a.component === 'ultradox_torrents' && b.component === 'torrents';
+})(), JSON.stringify([L.Activity.pushes[L.Activity.pushes.length - 2] && L.Activity.pushes[L.Activity.pushes.length - 2].component, L.Activity.pushes[L.Activity.pushes.length - 1] && L.Activity.pushes[L.Activity.pushes.length - 1].component]));
 
-// ---------- Online control: dedicated full-page embed list, pick-gated player ----------
-// The press ONLY pushes the dedicated page (no player auto-start, no request);
-// the page re-probes the item page read-only for its real embeds; the standard
-// Lampa.Player.play runs only from an explicit row pick, probed read-only first.
-console.log('fullpage: online route (Lampa.Player.play from an explicit row pick)');
+// ---------- TorrServer control: the core Lampa torrents search page ----------
+// The press ONLY pushes the core screen (component 'torrents': no request, no
+// player, no L.Select). The ultradox_online page is no longer a strip route:
+// its behavior (the read-only embed probe, the pick-gated Lampa.Player.play)
+// is covered from its own payload (the exact shape the detail page pushes).
+console.log('fullpage: torrserver route (core torrents page) + online page (own payload)');
 const playsBeforeOnline = L.Player.plays.length;
 const fetchesBeforeOnline = fetches.length;
 const notiesBeforeOnline = L.Noty.msgs.length;
-oBtn.handlers['hover:enter'].forEach((f) => f());
-const pushedO = L.Activity.pushes[L.Activity.pushes.length - 1];
-check('fullpage: "Онлайн" opens the dedicated full-page online screen (no player auto-start)', !!pushedO && pushedO.component === 'ultradox_online' && L.Player.plays.length === playsBeforeOnline && L.Noty.msgs.length === notiesBeforeOnline, JSON.stringify({ c: pushedO && pushedO.component, plays: L.Player.plays.length }));
-check('fullpage: the online press makes no HTTP request (the read-only probe happens inside the page)', fetches.length === fetchesBeforeOnline, String(fetches.length - fetchesBeforeOnline) + ' new fetches');
+const torrBeforeTorr = L.Torrent.calls.length;
+L.Select.last = null;
+tBtn.handlers['hover:enter'].forEach((f) => f());
+const pushedTS = L.Activity.pushes[L.Activity.pushes.length - 1];
+check('fullpage: "TorrServer" opens the core torrents search page (Activity push, no L.Select)', !!pushedTS && pushedTS.component === 'torrents' && pushedTS.title === L.Lang.translate('title_torrents') && L.Select.last === null, JSON.stringify(pushedTS && pushedTS.component));
+check('fullpage: the core push carries the title+year search and the item movie metadata', !!pushedTS && pushedTS.url === '' && pushedTS.search === 'Show Name 2021' && pushedTS.search_one === 'Show Name' && pushedTS.search_two === 'Show Name' && pushedTS.page === 1 && !!pushedTS.movie && pushedTS.movie.title === 'Show Name' && pushedTS.movie.original_title === 'Show Name' && pushedTS.movie.img === 'https://045.ultradox.click/upload/show.jpg' && pushedTS.movie.release_date === '2021' && Array.isArray(pushedTS.movie.genres) && pushedTS.movie.genres.length === 0 && pushedTS.movie.number_of_seasons === 1 && pushedTS.movie.source === 'ultradox', JSON.stringify(pushedTS && { s: pushedTS.search, m: pushedTS.movie }));
+check('fullpage: the core press starts nothing (no player, no torrent, no request)', L.Player.plays.length === playsBeforeOnline && L.Torrent.calls.length === torrBeforeTorr && L.Noty.msgs.length === notiesBeforeOnline && fetches.length === fetchesBeforeOnline, JSON.stringify({ plays: L.Player.plays.length - playsBeforeOnline, torr: L.Torrent.calls.length - torrBeforeTorr, fetches: fetches.length - fetchesBeforeOnline }));
 
-const lpO = new LP_O(pushedO);
+// The online page from its own payload: the read-only re-probe of the item
+// page for its real embeds, then the pick-gated standard player call.
+const oPayload = { title: pushedT.title, component: 'ultradox_online', item: pushedT.item, detail: pushedT.detail, seasons: pushedT.seasons };
+const lpO = new LP_O(oPayload);
 lpO.activity = { loader() {}, toggle() {} };
 lpO.create();
 const lpo = lpO.render();
@@ -828,9 +845,9 @@ const fFetches = fetches.length;
 const fPlays = L.Player.plays.length;
 const fTorr = L.Torrent.calls.length;
 L.Select.last = null;
-ftBtn.handlers['hover:enter'].forEach((f) => f());
+foBtn.handlers['hover:enter'].forEach((f) => f());
 const pushedFT = L.Activity.pushes[L.Activity.pushes.length - 1];
-check('fullpage(film): "TorrServer" opens the dedicated release page with the film payload', !!pushedFT && pushedFT.component === 'ultradox_torrents' && pushedFT.detail.releases.length === 1, JSON.stringify(pushedFT && pushedFT.component));
+check('fullpage(film): "Онлайн" opens the dedicated release page with the film payload', !!pushedFT && pushedFT.component === 'ultradox_torrents' && pushedFT.detail.releases.length === 1, JSON.stringify(pushedFT && pushedFT.component));
 check('fullpage(film): opening the page starts nothing (no request, no torrent, no L.Select)', fetches.length === fFetches && L.Torrent.calls.length === fTorr && L.Select.last === null, String(fetches.length - fFetches) + '/' + String(L.Torrent.calls.length - fTorr));
 
 const lpF = new LP_T(pushedFT);
@@ -846,13 +863,18 @@ check('fullpage(film): pick hands off the exact release (MagnetUri/Size)', (func
     return L.Torrent.calls.length === fTorr + 1 && c.o.MagnetUri === pushedFT.detail.releases[0].magnet && c.o.Size === 21474836480 && c.o.Tracker === 'Ultradox' && c.movie.number_of_seasons === undefined;
 })(), JSON.stringify(L.Torrent.calls[L.Torrent.calls.length - 1] && L.Torrent.calls[L.Torrent.calls.length - 1].o));
 
+// "TorrServer" on the film detail: the core torrents search page with the
+// film movie metadata (no seasons).
+ftBtn.handlers['hover:enter'].forEach((f) => f());
+const pushedFTs = L.Activity.pushes[L.Activity.pushes.length - 1];
+check('fullpage(film): "TorrServer" opens the core torrents search page (title+year search, film metadata)', !!pushedFTs && pushedFTs.component === 'torrents' && pushedFTs.search === 'Great Movie 2023' && pushedFTs.search_one === 'Great Movie' && !!pushedFTs.movie && pushedFTs.movie.number_of_seasons === 0 && pushedFTs.movie.img === '', JSON.stringify(pushedFTs && { s: pushedFTs.search, m: pushedFTs.movie }));
+
 // The film page carries no #iframe_block-player embed: the dedicated page
-// shows a clear in-page empty state, never an invented URL.
+// (driven from its own payload - no longer a strip route) shows a clear
+// in-page empty state, never an invented URL.
 const fTorrAfterPick = L.Torrent.calls.length;
-foBtn.handlers['hover:enter'].forEach((f) => f());
-const pushedFO = L.Activity.pushes[L.Activity.pushes.length - 1];
-check('fullpage(film): "Онлайн" opens the dedicated online page (no player auto-start)', !!pushedFO && pushedFO.component === 'ultradox_online' && L.Player.plays.length === fPlays, JSON.stringify({ c: pushedFO && pushedFO.component, plays: L.Player.plays.length }));
-const lpFO = new LP_O(pushedFO);
+const oPayloadF = { title: pushedFT.title, component: 'ultradox_online', item: pushedFT.item, detail: pushedFT.detail, seasons: pushedFT.seasons };
+const lpFO = new LP_O(oPayloadF);
 lpFO.activity = { loader() {}, toggle() {} };
 lpFO.create();
 const lpoFilm = lpFO.render();
@@ -889,10 +911,10 @@ const dTorr = L.Torrent.calls.length;
 const dNoties = L.Noty.msgs.length;
 const dFetches = fetches.length;
 dOBtn.handlers['hover:enter'].forEach((f) => f());
-check('fullpage(dead embed): the press opens the online page only (no player, no message yet)', L.Player.plays.length === dPlays && L.Noty.msgs.length === dNoties, JSON.stringify({ plays: L.Player.plays.length - dPlays, noties: L.Noty.msgs.length - dNoties }));
+check('fullpage(dead embed): the press opens the release list only (no player, no message yet)', L.Player.plays.length === dPlays && L.Noty.msgs.length === dNoties, JSON.stringify({ plays: L.Player.plays.length - dPlays, noties: L.Noty.msgs.length - dNoties }));
 const pushedDO = L.Activity.pushes[L.Activity.pushes.length - 1];
-check('fullpage(dead embed): "Онлайн" push carries the dead-item detail payload', !!pushedDO && pushedDO.component === 'ultradox_online' && !!pushedDO.detail, JSON.stringify(pushedDO && pushedDO.component));
-const lpD = new LP_O(pushedDO);
+check('fullpage(dead embed): the "Онлайн" push carries the dead-item release payload', !!pushedDO && pushedDO.component === 'ultradox_torrents' && !!pushedDO.detail && pushedDO.detail.releases.length === 1, JSON.stringify(pushedDO && { c: pushedDO.component, rel: pushedDO.detail && pushedDO.detail.releases.length }));
+const lpD = new LP_O({ title: pushedDO.title, component: 'ultradox_online', item: pushedDO.item, detail: pushedDO.detail, seasons: pushedDO.seasons });
 lpD.activity = { loader() {}, toggle() {} };
 lpD.create();
 const rowsD = findAll(lpD.render(), 'udxl__row');
@@ -967,7 +989,7 @@ check('fullpage(pixhost): action strip kept (online + TorrServer), old button go
 const sTorr = L.Torrent.calls.length;
 const sFetches = fetches.length;
 L.Select.last = null;
-sp.find('.udxf__act--torrents').handlers['hover:enter'].forEach((f) => f());
+sp.find('.udxf__act--online').handlers['hover:enter'].forEach((f) => f());
 const pushedS = L.Activity.pushes[L.Activity.pushes.length - 1];
 const lpS = new LP_T(pushedS);
 lpS.activity = { loader() {}, toggle() {} };
@@ -1001,7 +1023,7 @@ check('fullpage(pixhost poster): neutral fallback - the pixhost URL stays out of
 check('fullpage(pixhost poster): the left poster element keeps the raw URL untouched', pr.find('.udxf__poster') && pr.find('.udxf__poster').src === 'https://t3.pixhost.cc/6852/removed-placeholder.jpg', pr.find('.udxf__poster') ? pr.find('.udxf__poster').src : 'no poster element');
 
 // ---------- FullPage: multi-release detail -> every release listed ----------
-// No quality pre-filter in Phase 4: "TorrServer" lists every release of the
+// No quality pre-filter in Phase 4: "Онлайн" lists every release of the
 // item; the user just picks the concrete row they want, and that pick (only
 // that pick) drives the standard TorrServer handoff.
 console.log('fullpage: multi-release detail');
@@ -1020,11 +1042,11 @@ const multi = new FP({ item: { title: 'Multi Quality (2022)', serial: true, item
 multi.activity = { loader() {}, toggle() {} };
 multi.create();
 
-const mTBtn = multi.render().find('.udxf__act--torrents');
+const mOBtn = multi.render().find('.udxf__act--online');
 L.Select.last = null;
-mTBtn.handlers['hover:enter'].forEach((f) => f());
+mOBtn.handlers['hover:enter'].forEach((f) => f());
 const pushedM = L.Activity.pushes[L.Activity.pushes.length - 1];
-check('multi: "TorrServer" opens the dedicated release page with every release of the item (3)', !!pushedM && pushedM.component === 'ultradox_torrents' && pushedM.detail.releases.length === 3, JSON.stringify(pushedM && pushedM.detail && pushedM.detail.releases.length));
+check('multi: "Онлайн" opens the dedicated release page with every release of the item (3)', !!pushedM && pushedM.component === 'ultradox_torrents' && pushedM.detail.releases.length === 3, JSON.stringify(pushedM && pushedM.detail && pushedM.detail.releases.length));
 const lpM = new LP_T(pushedM);
 lpM.activity = { loader() {}, toggle() {} };
 lpM.create();
@@ -1049,7 +1071,7 @@ const missing = new FP({ item: { title: 'Missing (1999)', serial: false, itemUrl
 missing.activity = { loader() {}, toggle() {} };
 missing.create();
 const missRoot = missing.render();
-const missT = missRoot.find('.udxf__act--torrents');
+const missO = missRoot.find('.udxf__act--online');
 const selBefore = L.Select.last;
 const mNoties0 = L.Noty.msgs.length;
 const mPlays0 = L.Player.plays.length;
@@ -1058,12 +1080,14 @@ const mFetches0 = fetches.length;
 check('fullpage: enrichment slots stay hidden on the empty model', (function () { const r = missRoot.find('.udxf__rate'); return !!r && r.classes.has('hide') && r.text() === ''; })(), String(!!missRoot.find('.udxf__rate')));
 check('fullpage: failed fetch (empty model) -> fact rows hidden and empty', (function () { const d = missing.render().find('.udxf__fact--director'); const c = missing.render().find('.udxf__fact--cast'); return !!(d && c) && d.classes.has('hide') && c.classes.has('hide') && d.text() === '' && c.text() === ''; })(), JSON.stringify([txt(missing.render(), '.udxf__fact--director'), txt(missing.render(), '.udxf__fact--cast')]));
 
-// both strip controls on an empty release list: the dedicated pages answer
-// with the clear in-page empty states (no online source / no releases), no
-// selector, no error, no execution
+// both strip controls on an empty release list: the dedicated release page
+// answers with the clear in-page empty state (no releases), the core torrents
+// push carries the bare-title search (the failed detail has no year), the
+// online page (own payload) answers with its clear empty state - no selector,
+// no error, no execution
 let mErr = null;
 try {
-    missT.handlers['hover:enter'].forEach((f) => f());
+    missO.handlers['hover:enter'].forEach((f) => f());
     const pushedMT = L.Activity.pushes[L.Activity.pushes.length - 1];
     const lpeT = new LP_T(pushedMT);
     lpeT.activity = { loader() {}, toggle() {} };
@@ -1072,10 +1096,12 @@ try {
     check('fullpage(empty): no releases -> the dedicated page shows the clear empty state (no selector, no noty)', L.Select.last === selBefore && emT.length === 1 && emT[0].text() === L.Lang.translate('ultradox_no_link') && L.Noty.msgs.length === mNoties0 && L.Torrent.calls.length === mTorr0, JSON.stringify({ select: !!L.Select.last, empty: emT.map((e) => e.text()), noties: L.Noty.msgs.slice(mNoties0) }));
 
     const mRoot = missing.render();
-    const mO = mRoot.find('.udxf__act--online');
-    mO.handlers['hover:enter'].forEach((f) => f());
-    const pushedMO = L.Activity.pushes[L.Activity.pushes.length - 1];
-    const lpeO = new LP_O(pushedMO);
+    const mT2 = mRoot.find('.udxf__act--torrents');
+    mT2.handlers['hover:enter'].forEach((f) => f());
+    const pushedMTs = L.Activity.pushes[L.Activity.pushes.length - 1];
+    check('fullpage(empty): "TorrServer" opens the core torrents search page with the bare-title search (no year in the failed detail)', !!pushedMTs && pushedMTs.component === 'torrents' && pushedMTs.search === 'Missing' && pushedMTs.search_one === 'Missing' && !!pushedMTs.movie && pushedMTs.movie.number_of_seasons === 0 && L.Select.last === selBefore, JSON.stringify(pushedMTs && { c: pushedMTs.component, s: pushedMTs.search }));
+
+    const lpeO = new LP_O({ title: pushedMT.title, component: 'ultradox_online', item: pushedMT.item, detail: pushedMT.detail, seasons: pushedMT.seasons });
     lpeO.activity = { loader() {}, toggle() {} };
     lpeO.create();
     const lpeRoot = lpeO.render();
