@@ -109,7 +109,7 @@
                     '</div>' +
                 '</div>' +
             '</div>' +
-            '<div class="udxf__details">' +
+            '<div class="udxf__details selector">' +
                 '<div class="udxf__details-head"></div>' +
                 '<div class="udxf__overview"></div>' +
                 '<div class="udxf__fact udxf__fact--director"></div>' +
@@ -155,10 +155,10 @@
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxf__backdrop--on{opacity:1;}' +
-        // Poster-as-backdrop fallback: the raw poster art, zoomed to cover
-        // (no blur - the artwork stays readable as NUM backdrops do), all
-        // darkening comes from the zone veil (.udxf--poster state).
-        '.udxf__backdrop--poster{opacity:1;transform:scale(1.15);filter:brightness(.55) saturate(.9);}' +
+        // Poster-as-backdrop fallback: a small poster stretched full-screen
+        // shows upscale block artifacts, so a soft blur + darker tone hides
+        // them (atmospheric NUM-style backdrop); the zone veil does the rest.
+        '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.5) saturate(.88);}' +
         // Valid-backdrop veil (NUM-style): dark text zone on the left, the
         // scene stays clearly visible toward the right, soft bottom fade.
         '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.82),rgba(6,28,41,.42) 46%,rgba(6,28,41,.06) 82%),linear-gradient(to top,rgba(6,28,41,.58),rgba(6,28,41,0) 46%);}' +
@@ -167,12 +167,16 @@
         // rows (title/overview/actions) and fades to clear artwork toward the
         // right and the top - no layer is opaque, so the image stays visible
         // as atmosphere on the right.
-        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(6,28,41,.84),rgba(6,28,41,.52) 46%,rgba(6,28,41,0) 78%),linear-gradient(to top,rgba(6,28,41,.62),rgba(6,28,41,0) 44%);}' +
+        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(6,28,41,.86),rgba(6,28,41,.58) 46%,rgba(6,28,41,.1) 80%),linear-gradient(to top,rgba(6,28,41,.66),rgba(6,28,41,0) 46%);}' +
         // NUM reference geometry (measured from the NUM detail screen): the
         // poster is large (~22em wide at the 1080p root font), the title is a
         // display size (3em), the meta block sits to the right of the poster,
         // and the "Детально" strip spans the full width below both.
         '.udxf__slot{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;}' +
+        // Hard height bound on the core scroll element: the TV scroll driver
+        // clamps travel to maxOffset(body vs html offsetHeight) - without a
+        // fixed viewport height the page can never scroll.
+        '.udxf__slot .scroll{position:relative;height:100%;overflow:hidden;}' +
         '.udxf__content{min-height:100%;}' +
         '.udxf__zone{display:flex;align-items:center;min-height:36em;padding:10% 6% 3% 5%;box-sizing:border-box;}' +
         '.udxf__poster{flex-shrink:0;width:22em;border-radius:.55em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
@@ -201,6 +205,9 @@
         '.udxf__details{padding:0 6% 6% 5%;}' +
         '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:1.2em;}' +
         '.udxf__fact{font-size:1.1em;line-height:1.55;color:#cdd8e4;margin-top:1em;}' +
+        // Focus target: the whole strip receives the down-navigation focus; a
+        // soft glass highlight marks it (the core focus ring is suppressed).
+        '.udxf__details.focus{background:rgba(9,29,43,.5);box-shadow:inset 0 0 0 1px rgba(56,197,255,.22);border-radius:.8em;outline:none;}' +
         // TMDB enrichment slots: hidden until a real value arrives (best-effort,
         // the page never waits for them and keeps working without any of them).
         '.udxf .hide{display:none;}' +
@@ -213,7 +220,7 @@
         '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#061c29;}' +
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxl__backdrop--on{opacity:1;}' +
-        '.udxl__backdrop--poster{opacity:1;transform:scale(1.15);filter:brightness(.55) saturate(.9);}' +
+        '.udxl__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.5) saturate(.88);}' +
         // List-screen veil (NUM-style): dark card zone on the left, the
         // backdrop stays visible behind the rows on the right.
         '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,28,41,.78),rgba(6,28,41,.34) 55%,rgba(6,28,41,.08) 85%),linear-gradient(to top,rgba(6,28,41,.50),rgba(6,28,41,0) 46%);}' +
@@ -1150,6 +1157,14 @@
                     torrentsBtn.find('.udxf__tlab').text(L.Lang.translate('ultradox_torrserver'));
                     torrentsBtn.on('hover:focus', function () { lastAct = torrentsBtn; if (scroll) scroll.update(torrentsBtn); });
                     torrentsBtn.on('hover:enter', function () { self.openTorrents(); });
+                }
+                // Down-navigation target: the details strip is a focus element,
+                // so pressing down from the action pills scrolls the page to
+                // reveal the overview / director / cast (the core has no
+                // global focus-scroll hook - each element wires its own).
+                var detailsEl = html.find('.udxf__details');
+                if (detailsEl) {
+                    detailsEl.on('hover:focus', function () { if (scroll) scroll.update(detailsEl); });
                 }
                 // Lampa's Element.prototype.find returns a single node
                 // (querySelector), not a collection: use it directly, guard null.
