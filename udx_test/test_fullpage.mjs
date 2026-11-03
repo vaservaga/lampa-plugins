@@ -65,9 +65,10 @@
 //      driven from its own payload; an empty release list shows the clear
 //      in-page empty state.
 //      Both controls share one base geometry (60-64px tall at the 1080p root
-//      font, identical padding/radius/icon container, transform-only focus =
-//      no layout shift) while the roles differ (NUM reference design): left
-//      primary green-blue gradient, right secondary dark glass.
+//      font, identical padding/radius/icon container) and the native Lampa
+//      button surface: the core .full-start__button glass rgba(0,0,0,.3) at
+//      rest and the core .simple-button.focus invert (#fff/#000) on focus -
+//      no gradient, no custom glow, no layout shift.
 //   10. Backdrop fallbacks: fill() resets the previous image/states first,
 //      then applies exactly one state - a valid backdrop stays a plain url()
 //      with --on and no .udxf--poster; the poster fallback is a plain url()
@@ -351,10 +352,36 @@ const FILM_HTML =
     '<a href="magnet:?xt=urn:btih:aaaa1111bbbb2222cccc3333dddd4444eeee5555&amp;dn=Great.Movie.2023.2160p.WEB-DL.H265.mkv&amp;xl=21474836480"></a>' +
     '</body></html>';
 
+// The year-less serial card's item page: a real "Год:" field (the release
+// year) plus two releases with different "Загрузил" dates (the newest one,
+// 12 Окт 2026, is the catalog-addition date).
+const SERIALHD_URL = 'https://045.ultradox.click/serial-hd/56755-zhivoj-2-sezon.html';
+const SERIALHD_HTML =
+    '<html><head><meta name="description" content="Драма про готель. Формат: MKV."></head><body><ul>' +
+    '<li><span>Жанр:</span> Драма</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 2026</li>' +
+    '<li><span>Время:</span> 42 мин.</li>' +
+    '<li><span>Перевод:</span> Многоголосый</li>' +
+    '<li><span>Качество:</span> WEB-DLRip</li>' +
+    '</ul>' +
+    '<div id="torrent_1_info">' +
+    '<div class="info_d-size">1.4 GB</div>' +
+    '<div class="bord_a1">Загрузил: tester (01 Сен 2025)</div>' +
+    '<a href="magnet:?xt=urn:btih:0000000000000000000000000000000000000000&amp;dn=Zhivoy.2026.S01E01.720p.WEB-DLRip.mkv&amp;xl=1503238554"></a>' +
+    '</div>' +
+    '<div id="torrent_2_info">' +
+    '<div class="info_d-size">1.5 GB</div>' +
+    '<div class="bord_a1">Загрузил: tester (12 Окт 2026)</div>' +
+    '<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111&amp;dn=Zhivoy.2026.S01E02.720p.WEB-DLRip.mkv&amp;xl=1610612736"></a>' +
+    '</div>' +
+    '</body></html>';
+
 const ROUTES = new Map([
     ['https://045.ultradox.click/serial/', CATALOG_HTML],
     [SERIES_URL, SERIES_HTML],
     [FILM_URL, FILM_HTML],
+    [SERIALHD_URL, SERIALHD_HTML],
     // Reachable embed stub: the pre-player probe gets a 200-shaped answer for
     // the series' real embed URL (the live test covers the dead case against
     // the real host).
@@ -574,19 +601,23 @@ check('grid: /nerufilm/ item quality chip is a single token (BDRIP)', findAll(ne
 check('css: .card__view self-contained (position:relative + overflow:hidden)', /\.udx-content \.card__view\{[^}]*position:relative[^}]*overflow:hidden/.test(src), 'missing containment rule');
 check('css: title clamped to two lines with a reserved title area', /\.udx-content \.card__title\{[^}]*-webkit-line-clamp:2[^}]*min-height:2\.5em/.test(src), 'missing clamp rule');
 check('css: age line keeps its reserved height when present', /\.udx-content \.card__age\{[^}]*min-height:1\.4em/.test(src), 'missing reserved line rule');
+check('css: poster-to-title gap tightened (card__view margin-bottom 0.35em; the core default is 1em)', /\.udx-content \.card__view\{[^}]*margin-bottom:0\.35em/.test(src), 'missing margin-bottom rule');
+check('css: catalog-addition date is dimmed, distinct from the release year', /\.udx-content \.card__age \.udx-ad\{color:rgba\(255,255,255,\.55\);\}/.test(src), 'missing .udx-ad rule');
+check('css: glass top panel is scoped to the udx-glass class (dark translucent + soft backdrop blur)', /\.head\.udx-glass\{[^}]*background-color:rgba\(10,12,15,\.60\)[^}]*backdrop-filter:blur\(18px\);\}/.test(src) && /\.head\.udx-glass \.head__body\{background-color:transparent;\}/.test(src), 'missing glass head rules');
+check('boot: head glass follows activity starts and covers all four Ultradox components', src.indexOf("L.Listener.follow('activity'") !== -1 && src.indexOf("var GLASS_COMPONENTS = ['ultradox', 'ultradox_full', 'ultradox_online', 'ultradox_torrents'];") !== -1, 'missing glass activity listener');
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 check('css: .udx-kind pinned inside the poster (left/top 10px, no negative offset) and clipped to it', /\.udx-kind\{position:absolute;left:10px;top:10px;[^}]*max-width:calc\(100% - 20px\);[^}]*overflow:hidden;[^}]*white-space:nowrap/.test(src), 'missing .udx-kind containment rule');
 check('css: poster fallback soft-blurs the stretched poster (hides upscale blocks) and darkens it', /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.5\)[^}]*saturate\(\.88\)/.test(src) && src.indexOf('blur(22px)') === -1, 'missing .udxf__backdrop--poster rule');
 check('css: list-page poster fallback shares the same soft-blur treatment', /\.udxl__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.5\)[^}]*saturate\(\.88\)/.test(src), 'missing .udxl__backdrop--poster rule');
 check('css: detail scroll viewport is height-bounded (the TV scroll driver clamps travel to html offsetHeight)', /\.udxf__slot \.scroll\{position:relative;height:100%;overflow:hidden;\}/.test(src), 'missing bounded scroll rule');
 check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
-check('css: single permanent veil overlay (left+bottom gradients)', /\.udx-bg__veil\{[^}]*z-index:1[^}]*linear-gradient\(90deg,rgba\(6,28,41,\.78\),rgba\(6,28,41,\.30\) 60%\),linear-gradient\(to top,rgba\(6,28,41,\.70\),rgba\(6,28,41,0\) 42%\)/.test(src), 'missing .udx-bg__veil rule');
-check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(6,28,41,\.86\),rgba\(6,28,41,\.58\) 46%,rgba\(6,28,41,\.1\) 80%\),linear-gradient\(to top,rgba\(6,28,41,\.66\),rgba\(6,28,41,0\) 46%\);}/.test(src), 'missing .udxf--poster veil rule');
+check('css: single permanent veil overlay (left+bottom gradients, Lampa black-based alphas)', /\.udx-bg__veil\{[^}]*z-index:1[^}]*linear-gradient\(90deg,rgba\(0,0,0,\.78\),rgba\(0,0,0,\.30\) 60%\),linear-gradient\(to top,rgba\(0,0,0,\.70\),rgba\(0,0,0,0\) 42%\)/.test(src), 'missing .udx-bg__veil rule');
+check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(0,0,0,\.86\),rgba\(0,0,0,\.58\) 46%,rgba\(0,0,0,\.1\) 80%\),linear-gradient\(to top,rgba\(0,0,0,\.66\),rgba\(0,0,0,0\) 46%\);}/.test(src), 'missing .udxf--poster veil rule');
 check('css: poster-state veil has no fully opaque layer (the image stays visible)', (function () {
     const m = src.match(/\.udxf--poster \.udxf__gradient\{([^}]*)\}/);
-    return m && !/rgba\(\d+,\s*\d+,\s*\d+,\s*1(?:\.0)?\)/.test(m[1]) && m[1].indexOf('rgba(6,28,41,.1) 80%') !== -1 && m[1].indexOf('rgba(6,28,41,0) 46%') !== -1;
+    return m && !/rgba\(\d+,\s*\d+,\s*\d+,\s*1(?:\.0)?\)/.test(m[1]) && m[1].indexOf('rgba(0,0,0,.1) 80%') !== -1 && m[1].indexOf('rgba(0,0,0,0) 46%') !== -1;
 })(), 'opaque layer or missing fade stop');
-check('css: poster fallback uses the plain url() only (no embedded gradient)', /bg\.style\.backgroundImage = 'url\("'\s*\+\s*posterBackdrop/.test(src) && src.indexOf('rgba(6,28,41,.78),rgba(6,28,41,0) 42%') === -1, 'gradient still embedded in the poster fallback');
+check('css: poster fallback uses the plain url() only (no embedded gradient)', /bg\.style\.backgroundImage = 'url\("'\s*\+\s*posterBackdrop/.test(src) && src.indexOf('rgba(0,0,0,.78),rgba(0,0,0,0) 42%') === -1, 'gradient still embedded in the poster fallback');
 check('css: fill() resets the previous image and all states before applying one', /if \(bg\) \{\s*bg\.style\.backgroundImage = '';\s*bg\.removeClass\('udxf__backdrop--on'\);\s*bg\.removeClass\('udxf__backdrop--poster'\);\s*\}/.test(src) && /if \(udxRoot\) udxRoot\.removeClass\('udxf--poster'\);/.test(src), 'reset-first block missing');
 check('css: a pixhost-hosted poster URL is kept out of the backdrop background', src.indexOf('var posterBackdrop = \'\';') !== -1 && src.indexOf('pixhost\\.cc') !== -1, 'pixhost poster guard missing');
 
@@ -628,6 +659,19 @@ check('catbg: same URL -> no new preload, no state change', images.length === im
 })());
 
 serialCard.handlers['hover:focus'].forEach((f) => f());
+// Focus fetched the year-less serial's item page: the line under the title now
+// carries the real release year (Год) and the newest catalog-addition date
+// (latest "Загрузил" upload), the date dimmed and distinct from the year.
+check('grid: focused year-less serial gains real year + catalog date (no fabrication)', (function () {
+    const age = serialCard.find('.card__age');
+    if (!age) return false;
+    const kids = age.children;
+    return kids.length === 2 && kids[0].text() === '2026' && kids[1].text() === ' \u2022 12.10' && kids[1].classes.has('udx-ad');
+})(), (() => { const a = serialCard.find('.card__age'); return a ? JSON.stringify(a.children.map((c) => c.text())) : 'no age line'; })());
+// Refocusing an enriched card must not refetch or duplicate the line.
+const fetchesAfterEnrich = fetches.length;
+serialCard.handlers['hover:focus'].forEach((f) => f());
+check('grid: refocus of an enriched card does not refetch or duplicate the line', fetches.length === fetchesAfterEnrich && findAll(serialCard, 'card__age').length === 1, String(fetches.length - fetchesAfterEnrich) + ' new fetches, ' + findAll(serialCard, 'card__age').length + ' age lines');
 const staleImg = images[images.length - 1];
 sharkCard.handlers['hover:focus'].forEach((f) => f());
 const freshImg = images[images.length - 1];
@@ -723,8 +767,12 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
         const r = src.match(new RegExp(m.replace(/[-.]/g, '\\$&') + '\\{([^}]*)\\}'));
         return !!r && !/height:/.test(r[1]) && !/padding:/.test(r[1]) && !/border-radius:/.test(r[1]);
     }), JSON.stringify(mods));
-    check('strip: focus logic is transform-only for both roles (no layout shift)', /\.udxf__act--online\.focus\{[^}]*transform:translateY\(-\.1em\)[^}]*box-shadow[^}]*\}/.test(src) && /\.udxf__act--torrents\.focus\{[^}]*transform:translateY\(-\.1em\)[^}]*box-shadow[^}]*\}/.test(src), 'missing or shifting focus rule');
-    check('strip: left role is primary green-blue gradient, right role is secondary dark glass (NUM design)', /\.udxf__act--online\{background:linear-gradient\(120deg,#1fc26d 0%,#2e6bf0 100%\);border:1px solid rgba\(255,255,255,\.20\);color:#fff;\}/.test(src) && /\.udxf__act--torrents\{background:rgba\(9,29,43,\.62\);border:1px solid rgba\(255,255,255,\.24\);color:#dbe7f2;\}/.test(src), 'role styles missing');
+    // Native Lampa button focus: one shared invert rule (the core
+    // .simple-button.focus pattern); no per-role glow/transform rules.
+    check('strip: focus is the native Lampa button invert (one shared rule, no glow, no layout shift)', /\.udxf__act\.focus\{background-color:#fff;color:#000;\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-native focus rule present');
+    // Native Lampa button surface: the core .full-start__button / .simple-button
+    // glass at rest (both detail buttons are indistinguishable in core Lampa).
+    check('strip: both roles carry the native Lampa button glass (core .full-start__button surface)', /\.udxf__act--online\{background:rgba\(0,0,0,\.3\);color:#fff;\}/.test(src) && /\.udxf__act--torrents\{background:rgba\(0,0,0,\.3\);color:#fff;\}/.test(src), 'role styles missing');
     check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_ONLINE = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
 })();
 

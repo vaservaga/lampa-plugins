@@ -147,9 +147,21 @@
         '.udx-cat.udx-active{background-color:#fff;color:#000;}' +
         '.udx-content__list{position:relative;z-index:1;padding-top:80px;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
-        '.udx-content .card__view{position:relative;overflow:hidden;}' +
-        '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.25em;font-weight:600;color:#fff;}' +
-        '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.85em;line-height:1.4em;color:#fff;}' +
+        // Poster-to-title gap: the core .card__view carries a 1em
+        // margin-bottom; tighten it so the title sits close to the poster
+        // (one compact scale for all three category tabs).
+        '.udx-content .card__view{position:relative;overflow:hidden;margin-bottom:0.35em;}' +
+        '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:0.9em;line-height:1.2em;font-weight:600;color:#fff;}' +
+        '.udx-content .card__age{min-height:1.4em;margin-top:0;font-size:0.8em;line-height:1.3em;color:#fff;}' +
+        // Catalog-addition date (latest release upload date, real data): shown
+        // dimmed after the release year so the two dates stay distinct.
+        '.udx-content .card__age .udx-ad{color:rgba(255,255,255,.55);}' +
+        // Glass top panel on Ultradox screens only (the .udx-glass class is
+        // toggled on the core .head by the activity listener): a dark
+        // translucent surface + soft backdrop blur; on WebViews without
+        // backdrop-filter the translucent dark alone is the fallback.
+        '.head.udx-glass{background-color:rgba(10,12,15,.60);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);}' +
+        '.head.udx-glass .head__body{background-color:transparent;}' +
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
@@ -179,22 +191,25 @@
         // fixed viewport height the page can never scroll.
         '.udxf__slot .scroll{position:relative;height:100%;overflow:hidden;}' +
         '.udxf__content{min-height:100%;}' +
-        '.udxf__zone{display:flex;align-items:center;min-height:36em;padding:10% 6% 3% 5%;box-sizing:border-box;}' +
-        '.udxf__poster{flex-shrink:0;width:22em;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
+        // Compact zone (explicit user request 2026-11-04): the top block must
+        // leave room for the overview on a 1920x1080 screen without scrolling;
+        // the scroll viewport below stays height-bounded for long text.
+        '.udxf__zone{display:flex;align-items:center;min-height:30em;padding:7% 6% 2% 5%;box-sizing:border-box;}' +
+        '.udxf__poster{flex-shrink:0;width:19em;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
         '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
         '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
-        '.udxf__title{font-size:3em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
+        '.udxf__title{font-size:2.6em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
         '.udxf__orig{font-size:1.4em;line-height:1.35;color:rgba(255,255,255,.6);margin-top:.5em;}' +
-        '.udxf__line{font-size:1.1em;color:rgba(255,255,255,.5);margin-top:.9em;}' +
+        '.udxf__line{font-size:1.1em;color:rgba(255,255,255,.5);margin-top:.7em;}' +
         // Full overview - no line clamp (the page scrolls when it is long).
-        '.udxf__overview{font-size:1.15em;line-height:1.55;color:#fff;margin-top:.9em;}' +
+        '.udxf__overview{font-size:1.15em;line-height:1.55;color:#fff;margin-top:.7em;}' +
         // Compact horizontal action strip, ~62px tall at the 1080p root font
         // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
         // columns. Native Lampa button surface (core values): the
         // .full-start__button / .simple-button glass rgba(0,0,0,.3) at rest and
         // the .simple-button.focus invert (#fff/#000) on focus - no gradient,
         // no custom glow; the currentColor icons follow the text on invert.
-        '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:1.6em;}' +
+        '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:1.2em;}' +
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
@@ -220,9 +235,9 @@
         '.card__view>.card__quality{left:10px!important;bottom:10px!important;}' +
         // Full-width details strip under the top zone: heading, the complete
         // overview, director and the full cast (wrapped, never truncated).
-        '.udxf__details{padding:0 6% 6% 5%;}' +
-        '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:1.2em;}' +
-        '.udxf__fact{font-size:1.1em;line-height:1.55;color:rgba(255,255,255,.6);margin-top:1em;}' +
+        '.udxf__details{padding:0 6% 4% 5%;}' +
+        '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:.9em;}' +
+        '.udxf__fact{font-size:1.1em;line-height:1.55;color:rgba(255,255,255,.6);margin-top:.8em;}' +
         // Focus target: the whole strip receives the down-navigation focus
         // (scroll.update); no visible ring - the full-width white box-shadow
         // read as two horizontal lines across the screen.
@@ -300,6 +315,21 @@
         L.Component.add('ultradox_full', FullPage);
         L.Component.add('ultradox_online', ListPage);
         L.Component.add('ultradox_torrents', ListPage);
+
+        // Glass top panel on Ultradox screens only. The core sends an
+        // 'activity' event for every activity start (push, back, refresh), so
+        // the .udx-glass class is applied while any Ultradox component is the
+        // active screen and removed on the first start of any other screen
+        // (back to the main page, the core torrents search, ...). No global
+        // head restyle outside Ultradox; the core keeps its own look.
+        var GLASS_COMPONENTS = ['ultradox', 'ultradox_full', 'ultradox_online', 'ultradox_torrents'];
+        L.Listener.follow('activity', function (e) {
+            if (!e || e.type !== 'start') return;
+            var head = $('.head');
+            if (!head.length) return;
+            if (GLASS_COMPONENTS.indexOf(e.component) !== -1) head.addClass('udx-glass');
+            else head.removeClass('udx-glass');
+        });
 
         function addMenu() {
             if ($('.menu .menu__list').length == 0) return;
@@ -980,22 +1010,66 @@
             img.src = url;
         }
 
+        // Month name (ru/uk, any case or declension) -> 1..12, matched on the
+        // first three characters ("Окт", "октября", "жовтня" all resolve).
+        function monthNum(name) {
+            var n = String(name || '').toLowerCase().substring(0, 3);
+            var map = { янв: 1, фев: 2, мар: 3, апр: 4, май: 5, мая: 5, іюн: 6, июн: 6, іюл: 7, июл: 7, авг: 8, сен: 9, окт: 10, жов: 10, ноя: 11, лис: 11, гру: 12, груд: 12, дек: 12 };
+            return map[n] || 0;
+        }
+
+        // The newest catalog entry of an item: the latest "Загрузил: USER
+        // (dd Mon yyyy)" upload date across the page's releases, as 'dd.mm'.
+        // Real data only - '' when the page carries no readable date.
+        function catalogDate(html) {
+            var rel = parseReleases(html);
+            var y = 0, mo = 0, d = 0, i, m, mm, yy;
+            for (i = 0; i < rel.length; i++) {
+                m = String(rel[i].date || '').match(/^(\d{1,2})\s+(\S+)\s+(\d{4})/);
+                if (!m) continue;
+                mm = monthNum(m[2]);
+                if (!mm) continue;
+                yy = +m[3];
+                if (yy > y || (yy === y && mm > mo) || (yy === y && mm === mo && +m[1] > d)) {
+                    y = yy; mo = mm; d = +m[1];
+                }
+            }
+            if (!y) return '';
+            function p2(n) { return (n < 10 ? '0' : '') + n; }
+            return p2(d) + '.' + p2(mo);
+        }
+
         // Serials: the list carries no release year (titles end in "(N сезон)"),
-        // so when a card is focused its item page is fetched once and the real
-        // "Год:" field is shown as the year line. Best-effort and silent: a
-        // failed fetch leaves the card as-is; each card fetches at most once.
+        // so when a year-less card is focused its item page is fetched once and
+        // the real "Год:" field plus the newest catalog-addition date are shown
+        // as the line under the title (year, then the dimmed "• dd.mm").
+        // Best-effort and silent: a failed fetch leaves the card as-is; a card
+        // with a year from the list data is never fetched.
         this.enrichYear = function (item, card) {
             if (item.year || item._yBusy || !item.itemUrl) return;
             item._yBusy = 1;
             fetchText(item.itemUrl, function (html) {
+                var h = html || '';
                 var y = '';
-                var m = (html || '').match(/<span>Год:<\/span>\s*([^<]+)/i);
+                var m = h.match(/<span>Год:<\/span>\s*([^<]+)/i);
                 if (m) y = (strip(m[1]).match(/\b(19|20)\d{2}\b/) || [])[0] || '';
-                if (!y) { item._yBusy = 0; return; }
-                item.year = y;
+                var added = catalogDate(h);
+                if (!y && !added) { item._yBusy = 0; return; }
+                if (y) item.year = y;
+                if (added) item.added = added;
                 var age = document.createElement('div');
                 age.addClass('card__age');
-                age.text(y);
+                if (item.year) {
+                    var ye = document.createElement('span');
+                    ye.text(item.year);
+                    age.append(ye);
+                }
+                if (item.added) {
+                    var de = document.createElement('span');
+                    de.addClass('udx-ad');
+                    de.text((item.year ? ' \u2022 ' : '') + item.added);
+                    age.append(de);
+                }
                 card.append(age);
             }, function () { item._yBusy = 0; });
         };
