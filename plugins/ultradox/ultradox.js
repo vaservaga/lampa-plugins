@@ -136,10 +136,17 @@
         '</div>';
 
     var STYLE_HTML = '<style id="ultradox-style">' +
-        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;display:flex;flex-direction:column;}' +
-        '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
+        // No custom background of our own (user correction 2026-11-04): the
+        // catalog shows Lampa's native background (the core body surface)
+        // exactly like the NUM reference screen - nothing painted over it.
+        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;}' +
+        // The blurred poster backdrop layers and the dark veil stay in the DOM
+        // (the crossfade state machine keeps running harmlessly) but are
+        // hidden: any dark layer on top of the body background reads as a
+        // "darker than Lampa" film.
+        '.udx-bg{display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
-        '.udx-bg__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
+        '.udx-bg__veil{display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
