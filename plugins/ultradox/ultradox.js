@@ -143,8 +143,10 @@
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
-        // cannot affect the card geometry.
-        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:14px 20px;background:linear-gradient(rgba(0,0,0,.55),transparent);}' +
+        // cannot affect the card geometry. No glass band here: the tabs float
+        // over the plain Lampa background (+ the blurred backdrop behind),
+        // nothing painted on top of the content zone.
+        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:14px 20px;}' +
         '.udx-content__cats{display:flex;align-items:center;}' +
         '.udx-cat{flex-shrink:0;}' +
         '.udx-cat__label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
@@ -159,10 +161,12 @@
         // (the core 2.5em mask padding read as a large empty block).
         '.udx-content .scroll--mask .scroll__content{padding-top:0.75em;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
-        // Row width: five equal cells filling the whole line (the core 12.75em
-        // cards leave a large empty band on the right; the NUM reference fills
-        // the row edge to edge). The core 0.5em side paddings become the gap.
-        '.udx-content .category-full .card{width:20%;flex-shrink:0;}' +
+        // Row geometry: exactly five equal cells filling the whole line (NUM
+        // reference: edge to edge, the core 0.5em side paddings are the gap).
+        // flex-basis:0 + grow:1 makes the flex algorithm divide the available
+        // width into five EXACT parts; a width:20% percent rounds to integer
+        // pixels and 5 x rounded can exceed the line, wrapping the fifth card.
+        '.udx-content .category-full .card{flex:1 1 0;min-width:0;}' +
         // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
         // band measured on the NUM reference at 1920x1080); one value for all
         // three category tabs.
@@ -180,12 +184,9 @@
         // exactly as in the NUM DOM. No card-level ring: the grid rows are
         // stacked without a vertical gap, so a ring around the whole card
         // (poster + text block) would extend into the next row.
-        // Glass top panel on Ultradox screens only (the .udx-glass class is
-        // toggled on the core .head by the activity listener): a dark
-        // translucent surface + soft backdrop blur; on WebViews without
-        // backdrop-filter the translucent dark alone is the fallback.
-        '.head.udx-glass{background-color:rgba(10,12,15,.60);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);}' +
-        '.head.udx-glass .head__body{background-color:transparent;}' +
+        // No glass top panel on Ultradox screens (user correction 2026-11-04):
+        // the core .head keeps its native Lampa surface; nothing is painted
+        // on top of the content zone.
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
@@ -339,21 +340,6 @@
         L.Component.add('ultradox_full', FullPage);
         L.Component.add('ultradox_online', ListPage);
         L.Component.add('ultradox_torrents', ListPage);
-
-        // Glass top panel on Ultradox screens only. The core sends an
-        // 'activity' event for every activity start (push, back, refresh), so
-        // the .udx-glass class is applied while any Ultradox component is the
-        // active screen and removed on the first start of any other screen
-        // (back to the main page, the core torrents search, ...). No global
-        // head restyle outside Ultradox; the core keeps its own look.
-        var GLASS_COMPONENTS = ['ultradox', 'ultradox_full', 'ultradox_online', 'ultradox_torrents'];
-        L.Listener.follow('activity', function (e) {
-            if (!e || e.type !== 'start') return;
-            var head = $('.head');
-            if (!head.length) return;
-            if (GLASS_COMPONENTS.indexOf(e.component) !== -1) head.addClass('udx-glass');
-            else head.removeClass('udx-glass');
-        });
 
         function addMenu() {
             if ($('.menu .menu__list').length == 0) return;
