@@ -78,7 +78,6 @@
         '<div class="udx-content">' +
             '<div class="udx-bg udx-bg--first" aria-hidden="true"></div>' +
             '<div class="udx-bg udx-bg--second" aria-hidden="true"></div>' +
-            '<div class="udx-bg__veil" aria-hidden="true"></div>' +
             '<div class="udx-content__head">' +
                 '<div class="udx-content__cats"></div>' +
             '</div>' +
@@ -158,18 +157,21 @@
         // Ambience backdrop: two permanent crossfading layers behind the grid
         // (focus on a card swaps the image, NUM-style). display must stay
         // visible - the OFF state is opacity:0 only (a display:none layer was
-        // never shown at all on the TV); the veil (z 1) darkens the left zone,
-        // the content (z 2) stays above it.
+        // never shown at all on the TV); the content (z 20/1) stays above.
+        // No directional veil (user request 2026-11-04): the backdrop is one
+        // uniform image all around - the darkening gradient read as a black
+        // band over the top-left of the screen.
         '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
-        '.udx-bg__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
         // cannot affect the card geometry. No glass band here: the tabs float
         // over the plain Lampa background (+ the blurred backdrop behind),
         // nothing painted on top of the content zone.
-        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:14px 20px;}' +
+        // Tab zone sits below the screen top with a real top margin (the core
+        // bar is gone - user request 2026-11-04: lower it, uniform backdrop).
+        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:34px 20px 14px 20px;}' +
         '.udx-content__cats{display:flex;align-items:center;}' +
         '.udx-cat{flex-shrink:0;}' +
         '.udx-cat__label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
@@ -231,10 +233,10 @@
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
-        // Full-bleed detail/list pages (user request 2026-11-04): the core top
-        // bar is hidden while one of our pages is open (build adds the body
-        // class, destroy removes it; the catalog keeps the bar), and the page
-        // root is pinned to the full screen. The pin matters twice:
+        // Full-bleed Ultradox screens (user request 2026-11-04): the core top
+        // bar is hidden on all of them (catalog, detail, list - build adds the
+        // body class, destroy removes it), and the page root is pinned to the
+        // full screen so the ambience/backdrop is one image all around. The pin matters twice:
         // 1) the core content area starts below the head offset, so an
         //    in-flow page leaves a band of the previous screen (catalog
         //    ambience backdrop) visible at the top;
@@ -245,7 +247,7 @@
         //    the inner .scroll{height:100%} resolve to a real box, so the TV
         //    scroll driver's maxOffset clamp works for long content.
         'body.udx-nohead .head{display:none;}' +
-        'body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}' +
+        'body.udx-nohead .udx-content,body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         // NUM-style backdrop: the image is ALWAYS a soft-blurred atmosphere
         // (never a flat dark surface). The fanart is blurred lightly and kept
@@ -292,16 +294,13 @@
         '.udxf__overview{font-size:1.02em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~62px tall at the 1080p root font
         // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
-        // columns. MODS-style gradient pills (user request 2026-11-04, both
-        // buttons, the reference shot shape): a saturated disc, white icon +
-        // label, no glass. "Онлайн" carries the green->blue mark from the
-        // reference; "TorrServer" the blue->violet one.
+        // columns. MODS's-style pills (user request 2026-11-04, both buttons):
+        // one matte dark translucent surface, white icon + white label, no
+        // brand gradients (the old green/blue ones are gone).
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
-        '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.4em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:rgba(24,26,28,.62);}' +
+        '.udxf__act svg{flex:0 0 auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        '.udxf__act--online{background:linear-gradient(90deg,#3fd487,#2f7ff0);}' +
-        '.udxf__act--torrents{background:linear-gradient(90deg,#2f7ff0,#8a5cf6);}' +
         // Focus: the NUM green halo - the same #57F570 ring the core draws
         // around its focused cards - over the gradient (a core-style invert
         // would erase the pill color) + a slight brightness lift.
@@ -1034,6 +1033,10 @@
         this.build = function () {
             if (this.activity) this.activity.loader(false);
 
+            // Full-bleed screen: hide the core top bar (same as detail/list).
+            var udxBodyC = typeof document !== 'undefined' ? document.body : null;
+            if (udxBodyC && udxBodyC.classList) udxBodyC.classList.add('udx-nohead');
+
             if (!built) {
                 built = true;
                 html.append($(CONTENT_HTML));
@@ -1339,9 +1342,10 @@
                     else L.Controller.toggle('menu');
                 },
                 right: function () { NavMove('right'); },
+                // Up at the top edge simply stays: the top bar is hidden on
+                // our screens, so there is nothing to focus above the grid.
                 up: function () {
                     if (NavCanMove('up')) NavMove('up');
-                    else L.Controller.toggle('head');
                 },
                 down: function () { NavMove('down'); },
                 back: function () { L.Activity.backward(); }
@@ -1354,6 +1358,8 @@
         this.stop = function () {};
 
         this.destroy = function () {
+            var udxBodyC2 = typeof document !== 'undefined' ? document.body : null;
+            if (udxBodyC2 && udxBodyC2.classList) udxBodyC2.classList.remove('udx-nohead');
             if (scroll) scroll.destroy();
             html.remove();
             built = false;

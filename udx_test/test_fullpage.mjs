@@ -655,8 +655,8 @@ check('css: the backdrop is always a soft-blurred image (NUM-style): fanart ligh
 check('css: list-page poster fallback shares the same bright soft-blur treatment', /\.udxl__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src), 'missing .udxl__backdrop--poster rule');
 check('css: detail scroll viewport is height-bounded (the TV scroll driver clamps travel to html offsetHeight)', /\.udxf__slot \.scroll\{position:relative;height:100%;overflow:hidden;\}/.test(src), 'missing bounded scroll rule');
 check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
-check('css: single permanent veil overlay (left+bottom gradients, Lampa black-based alphas)', /\.udx-bg__veil\{[^}]*z-index:1[^}]*linear-gradient\(90deg,rgba\(0,0,0,\.78\),rgba\(0,0,0,\.30\) 60%\),linear-gradient\(to top,rgba\(0,0,0,\.70\),rgba\(0,0,0,0\) 42%\)/.test(src), 'missing .udx-bg__veil rule');
-check('css: the ambience backdrop layers are actually visible (no display:none - opacity alone is the off state; a display:none layer never showed on the TV) and stay under the content', !/\.udx-bg\{[^}]*display:none/.test(src) && !/\.udx-bg__veil\{[^}]*display:none/.test(src) && /\.udx-content__head\{[^}]*z-index:20/.test(src) && /\.udx-content__list\{[^}]*position:relative;z-index:1/.test(src), 'bg layers hidden or above content');
+check('css: no directional veil - the ambience backdrop is one uniform image all around (the left-darkening gradient read as a black band over the top-left)', src.indexOf('.udx-bg__veil') === -1, 'veil must be gone');
+check('css: the ambience backdrop layers are actually visible (no display:none - opacity alone is the off state; a display:none layer never showed on the TV) and stay under the content', !/\.udx-bg\{[^}]*display:none/.test(src) && /\.udx-content__head\{[^}]*z-index:20/.test(src) && /\.udx-content__list\{[^}]*position:relative;z-index:1/.test(src), 'bg layers hidden or above content');
 check('css: the catalog scroll gets a real bounded viewport via the core layer--wheight (frameUpdate sets innerHeight - head - navi)', src.indexOf("scEl.addClass('layer--wheight')") !== -1, 'scroll must get layer--wheight');
 check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(0,0,0,\.86\),rgba\(0,0,0,\.58\) 46%,rgba\(0,0,0,\.1\) 80%\),linear-gradient\(to top,rgba\(0,0,0,\.66\),rgba\(0,0,0,0\) 46%\);}/.test(src), 'missing .udxf--poster veil rule');
 check('css: poster-state veil has no fully opaque layer (the image stays visible)', (function () {
@@ -671,7 +671,7 @@ check('css: a pixhost-hosted poster URL is kept out of the backdrop background',
 console.log('catalog backdrop: two-layer crossfade');
 const croot = cat.render();
 const bgAll = findAll(croot, 'udx-bg');
-check('catbg: exactly two permanent background layers + one veil', bgAll.length === 2 && findAll(croot, 'udx-bg__veil').length === 1, bgAll.length + ':' + findAll(croot, 'udx-bg__veil').length);
+check('catbg: exactly two permanent background layers (no veil element)', bgAll.length === 2 && findAll(croot, 'udx-bg__veil').length === 0, bgAll.length + ':' + findAll(croot, 'udx-bg__veil').length);
 check('catbg: start neutral (both layers off, no image set)', bgAll.every((l) => !l.classes.has('udx-bg--on') && l.style.backgroundImage === undefined));
 
 // the catalog smoke hover:focus above already requested the first poster;
@@ -814,23 +814,18 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     const fEm = base && base[1].match(/font-size:([\d.]+)em/);
     const px = hEm && fEm ? parseFloat(hEm[1]) * parseFloat(fEm[1]) * 16 : 0;
     check('strip: shared base height is in the 60-64px band at the 1080p root font', !!base && px >= 60 && px <= 64, 'height=' + px + 'px');
-    const mods = ['.udxf__act--online', '.udxf__act--torrents'];
-    check('strip: both controls share the base geometry (no height/padding/radius override in the role rules)', mods.every((m) => {
-        const r = src.match(new RegExp(m.replace(/[-.]/g, '\\$&') + '\\{([^}]*)\\}'));
-        return !!r && !/height:/.test(r[1]) && !/padding:/.test(r[1]) && !/border-radius:/.test(r[1]);
-    }), JSON.stringify(mods));
-    // MODS-style gradient pills (user request 2026-11-04): a saturated disc per
-    // role, white icon + label; the focus is a full-width white ring over the
-    // gradient (a core-style invert would erase the pill color) + brightness
-    // lift, transform-free, zero layout shift.
-    check('strip: focus is the NUM green halo over the gradient (same #57F570 ring as the core cards; no invert, no layout shift)', /\.udxf__act\.focus\{box-shadow:0 0 0 \.25em #57F570;filter:brightness\(1\.08\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
+    check('strip: both controls share ONE dark pill - no per-role rules at all (no color/geometry override possible)', src.indexOf('.udxf__act--online{') === -1 && src.indexOf('.udxf__act--torrents{') === -1, 'role rules must be gone');
+    // Focus: the NUM green halo (#57F570, same ring as the core cards) over
+    // the dark pill; transform-free, zero layout shift.
+    check('strip: focus is the NUM green halo over the dark pill (same #57F570 ring as the core cards; no invert, no layout shift)', /\.udxf__act\.focus\{box-shadow:0 0 0 \.25em #57F570;filter:brightness\(1\.08\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
     check('focus: the green halo is one shared token across all custom surfaces (panel rows + list rows)', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row halo rules missing');
     check('css: the detail page hides the core top bar (body.udx-nohead, full-bleed)', src.indexOf('body.udx-nohead .head{display:none;}') !== -1, 'missing no-head rule');
-    check('css: the body class is added by build and removed by destroy (detail AND list pages)', src.split("classList.add('udx-nohead')").length - 1 >= 2 && src.split("classList.remove('udx-nohead')").length - 1 >= 2, 'body class wiring missing');
-    check('css: the detail/list pages pin to the full screen (fixed inset 0 - the core layer--height box) so no band of the previous screen shows at the top and the scroll viewport gets a real height', src.indexOf('body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}') !== -1, 'missing full-bleed pin rule');
+    check('css: the body class is added by build and removed by destroy (ALL Ultradox screens: catalog, detail, list)', src.split("classList.add('udx-nohead')").length - 1 >= 3 && src.split("classList.remove('udx-nohead')").length - 1 >= 3, 'body class wiring missing');
+    check('css: all Ultradox screens pin to the full screen (fixed inset 0 - the core layer--height box) so no band shows at the top and the backdrops reach the screen edges', src.indexOf('body.udx-nohead .udx-content,body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}') !== -1, 'missing full-bleed pin rule');
+    check('css: the tab zone sits lowered from the screen top (34px top margin) now that the core bar is gone', /\.udx-content__head\{[^}]*padding:34px 20px 14px 20px;\}/.test(src), 'missing tab-zone top margin');
     check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:center;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
     check('css: the details strip keeps the full text at compact spacing (no clamp, tighter lines)', /\.udxf__overview\{font-size:1\.02em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__fact\{font-size:1em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
-    check('strip: both roles carry the MODS gradient surfaces', /\.udxf__act--online\{background:linear-gradient\(90deg,#3fd487,#2f7ff0\);\}/.test(src) && /\.udxf__act--torrents\{background:linear-gradient\(90deg,#2f7ff0,#8a5cf6\);\}/.test(src), 'role styles missing');
+    check('strip: both actions share the MODS-style dark pill (matte translucent surface, white icon + label, no brand gradients)', /\.udxf__act\{[^}]*color:#fff;[^}]*background:rgba\(24,26,28,\.62\);\}/.test(src) && src.indexOf('#3fd487') === -1 && src.indexOf('#8a5cf6') === -1, 'dark pill style missing or gradients still present');
     check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_PLAY = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
 })();
 
