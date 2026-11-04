@@ -163,10 +163,12 @@
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         // Row geometry: exactly five equal cells filling the whole line (NUM
         // reference: edge to edge, the core 0.5em side paddings are the gap).
-        // flex-basis:0 + grow:1 makes the flex algorithm divide the available
-        // width into five EXACT parts; a width:20% percent rounds to integer
-        // pixels and 5 x rounded can exceed the line, wrapping the fifth card.
-        '.udx-content .category-full .card{flex:1 1 0;min-width:0;}' +
+        // The core sets *{box-sizing:border-box}, so the 0.5em paddings sit
+        // INSIDE the width; 20% - 0.5px keeps 5 x width strictly under the
+        // line for any container width (round(0.2W) x 5 can exceed W by a
+        // pixel and wrap the fifth card; flex-basis:0 puts all items on ONE
+        // line - neither is safe, the explicit sub-100% width is).
+        '.udx-content .category-full .card{width:calc(20% - 0.5px);flex-shrink:0;}' +
         // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
         // band measured on the NUM reference at 1920x1080); one value for all
         // three category tabs.
