@@ -182,16 +182,12 @@
         // must stay height-bounded).
         '.udx-content__list{flex:1 1 auto;min-height:0;position:relative;z-index:1;}' +
         '.udx-content__list>.scroll{height:100%;}' +
-        // NUM-smooth glide (user request 2026-11-04): the core gives every
-        // scroll body a 0.3s default-ease transform transition - a symmetric
-        // curve whose slow start restarts on every D-pad re-target and reads
-        // as a snappy crawl on a 1080p poster wall. The catalog overrides it
-        // with a longer, softer ease-out settle (fast start, long
-        // deceleration tail): rapid repeats blend into one continuous glide,
-        // like the NUM reference. The core .notransition/.transition-reset
-        // kill-switches (touch drag, reset) stay in force via the :not()
-        // guards.
-        '.udx-content .scroll__body:not(.notransition):not(.transition-reset){-webkit-transition:-webkit-transform .45s cubic-bezier(.22,1,.36,1);transition:transform .45s cubic-bezier(.22,1,.36,1);}' +
+        // No catalog transition override (user report 2026-11-04): the feed
+        // must scroll EXACTLY like the core Lampa build (compared on the TV) -
+        // the core 0.3s default-ease transform transition on every scroll
+        // body, driven by one scroll.update per focus move. The earlier
+        // 0.45s cubic-bezier ease-out override read as a jerky crawl next to
+        // the core, so the catalog keeps the stock core curve.
         // Small clear band between the tab zone and the first poster row
         // (the core 2.5em mask padding read as a large empty block).
         // Top/side clearance so the first row's focus halo (-0.5em band) is
@@ -1144,6 +1140,16 @@
                 lb.addClass('udx-cat__label');
                 lb.text(c.title);
                 b.append(lb);
+                b.on('hover:focus', function () {
+                    // Focus leaving the grid upward lands on a category
+                    // button: glide the grid back to the top so the page sits
+                    // at the categories again (core lists keep their top
+                    // visible while the header row holds focus). Without this
+                    // the grid stayed scrolled down under the focused button
+                    // (user report 2026-11-04: "сторінка з постерами не
+                    // піднімається знову на категорію").
+                    if (scroll && grid && grid.children[0]) scroll.update(grid.children[0], false);
+                });
                 b.on('hover:enter', (function (c2) {
                     return function () { self.selectCat(c2); };
                 })(c));
@@ -1372,14 +1378,22 @@
 
             card.on('hover:focus', function () {
                 last = card;
-                // One core-native glide per focus move (the same scroll.update
-                // the core items-line issues on focus): a single eased
-                // transition to the same target softTo computed. The old
-                // 150px-per-110ms softTo step loop restarted the core
-                // transition on every tick and read as a jerky crawl on the TV
-                // (user feedback 2026-11-04: the feed scroll was janky).
+                // The core's own focus glide, 1:1 the core items module
+                // (app.min.js Items$2 onAppend): scroll.update(item,
+                // align_left ? false : true) with the core default
+                // align_left:false -> tocenter TRUE - the focused row is
+                // CENTERED in the viewport, and the reposition runs on the way
+                // UP too, so every D-pad step glides and the row above the
+                // focus always stays on screen (the spatial Navigator then
+                // walks row by row instead of skipping off-screen rows). The
+                // old top-align (update(card, false)) pinned the row to the
+                // viewport top: the previous row left the screen and an UP
+                // press jumped straight to the category tabs with the grid
+                // left scrolled down - "сторінка не піднімається знову на
+                // категорію" (user report 2026-11-04). startScroll no-ops when
+                // the position is unchanged, so a plain call is safe.
                 if (scroll) {
-                    if (scroll.update) scroll.update(card, false);
+                    if (scroll.update) scroll.update(card, true);
                     else softTo(scroll, card);
                 }
                 focusBackdrop(item.poster);

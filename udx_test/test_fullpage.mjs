@@ -36,14 +36,15 @@
 //   5. Catalog card still renders and opens the FullPage on hover:enter; the
 //      old long-press playback trigger (hover:long) is gone; the scroll
 //      viewport is bounded (flex-bounded list + height:100% scroll) and focus
-//      glides with ONE core-native transition per focus move (scroll.update -
-//      the same call the core items-line uses; the old 150px-per-tick softTo
-//      step loop restarted the core transition every tick and read as a jerky
-//      crawl on the TV); the catalog scroll body additionally rides a
-//      NUM-smooth 0.45s ease-out settle (cubic-bezier(.22,1,.36,1)) overriding
-//      the core 0.3s default-ease (snappy on a 1080p poster wall), the core
-//      notransition/transition-reset kill-switches stay in force; cards win
-//      over the legacy fallback table rows.
+//      glides with ONE core-native CENTERED transition per focus move
+//      (scroll.update(card, true) - 1:1 the core items module with
+//      align_left:false; centering keeps the row above the focus on screen so
+//      the Navigator walks row by row and the way UP re-glides the page back;
+//      the earlier top-align pinned the row to the top and an UP press jumped
+//      to the tabs with the grid left scrolled down); focusing a category
+//      button glides the grid back to its top; the catalog scroll body keeps
+//      the STOCK core transition (no plugin override - it must scroll exactly
+//      like the core build); cards win over the legacy fallback table rows.
 //   6. All network fetches go to the public mirrors only (no external metadata
 //      service, no TorrServer/LAN); TMDB traffic goes through the core
 //      integration mock only.
@@ -440,7 +441,7 @@ const L = {
         constructor() {
             this.onEnd = null;
             this.minusCalls = 0; this.lastMinus = null;
-            this.updateCalls = 0; this.lastUpdate = null;
+            this.updateCalls = 0; this.lastUpdate = null; this.lastCenter = undefined;
             this.wheelCalls = 0; this.lastWheel = null;
             this._pos = 0; this._softTarget = null; this._inner = null;
             this._body = makeEl('scroll-body'); this._body._top = 0;
@@ -453,7 +454,7 @@ const L = {
         render() { const s = makeEl('scroll'); if (this._inner) s.append(this._inner); return s; }
         minus(el) { this.minusCalls++; this.lastMinus = el; }
         reset() { this._pos = 0; }
-        update(el) { this.updateCalls++; this.lastUpdate = el; }
+        update(el, center) { this.updateCalls++; this.lastUpdate = el; this.lastCenter = center; }
         position() { return this._pos; }
         wheel(size) {
             this.wheelCalls++; this.lastWheel = size;
@@ -576,7 +577,20 @@ const catScroll = L.Scroll.last;
 const catUpdateBefore = catScroll.updateCalls;
 const catWheelBefore = catScroll.wheelCalls;
 card.handlers['hover:focus'].forEach((f) => f());
-check('catalog: focus glides with ONE core-native transition (scroll.update, no wheel-step loop)', catScroll.updateCalls === catUpdateBefore + 1 && catScroll.lastUpdate === card && catScroll.wheelCalls === catWheelBefore, JSON.stringify({ update: catScroll.updateCalls, lastUpdate: catScroll.lastUpdate === card, wheel: catScroll.wheelCalls }));
+check('catalog: focus glides with ONE core-native CENTERED transition (scroll.update(card, true) - the core items module with align_left:false; no wheel-step loop)', catScroll.updateCalls === catUpdateBefore + 1 && catScroll.lastUpdate === card && catScroll.lastCenter === true && catScroll.wheelCalls === catWheelBefore, JSON.stringify({ update: catScroll.updateCalls, lastUpdate: catScroll.lastUpdate === card, center: catScroll.lastCenter, wheel: catScroll.wheelCalls }));
+{
+    // Focus leaving the grid upward lands on a category button: the grid must
+    // glide back to its top (first card, top-aligned) so the page sits at the
+    // categories again instead of staying scrolled down under the button.
+    const catRoot = cat.render();
+    const tab = findAll(catRoot, 'udx-cat')[0];
+    check('catalog: a category button exists in the tab zone', !!tab, 'no .udx-cat found');
+    if (tab && tab.handlers['hover:focus']) {
+        const uBefore = catScroll.updateCalls;
+        tab.handlers['hover:focus'].forEach((f) => f());
+        check('catalog: focusing a category button glides the grid back to the top (scroll.update(firstCard, false))', catScroll.updateCalls === uBefore + 1 && catScroll.lastUpdate === card && catScroll.lastCenter === false, JSON.stringify({ update: catScroll.updateCalls - uBefore, lastUpdate: catScroll.lastUpdate === card, center: catScroll.lastCenter }));
+    }
+}
 card.handlers['hover:enter'].forEach((f) => f());
 const pushed = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('catalog: enter opens FullPage with item', pushed && pushed.component === 'ultradox_full' && pushed.item && pushed.item.itemUrl === SERIES_URL);
@@ -658,7 +672,7 @@ check('css: vertical row distance - margin-bottom 2.5em between card rows (NUM r
 check('css: tab zone is flex flow above the grid (head not an overlay; no poster can be covered by the tabs)', /\.udx-content\{[^}]*display:flex[^}]*flex-direction:column/.test(src) && /\.udx-content__head\{flex:0 0 auto;[^}]*\}/.test(src) && src.indexOf('.udx-content__head{position:absolute') === -1, 'head must stay in flow');
 check('css: grid area is the flex remainder with a bounded scroll viewport (TV scroll driver clamps to offsetHeight)', /\.udx-content__list\{flex:1 1 auto;min-height:0;[^}]*\}/.test(src) && /\.udx-content__list>\.scroll\{height:100%;\}/.test(src), 'list/scroll must stay height-bounded');
 
-check('css: catalog glide is the NUM-smooth 0.45s ease-out settle (the core 0.3s default-ease reads as a snappy crawl on a 1080p poster wall; the core notransition/transition-reset kill-switches stay in force via :not() guards)', src.indexOf(".udx-content .scroll__body:not(.notransition):not(.transition-reset){-webkit-transition:-webkit-transform .45s cubic-bezier(.22,1,.36,1);transition:transform .45s cubic-bezier(.22,1,.36,1);}") !== -1, 'catalog glide override missing');
+check('css: the catalog scroll keeps the STOCK core transition (no plugin override - the feed must scroll exactly like the core Lampa build the user compared on the TV; the earlier 0.45s cubic-bezier override read as a jerky crawl next to it)', src.indexOf('.udx-content .scroll__body') === -1, 'catalog scroll transition override must stay removed');
 check('css: clearance above the first row and at the sides so the focus halo is never clipped at the viewport edges', /\.udx-content \.scroll--mask \.scroll__content\{padding:1\.4em 0\.5em;\}/.test(src), 'missing mask clearance rule');
 check('css: card title matches the NUM reference scale and weight (1em regular)', /\.udx-content \.card__title\{[^}]*font-size:1em[^}]*font-weight:400/.test(src), 'missing title scale rule');
 check('css: an active poster gets the NUM green halo (#57F570 band around the poster box only - a whole-card ring would reach the next row); card__view must not clip the ::after band', /\.udx-content \.card\.focus \.card__view::after\{content:"";position:absolute;top:-0\.5em;left:-0\.5em;right:-0\.5em;bottom:-0\.5em;border:0\.3em solid #57F570;border-radius:1\.4em;z-index:-1;pointer-events:none;\}/.test(src) && /\.udx-content \.card\.hover \.card__view::after\{border-color:rgba\(87,245,112,\.5\);\}/.test(src) && !/\.udx-content \.card__view\{[^}]*overflow:hidden/.test(src), 'green poster halo rules missing or card__view clips the band');
