@@ -292,11 +292,22 @@
         // without scrolling: no min-height dead space under the poster, tight
         // padding and line spacing. The scroll viewport below stays
         // height-bounded as a safety net for unusually long text.
-        '.udxf__zone{display:flex;align-items:center;padding:4.5% 6% 1% 5%;box-sizing:border-box;}' +
-        '.udxf__poster{flex-shrink:0;width:19em;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
-        '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
+        // align-items:stretch: the meta column spans the poster's full height
+        // (reference layout: top line at the poster top, the action pills at
+        // the poster bottom - "текст і кнопки на рівні з постером").
+        '.udxf__zone{display:flex;align-items:stretch;padding:4.5% 6% 1% 5%;box-sizing:border-box;}' +
+        // The poster anchors the zone height; when the meta column grows past
+        // it the poster stretches with object-fit:cover (cropped, never
+        // distorted).
+        '.udxf__poster{flex-shrink:0;width:19em;object-fit:cover;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
+        // The meta column spans the poster's full height (user request
+        // 2026-11-04: text and buttons at the level of the poster) - top line
+        // starts at the poster top, the actions ride the poster bottom.
+        '.udxf__meta{display:flex;flex-direction:column;margin-left:2.5em;min-width:0;max-width:64%;}' +
         '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
-        '.udxf__title{font-size:3em;font-weight:400;line-height:1.12;color:#fff;margin-top:.3em;}' +
+        // Display-size title (user request 2026-11-04: match the reference -
+        // a large regular-weight display title over the meta line).
+        '.udxf__title{font-size:4em;font-weight:400;line-height:1.1;color:#fff;margin-top:.25em;}' +
         '.udxf__line{font-size:1em;color:rgba(255,255,255,.5);margin-top:.5em;}' +
         // Full overview - no line clamp; the compact spacing keeps even a long
         // one inside the 1080p page.
@@ -309,7 +320,11 @@
         // 2026-11-04, both states from the reference screenshots). White icon
         // + white regular-weight label, the reference proportions (big label
         // in a compact bar). No per-role rules - both inherit this base.
-        '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:.8em;}' +
+        // The action strip rides the BOTTOM of the poster (the meta column is
+        // a flex column stretched to the poster height): margin-top:auto eats
+        // the free space, so the text starts at the poster top and the pills
+        // sit at the poster bottom - the reference layout.
+        '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:rgba(24,26,28,.6);}' +
         '.udxf__act svg{flex:0 0 auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
