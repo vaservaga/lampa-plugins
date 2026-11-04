@@ -66,8 +66,11 @@
     var goodBase = null;
 
     var ICON_MENU = '<svg width="38" height="31" viewBox="0 0 38 31" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8-4-1-7-4-7-9V3h6v9c0 4 3 6 7 6s7-2 7-6V3z" fill="currentColor"/><path d="M22 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8V3z" fill="currentColor" opacity="0.55"/></svg>';
-    // Globe mark for the online action (own minimal mark; no play triangle).
+    // Globe mark (kept for the legacy online page icon use).
     var ICON_ONLINE = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" stroke="currentColor" stroke-width="1.7"/></svg>';
+    // Play mark for the "Онлайн" pill (the MODS reference shape: a white play
+    // triangle sitting on the gradient disc).
+    var ICON_PLAY = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.2-6.8c.6-.4.6-1.4 0-1.8L9.6 4.3c-.7-.4-1.6.1-1.6.9z" fill="currentColor"/></svg>';
     // List pictogram for the releases button: a plain list, no play hint.
     var ICON_RELEASES = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.5 5.5h11M8.5 12h11M8.5 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="4.2" cy="5.5" r="1.5" fill="currentColor"/><circle cx="4.2" cy="12" r="1.5" fill="currentColor"/><circle cx="4.2" cy="18.5" r="1.5" fill="currentColor"/></svg>';
 
@@ -86,11 +89,19 @@
     // (.udxf__slot); the scroll content is built separately (ZONE_HTML) so the
     // same node is never parented twice - the top zone (poster + meta block
     // with the two action pills) and the full-width details strip below it.
+    // The release side window (user request 2026-11-04): the "Онлайн" action
+    // opens this right-hand panel over the detail page instead of a dedicated
+    // full page; it lists the item's real releases (quality • size, the site's
+    // own upload date) and BACK / a left move closes it.
     var DETAIL_HTML =
         '<div class="udxf">' +
             '<div class="udxf__backdrop" aria-hidden="true"></div>' +
             '<div class="udxf__gradient" aria-hidden="true"></div>' +
             '<div class="udxf__slot"></div>' +
+            '<div class="udxf__panel" aria-hidden="true">' +
+                '<div class="udxf__panel__head"><span class="udxf__panel__title"></span></div>' +
+                '<div class="udxf__panel__list"></div>' +
+            '</div>' +
         '</div>';
 
     var ZONE_HTML =
@@ -105,7 +116,7 @@
                     '<div class="udxf__line"></div>' +
                     '<div class="udxf__seasons hide"></div>' +
                     '<div class="udxf__actions">' +
-                        '<div class="simple-button selector udxf__act udxf__act--online">' + ICON_ONLINE + '<span class="udxf__act__label udxf__olab"></span></div>' +
+                        '<div class="simple-button selector udxf__act udxf__act--online">' + ICON_PLAY + '<span class="udxf__act__label udxf__olab"></span></div>' +
                         '<div class="simple-button selector udxf__act udxf__act--torrents">' + ICON_RELEASES + '<span class="udxf__act__label udxf__tlab"></span></div>' +
                     '</div>' +
                 '</div>' +
@@ -243,23 +254,20 @@
         '.udxf__overview{font-size:1.15em;line-height:1.55;color:#fff;margin-top:.7em;}' +
         // Compact horizontal action strip, ~62px tall at the 1080p root font
         // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
-        // columns. Native Lampa button surface (core values): the
-        // .full-start__button / .simple-button glass rgba(0,0,0,.3) at rest and
-        // the .simple-button.focus invert (#fff/#000) on focus - no gradient,
-        // no custom glow; the currentColor icons follow the text on invert.
+        // columns. MODS-style gradient pills (user request 2026-11-04, both
+        // buttons, the reference shot shape): a saturated disc, white icon +
+        // label, no glass. "Онлайн" carries the green->blue mark from the
+        // reference; "TorrServer" the blue->violet one.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:1.2em;}' +
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        // Both pills carry the same native Lampa glass (the core detail-page
-        // buttons .full-start__button are indistinguishable at rest; the label
-        // and the icon mark the role), radius 1em per the core pill scale.
-        '.udxf__act--online{background:rgba(0,0,0,.3);color:#fff;}' +
-        // Native Lampa focus for buttons (the core .simple-button.focus
-        // pattern, declared here so a remote core-CSS change cannot alter it):
-        // full invert, transform-free, zero layout shift.
-        '.udxf__act.focus{background-color:#fff;color:#000;}' +
-        '.udxf__act--torrents{background:rgba(0,0,0,.3);color:#fff;}' +
+        '.udxf__act--online{background:linear-gradient(90deg,#3fd487,#2f7ff0);}' +
+        '.udxf__act--torrents{background:linear-gradient(90deg,#2f7ff0,#8a5cf6);}' +
+        // Focus: the full-width white ring over the gradient (a core-style
+        // invert would erase the pill color) + a slight brightness lift.
+        // Transform-free, zero layout shift.
+        '.udxf__act.focus{box-shadow:0 0 0 .28em rgba(255,255,255,.95);filter:brightness(1.12);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
@@ -288,6 +296,25 @@
         '.udxf__rate{display:inline-flex;align-items:baseline;background:rgba(0,0,0,.3);padding:.3em .8em;border-radius:.3em;font-size:1em;font-weight:700;color:#fff;margin-top:.8em;}' +
         '.udxf__orig{font-size:1em;color:rgba(255,255,255,.5);margin-top:.3em;}' +
         '.udxf__seasons{font-size:1.05em;color:rgba(255,255,255,.5);margin-top:.8em;}' +
+        // Release side window (the "Онлайн" target): a native-Lampa side-menu
+        // surface (dark, full height) over the right part of the detail page.
+        // display:none when closed so its selectors leave the spatial focus
+        // map; the scroll viewport stays height-bounded (TV driver clamps
+        // travel to the scroll element's offsetHeight).
+        '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:40%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);}' +
+        '.udxf__panel--open{display:flex;}' +
+        '.udxf__panel__head{flex:0 0 auto;padding:0 0 .9em;}' +
+        '.udxf__panel__title{font-size:1.3em;font-weight:700;color:#fff;letter-spacing:.02em;}' +
+        '.udxf__panel__list{flex:1 1 auto;min-height:0;position:relative;}' +
+        '.udxf__panel__list>.scroll{position:relative;height:100%;overflow:hidden;}' +
+        // Rows: the former full release page shape (quality • size on the main
+        // line, the site's own upload date below), core simple-button surface,
+        // auto height for the two lines. Focus: white ring (the reference row
+        // highlight), no invert.
+        '.udxf__prow{display:block;margin-bottom:.7em;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:.7em;}' +
+        '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #fff;}' +
+        '.udxf__prow__main{font-size:1.05em;font-weight:600;color:#fff;line-height:1.35;}' +
+        '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
         '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
@@ -335,6 +362,7 @@
             ultradox_no_online: { uk: 'Немає онлайн-джерела', ru: 'Нет онлайн-источника', en: 'No online source', be: 'Няма анлайн-крыніцы' },
             ultradox_online_unavailable: { uk: 'Онлайн-джерело недоступне', ru: 'Онлайн-источник недоступен', en: 'Online source unavailable', be: 'Анлайн-крыніца недаступная' },
             ultradox_torrserver: { uk: 'TorrServer', ru: 'TorrServer', en: 'TorrServer', be: 'TorrServer' },
+            ultradox_releases: { uk: 'Релізи', ru: 'Релизы', en: 'Releases', be: 'Рэлізы' },
             ultradox_seasons: { uk: 'Сезонів', ru: 'Сезонов', en: 'Seasons', be: 'Сезонаў' },
             ultradox_director: { uk: 'Режисер', ru: 'Режиссёр', en: 'Director', be: 'Рэжысёр' },
             ultradox_cast: { uk: 'У ролях', ru: 'В ролях', en: 'Starring', be: 'У ролях' },
@@ -352,7 +380,9 @@
         L.Component.add('ultradox', Component);
         L.Component.add('ultradox_full', FullPage);
         L.Component.add('ultradox_online', ListPage);
-        L.Component.add('ultradox_torrents', ListPage);
+        // The dedicated full release page is gone (user request 2026-11-04):
+        // the "Онлайн" action opens the in-page release side window inside
+        // ultradox_full instead, so no ultradox_torrents component any more.
 
         function addMenu() {
             if ($('.menu .menu__list').length == 0) return;
@@ -392,6 +422,90 @@
         var net = new window.Lampa.Reguest();
         net.timeout(20000);
         net.native(url, ok, err, undefined, { dataType: 'text' });
+    }
+
+    // Soft scroll (user request 2026-11-04: "м'ягший скролінг, як в нативній
+    // Lampa"). The native feel is fixed ~150px steps animated by the core
+    // 0.3s transform transition (scroll.wheel). Our focus targets can sit far
+    // apart, so a single scroll.update(el) teleports the whole distance in one
+    // fast hop. This glides toward the element in native-sized steps instead:
+    // each tick asks the core for one step (it animates as usual), the ticks
+    // overlap the 0.3s transition into one continuous glide. The target is
+    // computed with the core's own formula (bodyTop - elTop, clamped to 0).
+    var SOFT_STEP = 150;
+    var SOFT_TICK = 110;
+    function softTo(scroll, el) {
+        if (!scroll || !el || typeof scroll.position !== 'function' || typeof scroll.wheel !== 'function') return;
+        var body = (typeof scroll.body === 'function') ? scroll.body(true) : null;
+        if (!body || typeof body.getBoundingClientRect !== 'function') { if (scroll.update) scroll.update(el); return; }
+        var target = Math.min(0, body.getBoundingClientRect().top - el.getBoundingClientRect().top);
+        var token = (scroll._udxSoft || 0) + 1;
+        scroll._udxSoft = token;
+        function tick() {
+            if (scroll._udxSoft !== token) return;
+            var cur = scroll.position();
+            var delta = target - cur;
+            if (!delta) return;
+            var step = Math.abs(delta) < SOFT_STEP ? Math.abs(delta) : SOFT_STEP;
+            scroll.wheel(delta > 0 ? -step : step);
+            if (Math.abs(target - scroll.position()) > 0.5) setTimeout(tick, SOFT_TICK);
+        }
+        tick();
+    }
+
+    // Month name (ru/uk, any case or declension) -> 1..12, matched on the
+    // first three characters ("Окт", "октября", "жовтня" all resolve).
+    function monthNum(name) {
+        var n = String(name || '').toLowerCase().substring(0, 3);
+        var map = { янв: 1, фев: 2, мар: 3, апр: 4, май: 5, мая: 5, іюн: 6, июн: 6, іюл: 7, июл: 7, авг: 8, сен: 9, окт: 10, жов: 10, ноя: 11, лис: 11, гру: 12, груд: 12, дек: 12 };
+        return map[n] || 0;
+    }
+
+    // Real site data only: the page's own "Год:" field as a bare year plus the
+    // newest upload date (latest "Загрузил: USER (dd Mon yyyy)") across the
+    // page's releases, as 'dd.mm'. Both '' when the page carries nothing
+    // readable - never fabricated.
+    function siteDates(html) {
+        var h = String(html || '');
+        var y = '';
+        var my = h.match(/<span>Год:<\/span>\s*([^<]+)/i);
+        if (my) y = (strip(my[1]).match(/\b(19|20)\d{2}\b/) || [])[0] || '';
+        var rel = parseReleases(h);
+        var yy = 0, mo = 0, d = 0, i, m, mm;
+        // newest date wins (year, then month, then day)
+        for (i = 0; i < rel.length; i++) {
+            m = String(rel[i].date || '').match(/^(\d{1,2})\s+(\S+)\s+(\d{4})/);
+            if (!m) continue;
+            mm = monthNum(m[2]);
+            if (!mm) continue;
+            var yv = +m[3];
+            if (yv > yy || (yv === yy && mm > mo) || (yv === yy && mm === mo && +m[1] > d)) {
+                yy = yv; mo = mm; d = +m[1];
+            }
+        }
+        function p2(n) { return (n < 10 ? '0' : '') + n; }
+        return { y: y, a: yy ? p2(d) + '.' + p2(mo) : '' };
+    }
+
+    // The standard Lampa torrent flow (the single handoff, pick-gated): the
+    // picked release's MagnetUri/Size go to L.Torrent.start with the item's
+    // movie metadata. Called ONLY from explicit row picks (panel rows and the
+    // legacy online page rows).
+    function startTorrServer(r, item, movie) {
+        var L = window.Lampa;
+        if (!r || !r.magnet) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
+        var o = {
+            title: item.title,
+            Title: item.title,
+            Tracker: 'Ultradox',
+            size: r.size || '',
+            Size: r.sizeBytes || 0,
+            Seeders: 0,
+            Peers: 0,
+            MagnetUri: r.magnet,
+            Link: ''
+        };
+        L.Torrent.start(o, movie);
     }
 
     // Best-effort TMDB through the already-present Lampa core integration:
@@ -560,15 +674,26 @@
             if (!remaining) { done(kept.filter(function (item) { return !!item; })); return; }
             launch();
         }
+        // The cache value is { r: russian, y: release year, a: 'dd.mm' }: the
+        // same detail-page fetch that decides the country filter also carries
+        // the site's own release year + newest upload date, which year-less
+        // items (serials) need for the card line - no extra request, and a
+        // cached second visit gets the same dates without re-fetching.
         function check(item, index) {
             if (!item.itemUrl) { complete(index, false); return; }
             if (Object.prototype.hasOwnProperty.call(countryCache, item.itemUrl)) {
-                complete(index, countryCache[item.itemUrl]);
+                var cc = countryCache[item.itemUrl];
+                if (cc.y && !item.year) item.year = cc.y;
+                if (cc.a) item.added = cc.a;
+                complete(index, cc.r);
                 return;
             }
             fetchText(item.itemUrl, function (html) {
                 var russian = /(?:россия|russia)/i.test(countryFromDetail(html));
-                countryCache[item.itemUrl] = russian;
+                var sd = siteDates(html);
+                countryCache[item.itemUrl] = { r: russian, y: sd.y, a: sd.a };
+                if (sd.y && !item.year) item.year = sd.y;
+                if (sd.a) item.added = sd.a;
                 complete(index, russian);
             }, function () {
                 // A failed country lookup must not silently hide a release.
@@ -1030,53 +1155,23 @@
             img.src = url;
         }
 
-        // Month name (ru/uk, any case or declension) -> 1..12, matched on the
-        // first three characters ("Окт", "октября", "жовтня" all resolve).
-        function monthNum(name) {
-            var n = String(name || '').toLowerCase().substring(0, 3);
-            var map = { янв: 1, фев: 2, мар: 3, апр: 4, май: 5, мая: 5, іюн: 6, июн: 6, іюл: 7, июл: 7, авг: 8, сен: 9, окт: 10, жов: 10, ноя: 11, лис: 11, гру: 12, груд: 12, дек: 12 };
-            return map[n] || 0;
-        }
-
-        // The newest catalog entry of an item: the latest "Загрузил: USER
-        // (dd Mon yyyy)" upload date across the page's releases, as 'dd.mm'.
-        // Real data only - '' when the page carries no readable date.
-        function catalogDate(html) {
-            var rel = parseReleases(html);
-            var y = 0, mo = 0, d = 0, i, m, mm, yy;
-            for (i = 0; i < rel.length; i++) {
-                m = String(rel[i].date || '').match(/^(\d{1,2})\s+(\S+)\s+(\d{4})/);
-                if (!m) continue;
-                mm = monthNum(m[2]);
-                if (!mm) continue;
-                yy = +m[3];
-                if (yy > y || (yy === y && mm > mo) || (yy === y && mm === mo && +m[1] > d)) {
-                    y = yy; mo = mm; d = +m[1];
-                }
-            }
-            if (!y) return '';
-            function p2(n) { return (n < 10 ? '0' : '') + n; }
-            return p2(d) + '.' + p2(mo);
-        }
-
         // Serials: the list carries no release year (titles end in "(N сезон)"),
         // so when a year-less card is focused its item page is fetched once and
         // the real "Год:" field plus the newest catalog-addition date are shown
-        // as the line under the title (year, then the dimmed "• dd.mm").
+        // as the line under the title (year, then the dimmed "• dd.mm"; the
+        // date alone when the page carries no readable year).
         // Best-effort and silent: a failed fetch leaves the card as-is; a card
         // with a year from the list data is never fetched.
         this.enrichYear = function (item, card) {
             if (item.year || item._yBusy || !item.itemUrl) return;
             item._yBusy = 1;
             fetchText(item.itemUrl, function (html) {
-                var h = html || '';
-                var y = '';
-                var m = h.match(/<span>Год:<\/span>\s*([^<]+)/i);
-                if (m) y = (strip(m[1]).match(/\b(19|20)\d{2}\b/) || [])[0] || '';
-                var added = catalogDate(h);
-                if (!y && !added) { item._yBusy = 0; return; }
-                if (y) item.year = y;
-                if (added) item.added = added;
+                var sd = siteDates(html);
+                if (!sd.y && !sd.a) { item._yBusy = 0; return; }
+                if (sd.y) item.year = sd.y;
+                if (sd.a) item.added = sd.a;
+                var old = card.find('.card__age');
+                if (old) old.remove();
                 var age = document.createElement('div');
                 age.addClass('card__age');
                 if (item.year) {
@@ -1106,14 +1201,25 @@
             // of a fallback row (no poster). With nothing to show it is
             // removed entirely (same as the core Release/FullEpisode cards):
             // no empty row, no placeholder; the title's reserved area keeps
-            // the card geometry stable.
+            // the card geometry stable. Year-less items (serials) get their
+            // year + the newest upload date from the site's own page data
+            // (the country-check fetch piggybacked both - real data only,
+            // shown as soon as the card appears, no focus needed).
             var meta = [];
             if (item.type && !item.poster) meta.push(item.type);
             if (item.size) meta.push(item.size);
             var ageLine = card.find('.card__age');
             if (ageLine) {
                 if (meta.length) ageLine.text(meta.join(' • '));
-                else if (!year) ageLine.remove();
+                else if (year) {
+                    if (item.added) {
+                        var ad = document.createElement('span');
+                        ad.addClass('udx-ad');
+                        ad.text(' \u2022 ' + item.added);
+                        ageLine.append(ad);
+                    }
+                } else if (item.added) ageLine.text(item.added);
+                else ageLine.remove();
             }
 
             if (item.poster) {
@@ -1148,7 +1254,7 @@
 
             card.on('hover:focus', function () {
                 last = card;
-                if (scroll) scroll.update(card);
+                if (scroll) softTo(scroll, card);
                 focusBackdrop(item.poster);
                 self.enrichYear(item, card);
             });
@@ -1208,20 +1314,23 @@
         };
     }
 
-    // Full release page (catalog -> OK): the NUM reference layout 1:1 -
+    // Detail page (catalog -> OK): the NUM reference layout 1:1 -
     // backdrop only from the film's own fanart (without one, the raw poster
     // art doubles as a zone-veiled backdrop, zoomed to cover, no blur), a
     // large poster on the left, the meta block on the right (country • year,
     // large title, original title, rating badge, runtime • genre line,
-    // seasons) with the two action pills below it, and the full-width
-    // "Детально" details strip (complete overview, director, full cast -
-    // nothing clamped or truncated) inside a scroll viewport, with exactly
-    // two actions:
-    //   left  "Онлайн"    -> opens the ultradox_torrents page: the item's real
-    //                        releases (NUM-style: info card left, quality •
-    //                        size rows with the upload date right); the
+    // seasons) with the two MODS-style action pills below it, and the
+    // full-width "Детально" details strip (complete overview, director, full
+    // cast - nothing clamped or truncated) inside a scroll viewport, with
+    // exactly two actions:
+    //   left  "Онлайн"    -> opens the in-page release SIDE WINDOW (user
+    //                        request 2026-11-04, replaces the old dedicated
+    //                        full release page): a right-hand panel over this
+    //                        page listing the item's real releases (quality •
+    //                        size rows, the site's own upload date); the
     //                        standard Lampa torrent flow runs only after an
-    //                        explicit row pick there;
+    //                        explicit row pick in the panel; BACK or a left
+    //                        move closes the window and refocuses the strip;
     //   right "TorrServer"-> pushes the core Lampa torrents search page
     //                        (component 'torrents', the title+year search and
     //                        the item's movie metadata); the result list is
@@ -1240,6 +1349,11 @@
         var enrichToken = 0;
         var udxRoot = null;
         var scroll = null;
+        // Release side window state (the "Онлайн" target).
+        var panelEl = null, panelScroll = null, panelBox = null;
+        var panelOpen = false;
+        var firstPanelRow = null, lastPanelRow = null;
+        var lastActBefore = null;
         var html = document.createElement('div');
 
         this.create = function () {
@@ -1283,30 +1397,45 @@
                 html.find('.udxf__slot').append(scroll.render(true));
                 onlineBtn = html.find('.udxf__act--online');
                 torrentsBtn = html.find('.udxf__act--torrents');
-                // Left action: opens the dedicated release-list page.
+                // The release side window: title, the row list inside its own
+                // height-bounded scroll viewport (the TV driver clamps travel
+                // to the scroll element's offsetHeight).
+                panelEl = html.find('.udxf__panel');
+                if (panelEl) {
+                    panelEl.find('.udxf__panel__title').text(L.Lang.translate('ultradox_releases'));
+                    panelBox = document.createElement('div');
+                    panelBox.addClass('udxf__prows');
+                    panelScroll = new Lampa.Scroll({ mask: true, over: true });
+                    panelScroll.append(panelBox);
+                    html.find('.udxf__panel__list').append(panelScroll.render(true));
+                }
+                // Left action: opens the release side window (in-page).
                 // Right action: opens the core torrents search page.
                 // hover:focus remembers the last touched action so the page
                 // refocuses exactly there (start() falls back to the online
                 // button while nothing has been focused yet) and keeps it
-                // visible inside the scroll viewport.
+                // visible inside the scroll viewport; a focus landing on a
+                // pill while the window is open (a left/up move from it)
+                // closes the window without stealing the focus back.
                 var self = this;
                 if (onlineBtn) {
                     onlineBtn.find('.udxf__olab').text(L.Lang.translate('ultradox_online'));
-                    onlineBtn.on('hover:focus', function () { lastAct = onlineBtn; if (scroll) scroll.update(onlineBtn); });
+                    onlineBtn.on('hover:focus', function () { lastAct = onlineBtn; if (panelOpen) hidePanel(); if (scroll) softTo(scroll, onlineBtn); });
                     onlineBtn.on('hover:enter', function () { self.openReleaseList(); });
                 }
                 if (torrentsBtn) {
                     torrentsBtn.find('.udxf__tlab').text(L.Lang.translate('ultradox_torrserver'));
-                    torrentsBtn.on('hover:focus', function () { lastAct = torrentsBtn; if (scroll) scroll.update(torrentsBtn); });
+                    torrentsBtn.on('hover:focus', function () { lastAct = torrentsBtn; if (panelOpen) hidePanel(); if (scroll) softTo(scroll, torrentsBtn); });
                     torrentsBtn.on('hover:enter', function () { self.openTorrents(); });
                 }
                 // Down-navigation target: the details strip is a focus element,
                 // so pressing down from the action pills scrolls the page to
                 // reveal the overview / director / cast (the core has no
                 // global focus-scroll hook - each element wires its own).
+                // The glide is soft (native-style ~150px steps, softTo).
                 var detailsEl = html.find('.udxf__details');
                 if (detailsEl) {
-                    detailsEl.on('hover:focus', function () { if (scroll) scroll.update(detailsEl); });
+                    detailsEl.on('hover:focus', function () { if (scroll) softTo(scroll, detailsEl); });
                 }
                 // Lampa's Element.prototype.find returns a single node
                 // (querySelector), not a collection: use it directly, guard null.
@@ -1428,12 +1557,96 @@
             return p;
         }
 
-        // Left action "Онлайн": opens the dedicated full-page release list
-        // (NUM-style: info card left, the item's real releases right). The
-        // standard Lampa torrent flow runs only after an explicit user pick
-        // inside that page.
+        // Left action "Онлайн": opens the release side window over this page
+        // (no dedicated full page any more): the item's real releases as
+        // quality • size rows with the site's own upload date. Focus moves to
+        // the first row; BACK or a left/up move back to a pill closes it. The
+        // standard Lampa torrent flow runs only after an explicit row pick.
         this.openReleaseList = function () {
-            L.Activity.push({ title: item.title, component: 'ultradox_torrents', item: item, detail: detail, seasons: tmdbSeasons });
+            if (!panelEl) return;
+            this.fillPanelRows();
+            panelOpen = true;
+            lastActBefore = lastAct || onlineBtn;
+            panelEl.addClass('udxf__panel--open');
+            L.Controller.collectionSet(html);
+            L.Controller.collectionFocus(firstPanelRow || panelEl, html);
+        };
+
+        // Hide the window (a left/up focus move onto a pill uses this: the
+        // Navigator already owns the focus, so no refocus here).
+        function hidePanel() {
+            if (!panelOpen) return;
+            panelOpen = false;
+            if (panelEl) panelEl.removeClass('udxf__panel--open');
+        }
+
+        // BACK with the window open closes it and refocuses the action the
+        // user came from; with it closed, BACK leaves the page (to the
+        // catalog on the same card).
+        this.closePanel = function () {
+            if (!panelOpen) return;
+            panelOpen = false;
+            if (panelEl) panelEl.removeClass('udxf__panel--open');
+            L.Controller.collectionSet(html);
+            L.Controller.collectionFocus(lastActBefore || onlineBtn, html);
+        };
+
+        // Fill the window rows from the detail payload (memory only - the
+        // detail page already fetched it): "quality • size" on the main line,
+        // the site's own upload date on the second, the raw release as the
+        // inert pick payload.
+        this.fillPanelRows = function () {
+            if (!panelBox) return;
+            panelBox.empty();
+            firstPanelRow = null;
+            lastPanelRow = null;
+            var data = releaseRows(detail);
+            if (!data.length) {
+                var em = document.createElement('div');
+                em.addClass('udx-empty');
+                em.text(L.Lang.translate('ultradox_no_link'));
+                panelBox.append(em);
+                if (panelScroll) L.Layer.visible(panelScroll.render(true));
+                return;
+            }
+            for (var i = 0; i < data.length; i++) this.appendPanelRow(data[i]);
+            if (panelScroll) L.Layer.visible(panelScroll.render(true));
+        };
+
+        this.appendPanelRow = function (row) {
+            var el = document.createElement('div');
+            el.addClass('simple-button selector udxf__prow');
+            var main = document.createElement('div');
+            main.addClass('udxf__prow__main');
+            main.text(row.main);
+            el.append(main);
+            if (row.sub) {
+                var sub = document.createElement('div');
+                sub.addClass('udxf__prow__sub');
+                sub.text(row.sub);
+                el.append(sub);
+            }
+            var self = this;
+            el.on('hover:focus', function () {
+                lastPanelRow = el;
+                if (panelScroll) softTo(panelScroll, el);
+            });
+            // Explicit row pick only: the standard Lampa torrent flow with the
+            // picked release's payload (never by button press or navigation).
+            el.on('hover:enter', function () {
+                if (!row.release || !row.release.magnet) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
+                var movie = {
+                    title: item.title,
+                    original_title: item.title,
+                    img: item.poster || '',
+                    number_of_seasons: item.serial ? (tmdbSeasons || 1) : undefined
+                };
+                startTorrServer(row.release, item, movie);
+            });
+            if (!firstPanelRow) firstPanelRow = el;
+            lastPanelRow = el;
+            if (L.Controller.own && L.Controller.own(self)) L.Controller.collectionAppend(el);
+            panelBox.append(el);
         };
 
         // Right action "TorrServer": the core torrent search screen for this
@@ -1510,6 +1723,7 @@
         this.start = function () {
             if (L.Activity.active() && L.Activity.active().activity !== this.activity) return;
 
+            var self = this;
             L.Controller.add('content', {
                 link: this,
                 invisible: true,
@@ -1527,7 +1741,12 @@
                     else L.Controller.toggle('head');
                 },
                 down: function () { NavMove('down'); },
-                back: function () { L.Activity.backward(); }
+                // BACK with the release window open closes it (focus returns
+                // to the action strip); only a closed window leaves the page.
+                back: function () {
+                    if (panelOpen) self.closePanel();
+                    else L.Activity.backward();
+                }
             });
 
             L.Controller.toggle('content');
@@ -1538,6 +1757,7 @@
 
         this.destroy = function () {
             if (scroll) scroll.destroy();
+            if (panelScroll) panelScroll.destroy();
             html.remove();
             built = false;
             scroll = null;
@@ -1545,25 +1765,26 @@
             lastAct = null;
             tmdbSeasons = 0;
             enrichToken++;
+            panelEl = null; panelScroll = null; panelBox = null;
+            panelOpen = false;
+            firstPanelRow = null; lastPanelRow = null;
+            lastActBefore = null;
         };
     }
 
-    // Dedicated full-page list screens (NUM-style: the item's info card on
-    // the left, the item's real rows on the right). The release-list page is
-    // opened by the detail strip; the online page stays available from its
-    // own payload (no longer a strip route). Neither variant starts anything
-    // by itself:
-    //   ultradox_online  -> the item's real online embeds, probed read-only
-    //                       from its detail page (or a clear empty state when
-    //                       the page has none); the standard Lampa player call
-    //                       (Lampa.Player.play) runs only from an explicit row
-    //                       pick, which is probed read-only first so a dead
-    //                       embed shows a message instead of a black screen;
-    //   ultradox_torrents-> the item's real releases (quality • size rows with
-    //                       the upload date); the standard Lampa torrent flow
-    //                       (L.Torrent.start with MagnetUri/Size) runs only
-    //                       from an explicit row pick.
-    // Back returns to the detail page on the same item.
+    // Dedicated full-page list screen (NUM-style: the item's info card on the
+    // left, the item's real rows on the right). Only the online variant is
+    // registered any more (the release-list page was replaced by the in-page
+    // release side window inside ultradox_full, user request 2026-11-04); the
+    // online page stays available from its own payload (no longer a strip
+    // route). It never starts anything by itself:
+    //   ultradox_online -> the item's real online embeds, probed read-only
+    //                      from its detail page (or a clear empty state when
+    //                      the page has none); the standard Lampa player call
+    //                      (Lampa.Player.play) runs only from an explicit row
+    //                      pick, which is probed read-only first so a dead
+    //                      embed shows a message instead of a black screen.
+    // Back returns to the page it was opened from.
     function ListPage(object) {
         var L = window.Lampa;
         var mode = object.component === 'ultradox_torrents' ? 'torrents' : 'online';
@@ -1718,7 +1939,7 @@
             var self = this;
             el.on('hover:focus', function () {
                 lastRow = el;
-                if (scroll) scroll.update(el);
+                if (scroll) softTo(scroll, el);
             });
             el.on('hover:enter', function () {
                 if (mode === 'online') self.playRow(row.data);
@@ -1749,29 +1970,16 @@
             });
         };
 
-        // Explicit row pick only: the standard Lampa torrent flow, same
-        // payload shape the earlier Ultradox build used for TorrServer
-        // playback (MagnetUri/Size).
+        // Explicit row pick only: delegates to the single shared handoff
+        // (the top-level startTorrServer - one L.Torrent.start call site).
         this.startTorrServer = function (r) {
-            if (!r || !r.magnet) { L.Noty.show(L.Lang.translate('ultradox_no_link')); return; }
-            var o = {
-                title: item.title,
-                Title: item.title,
-                Tracker: 'Ultradox',
-                size: r.size || '',
-                Size: r.sizeBytes || 0,
-                Seeders: 0,
-                Peers: 0,
-                MagnetUri: r.magnet,
-                Link: ''
-            };
             var movie = {
                 title: item.title,
                 original_title: item.title,
                 img: item.poster || '',
                 number_of_seasons: item.serial ? (object.seasons || 1) : undefined
             };
-            L.Torrent.start(o, movie);
+            startTorrServer(r, item, movie);
         };
 
         this.start = function () {
