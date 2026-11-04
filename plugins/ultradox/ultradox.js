@@ -155,9 +155,14 @@
         // (the crossfade state machine keeps running harmlessly) but are
         // hidden: any dark layer on top of the body background reads as a
         // "darker than Lampa" film.
-        '.udx-bg{display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
+        // Ambience backdrop: two permanent crossfading layers behind the grid
+        // (focus on a card swaps the image, NUM-style). display must stay
+        // visible - the OFF state is opacity:0 only (a display:none layer was
+        // never shown at all on the TV); the veil (z 1) darkens the left zone,
+        // the content (z 2) stays above it.
+        '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
-        '.udx-bg__veil{display:none;position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
+        '.udx-bg__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.30) 60%),linear-gradient(to top,rgba(0,0,0,.70),rgba(0,0,0,0) 42%);}' +
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
@@ -177,7 +182,9 @@
         '.udx-content__list>.scroll{height:100%;}' +
         // Small clear band between the tab zone and the first poster row
         // (the core 2.5em mask padding read as a large empty block).
-        '.udx-content .scroll--mask .scroll__content{padding-top:0.75em;}' +
+        // Top/side clearance so the first row's focus halo (-0.5em band) is
+        // never clipped at the viewport edges (user request 2026-11-04).
+        '.udx-content .scroll--mask .scroll__content{padding:1.4em 0.5em;}' +
         '.udx-empty{width:100%;text-align:center;padding:5em 0;color:rgba(255,255,255,.5);font-size:1.5em;}' +
         // Row geometry: exactly five equal cells filling the whole line (NUM
         // reference: edge to edge, the core 0.5em side paddings are the gap).
@@ -190,7 +197,10 @@
         // rhythm ~50-60px of air before the next poster; without it the gap
         // was only the reserved text-block slack, 7-27px depending on the
         // title line count - uneven).
-        '.udx-content .category-full .card{width:calc(20% - 0.5px);flex-shrink:0;margin-bottom:2.5em;}' +
+        // Five equal cells, slightly sub-20% (a thin inter-column gap, cards
+        // a touch smaller per user request 2026-11-04 - no rounded-percent
+        // wrap, not a single 20-item line; NUM reference).
+        '.udx-content .category-full .card{width:calc(20% - 0.5em);flex-shrink:0;margin-bottom:2.5em;}' +
         // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
         // band measured on the NUM reference at 1920x1080); one value for all
         // three category tabs.
@@ -1036,7 +1046,15 @@
                 grid = document.createElement('div');
                 grid.addClass('category-full');
                 scroll.append(grid);
-                html.find('.udx-content__list').append(scroll.render(true));
+                // Real scroll viewport: the core frameUpdate (fired by the
+                // Layer.update below and on every resize) sets an explicit
+                // height (innerHeight - head - navi) on layer--wheight elements.
+                // Without a bounded box the TV scroll driver clamps travel to
+                // the element's offsetHeight - an unbounded element can never
+                // scroll, and the second row stays cut off at the screen edge.
+                var scEl = scroll.render(true);
+                scEl.addClass('layer--wheight');
+                html.find('.udx-content__list').append(scEl);
 
                 this.buildCats();
                 L.Layer.update(html);
