@@ -169,9 +169,10 @@
         // cannot affect the card geometry. No glass band here: the tabs float
         // over the plain Lampa background (+ the blurred backdrop behind),
         // nothing painted on top of the content zone.
-        // Tab zone sits below the screen top with a real top margin (the core
-        // bar is gone - user request 2026-11-04: lower it, uniform backdrop).
-        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:34px 20px 14px 20px;}' +
+        // The core top bar is visible on the catalog again (user request
+        // 2026-11-05), so the tab zone keeps the normal top padding (the old
+        // 34px margin compensated for the hidden bar).
+        '.udx-content__head{flex:0 0 auto;z-index:20;display:flex;align-items:center;padding:14px 20px 14px 20px;}' +
         '.udx-content__cats{display:flex;align-items:center;}' +
         '.udx-cat{flex-shrink:0;}' +
         '.udx-cat__label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
@@ -239,21 +240,13 @@
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
-        // Full-bleed Ultradox screens (user request 2026-11-04): the core top
-        // bar is hidden on all of them (catalog, detail, list - build adds the
-        // body class, destroy removes it), and the page root is pinned to the
-        // full screen so the ambience/backdrop is one image all around. The pin matters twice:
-        // 1) the core content area starts below the head offset, so an
-        //    in-flow page leaves a band of the previous screen (catalog
-        //    ambience backdrop) visible at the top;
-        // 2) the core gives .wrap/.wrap__content an explicit 100vh height
-        //    (layer--height) and will-change:transform, so a fixed child is
-        //    positioned against that full-screen box - inset 0 = the whole
-        //    viewport in every build. The explicit viewport height also makes
-        //    the inner .scroll{height:100%} resolve to a real box, so the TV
-        //    scroll driver's maxOffset clamp works for long content.
-        'body.udx-nohead .head{display:none;}' +
-        'body.udx-nohead .udx-content,body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}' +
+        // The core top bar stays visible on every Ultradox screen (user
+        // request 2026-11-05): the screens sit in flow in the core content
+        // area below the head, exactly like a core page. The core gives
+        // .wrap/.wrap__content an explicit height via frameUpdate, so
+        // .udxf/.udxl height:100% resolves against a real box and the inner
+        // .scroll{height:100%} viewport stays bounded for the TV scroll
+        // driver's maxOffset clamp.
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         // NUM-style backdrop: the image is ALWAYS a soft-blurred atmosphere
         // (never a flat dark surface). The fanart is blurred lightly and kept
@@ -843,27 +836,6 @@
         return String(title || '').replace(/\s*\((19|20)\d{2}\)\s*$/, '');
     }
 
-    // The full-bleed body class is shared by ALL Ultradox screens (catalog,
-    // detail, list). They stack: a back-navigation destroys the upper screen
-    // while the lower one stays alive, so a plain add-on-build /
-    // remove-on-destroy would re-show the core top bar on the survivor
-    // (detail -> back -> catalog). Reference count instead: each screen
-    // registers once on its first build and releases once in destroy; the
-    // class drops only when the last screen leaves.
-    var udxNoHeadCount = 0;
-    function udxNoHeadOn() {
-        var b = typeof document !== 'undefined' ? document.body : null;
-        if (!b || !b.classList) return;
-        ++udxNoHeadCount;
-        b.classList.add('udx-nohead');
-    }
-    function udxNoHeadOff() {
-        var b = typeof document !== 'undefined' ? document.body : null;
-        if (!b || !b.classList) return;
-        if (udxNoHeadCount > 0) --udxNoHeadCount;
-        if (!udxNoHeadCount) b.classList.remove('udx-nohead');
-    }
-
     // One compact quality token from the raw site value (e.g.
     // "WEB-DL/WEB-DLRip" -> "WEB-DL"): a single real token, no slash, no repeats.
     function qualityToken(type) {
@@ -1071,7 +1043,7 @@
         var L = window.Lampa;
         var items = [], rendered = 0, catId = null, catPath = null;
         var seen = {}, serverPage = 1, fetching = false, consecutiveEmpty = 0;
-        var last = null, scroll = null, grid = null, built = false, catBtns = [], loadToken = 0, noHead = false;
+        var last = null, scroll = null, grid = null, built = false, catBtns = [], loadToken = 0;
         var bgLayers = [null, null], bgFront = 0, bgShown = '', bgPending = '', bgToken = 0;
         var html = document.createElement('div');
 
@@ -1101,11 +1073,6 @@
 
         this.build = function () {
             if (this.activity) this.activity.loader(false);
-
-            // Full-bleed screen: hide the core top bar while this screen is
-            // alive (reference-counted - a back-navigation leaves the screen
-            // below alive, so its class must not drop).
-            if (!noHead) { noHead = true; udxNoHeadOn(); }
 
             if (!built) {
                 built = true;
@@ -1448,8 +1415,10 @@
                     else L.Controller.toggle('menu');
                 },
                 right: function () { NavMove('right'); },
-                // Up at the top edge simply stays: the top bar is hidden on
-                // our screens, so there is nothing to focus above the grid.
+                // Up from the top row goes to the category tab (core
+                // behaviour); with the core top bar visible again (user
+                // request 2026-11-05) a further up takes the focus into the
+                // head via the core spatial Navigator.
                 up: function () {
                     var dest = NavCanMove('up');
                     if (!dest) return;
@@ -1485,7 +1454,6 @@
         this.stop = function () {};
 
         this.destroy = function () {
-            if (noHead) { noHead = false; udxNoHeadOff(); }
             if (scroll) scroll.destroy();
             html.remove();
             built = false;
@@ -1522,7 +1490,6 @@
         var item = object.item || {};
         var detail = null;
         var built = false;
-        var noHead = false;
         var onlineBtn = null, torrentsBtn = null;
         var lastAct = null;
         var tmdbSeasons = 0;
@@ -1561,10 +1528,6 @@
 
         this.build = function () {
             if (this.activity) this.activity.loader(false);
-
-            // Full-bleed page: hide the core top bar while this screen is
-            // alive (reference-counted - back to the catalog must keep it).
-            if (!noHead) { noHead = true; udxNoHeadOn(); }
 
             if (!built) {
                 built = true;
@@ -1925,9 +1888,9 @@
                 // The core Navigator is spatial only: when focus has nowhere
                 // to go the page drives its own scroll in native-sized 150px
                 // wheel steps (the core list-page feel), clamped at the edges.
-                // The top bar is hidden on this page, so up at the very top
-                // simply stays; an open release window scrolls its own list,
-                // never the page behind.
+                // An open release window scrolls its own list, never the page
+                // behind; at the very top the core may take the focus into the
+                // head (normal core behaviour, the top bar is visible here).
                 up: function () {
                     if (NavCanMove('up')) NavMove('up');
                     else if (panelOpen && panelScroll && panelScroll.position() < 0) panelScroll.wheel(-SOFT_STEP);
@@ -1953,7 +1916,6 @@
         this.stop = function () {};
 
         this.destroy = function () {
-            if (noHead) { noHead = false; udxNoHeadOff(); }
             if (scroll) scroll.destroy();
             if (panelScroll) panelScroll.destroy();
             html.remove();
@@ -1989,7 +1951,6 @@
         var item = object.item || {};
         var detail = object.detail || {};
         var built = false;
-        var noHead = false;
         var rows = [];
         var firstRow = null, lastRow = null, scroll = null, listBox = null;
         var html = document.createElement('div');
@@ -2022,10 +1983,6 @@
 
         this.build = function () {
             if (this.activity) this.activity.loader(false);
-
-            // Same full-bleed treatment as the detail page (reference-counted
-            // - back to the page below must keep the bar hidden).
-            if (!noHead) { noHead = true; udxNoHeadOn(); }
 
             if (!built) {
                 built = true;
@@ -2212,7 +2169,6 @@
         this.stop = function () {};
 
         this.destroy = function () {
-            if (noHead) { noHead = false; udxNoHeadOff(); }
             if (scroll) scroll.destroy();
             html.remove();
             built = false;

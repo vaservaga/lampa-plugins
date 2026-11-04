@@ -551,8 +551,9 @@ const L = {
 
 globalThis.window = { Lampa: L, appready: true, plugin_ultradox_ready: false };
 globalThis.Lampa = L; // in the browser window.Lampa is the global binding
-// The core top bar hides behind a body class; the mock body carries it so the
-// full-bleed lifecycle (reference count across stacked screens) is verifiable.
+// The mock body records any class the plugin would add (the former full-bleed
+// udx-nohead mechanism is gone - user request 2026-11-05 keeps the core top
+// bar visible) so the lifecycle checks can assert it stays empty.
 const bodyClasses = new Set();
 globalThis.document = { addEventListener() {}, body: { classList: { add: (c) => bodyClasses.add(c), remove: (c) => bodyClasses.delete(c) } }, createElement: (t) => makeEl(t) };
 globalThis.$ = (arg) => (typeof arg === 'string' ? asQuery(parseHtml(arg)) : (arg && arg.tagName ? asQuery([arg]) : arg));
@@ -908,10 +909,8 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('focus: the green halo is one shared token across all custom surfaces (panel rows + list rows)', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row halo rules missing');
     check('css: the release side window is a narrow inset card (24% wide with the content-zone margins - top 4.5%, right 6%, bottom 1% - so it does not take half the screen, sits symmetric to the page and its left edge (70%) clears the action strip; the right pill ends at ~67%)', /\.udxf__panel\{position:absolute;top:4\.5%;right:6%;bottom:1%;width:24%;z-index:30;[^}]*\}/.test(src), 'inset panel geometry missing');
     check('css: release rows are bounded content-width bars centered in the panel (never wider than it; a long label wraps inside the bar instead of being clipped), rounded 1.4em like the catalog card halo', /\.udxf__prow\{display:block;width:fit-content;max-width:100%;box-sizing:border-box;white-space:normal;margin:0 auto \.7em auto;height:auto;min-height:2\.8em;padding:\.55em 1\.1em;border-radius:1\.4em;\}/.test(src), 'bounded row width rule missing');
-    check('css: the detail page hides the core top bar (body.udx-nohead, full-bleed)', src.indexOf('body.udx-nohead .head{display:none;}') !== -1, 'missing no-head rule');
-    check('css: the body class is reference-counted across ALL Ultradox screens (catalog, detail, list) so a back-navigation never re-shows the core bar on the surviving screen below', src.indexOf('function udxNoHeadOn()') !== -1 && src.indexOf('function udxNoHeadOff()') !== -1 && countTok(/udxNoHeadOn\(\);/g, src) >= 3 && countTok(/udxNoHeadOff\(\);/g, src) >= 3, 'reference-counted body class wiring missing');
-    check('css: all Ultradox screens pin to the full screen (fixed inset 0 - the core layer--height box) so no band shows at the top and the backdrops reach the screen edges', src.indexOf('body.udx-nohead .udx-content,body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}') !== -1, 'missing full-bleed pin rule');
-    check('css: the tab zone sits lowered from the screen top (34px top margin) now that the core bar is gone', /\.udx-content__head\{[^}]*padding:34px 20px 14px 20px;\}/.test(src), 'missing tab-zone top margin');
+    check('css: the core top bar stays visible on every Ultradox screen (no body.udx-nohead hide rule, no fixed-inset full-bleed pin - the screens sit in flow below the head like a core page, user request 2026-11-05)', src.indexOf('udx-nohead') === -1 && src.indexOf('udxNoHeadOn') === -1, 'the no-head mechanism must be gone');
+    check('css: the tab zone keeps the normal top padding (14px, the same rhythm as the sides/bottom) now that the core bar is back on the catalog', /\.udx-content__head\{[^}]*padding:14px 20px 14px 20px;\}/.test(src), 'missing tab-zone top margin');
     check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:stretch;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
     check('css: the title is the reference display size at regular weight (4em/400, not bold)', /\.udxf__title\{font-size:4em;font-weight:400;line-height:1\.1;color:#fff;margin-top:\.25em;\}/.test(src), 'title scale rule missing');
     check('css: the meta column spans the poster full height with the actions riding the poster bottom (text and buttons at the level of the poster - the reference layout; the poster carries an explicit 2:3 box so its bottom edge always defines the zone bottom, cover-cropping a short poster instead of distorting)', /\.udxf__meta\{display:flex;flex-direction:column;[^}]*\}/.test(src) && /\.udxf__actions\{[^}]*margin-top:auto;[^}]*padding-top:\.8em;\}/.test(src) && /\.udxf__poster\{[^}]*min-height:28\.5em;[^}]*object-fit:cover/.test(src), 'poster-level meta layout missing');
@@ -987,7 +986,7 @@ check('fullpage: down steps the page scroll in native 150px wheel steps when foc
     cfg.down(); cfg.down(); cfg.down();
     return s.lastWheel === 150 && s.position() === -900;
 })(), JSON.stringify({ wheel: seriesScrolls.main.lastWheel, pos: seriesScrolls.main.position() }));
-check('fullpage: up steps the scroll back to the top and stays there (the top bar is hidden on this page)', (function () {
+check('fullpage: up steps the scroll back to the top and stays clamped there (no wheel, no core head toggle at the top edge)', (function () {
     const cfg = L.Controller.configs.content;
     const s = seriesScrolls.main;
     while (s.position() < 0) cfg.up();
@@ -1331,7 +1330,7 @@ check('fullpage: failed fetch (empty model) -> fact rows hidden and empty', (fun
 // page (own payload) answers with its clear empty state - no selector, no
 // error, no execution
 let mErr = null;
-let lpeO = null; // module scope: the full-bleed lifecycle destroy needs it (declared in the try below)
+let lpeO = null; // module scope: the head-lifecycle destroy needs it (declared in the try below)
 try {
     const mPushes0 = L.Activity.pushes.length;
     missO.handlers['hover:enter'].forEach((f) => f());
@@ -1401,27 +1400,27 @@ check('grid: repeated focus does not duplicate the type badge', findAll(filmCard
 check('grid: repeated focus keeps the badge inside the poster container', inPoster(filmCard, 'udx-kind') && inPoster(serialCard, 'udx-kind'), 'badge moved out of .card__view');
 check('grid: repeated focus keeps the badge text intact', filmCard.find('.udx-kind').text() === 'Фільм' && serialCard.find('.udx-kind').text() === 'Серіал', txt(filmCard, '.udx-kind') + ':' + txt(serialCard, '.udx-kind'));
 
-// ---------- full-bleed lifecycle: the body class is reference-counted ----------
-// Back-navigation destroys the upper screen while the lower one stays alive:
-// the class must survive every destroy until the LAST Ultradox screen leaves
-// (a plain per-screen remove re-shows the core top bar on the survivor -
-// the reported detail -> back -> catalog stripe).
-console.log('fullpage: full-bleed body class lifecycle');
-check('fullpage: the class is present while any Ultradox screen is alive', bodyClasses.has('udx-nohead'), String(bodyClasses));
+// ---------- head lifecycle: the core top bar stays on every Ultradox screen ----------
+// User request 2026-11-05: no full-bleed body class any more - the screens sit
+// in flow below the head like a core page. Walk the same stack/back lifecycle
+// and assert the body class list never grows (the old udx-nohead stripe -
+// detail -> back -> catalog re-showing/hiding the bar - cannot happen).
+console.log('fullpage: core top bar lifecycle');
+check('fullpage: the top bar stays while any Ultradox screen is alive (no body class touched)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 [cat, series, lpO, film, lpFO, dead, lpD, nobg, shark, pp, multi, missing, lpeO, tfFail, tfThrow, series2].forEach((c) => c.destroy());
-check('fullpage: the class drops when the last screen leaves (all screens destroyed)', !bodyClasses.has('udx-nohead'), String(bodyClasses));
+check('fullpage: the top bar stays when the last screen leaves (all screens destroyed)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 const lcCat = new Comp({ category: 'serial' });
 lcCat.activity = { loader() {}, toggle() {} };
 lcCat.create();
-check('fullpage: a fresh catalog build hides the top bar again', bodyClasses.has('udx-nohead') && bodyClasses.size === 1, String(bodyClasses));
+check('fullpage: a fresh catalog build keeps the top bar visible', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 const lcDetail = new FP({ item: { title: 'Lifecycle (2021)', serial: true, itemUrl: SERIES_URL, poster: '' } });
 lcDetail.activity = { loader() {}, toggle() {} };
 lcDetail.create();
-check('fullpage: a stacked detail keeps the single class state', bodyClasses.has('udx-nohead') && bodyClasses.size === 1, String(bodyClasses));
+check('fullpage: a stacked detail keeps the top bar visible', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 lcDetail.destroy();
-check('fullpage: back to the catalog keeps the core top bar hidden (the reported regression)', bodyClasses.has('udx-nohead'), String(bodyClasses));
+check('fullpage: back to the catalog keeps the top bar visible (no stripe across the back-navigation)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 lcCat.destroy();
-check('fullpage: leaving the catalog drops the class again', !bodyClasses.has('udx-nohead'), String(bodyClasses));
+check('fullpage: leaving the catalog keeps the top bar visible', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 
 // ---------- final verdict ----------
 check('torrent: L.Torrent.start counter equals the explicit row picks (' + picks + ')', L.Torrent.calls.length === picks, String(L.Torrent.calls.length));
