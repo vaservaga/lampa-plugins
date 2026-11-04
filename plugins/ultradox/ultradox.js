@@ -175,7 +175,11 @@
         // line for any container width (round(0.2W) x 5 can exceed W by a
         // pixel and wrap the fifth card; flex-basis:0 puts all items on ONE
         // line - neither is safe, the explicit sub-100% width is).
-        '.udx-content .category-full .card{width:calc(20% - 0.5px);flex-shrink:0;}' +
+        // margin-bottom is the vertical distance between rows (NUM reference
+        // rhythm ~50-60px of air before the next poster; without it the gap
+        // was only the reserved text-block slack, 7-27px depending on the
+        // title line count - uneven).
+        '.udx-content .category-full .card{width:calc(20% - 0.5px);flex-shrink:0;margin-bottom:2.5em;}' +
         // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
         // band measured on the NUM reference at 1920x1080); one value for all
         // three category tabs.
