@@ -182,6 +182,16 @@
         // must stay height-bounded).
         '.udx-content__list{flex:1 1 auto;min-height:0;position:relative;z-index:1;}' +
         '.udx-content__list>.scroll{height:100%;}' +
+        // NUM-smooth glide (user request 2026-11-04): the core gives every
+        // scroll body a 0.3s default-ease transform transition - a symmetric
+        // curve whose slow start restarts on every D-pad re-target and reads
+        // as a snappy crawl on a 1080p poster wall. The catalog overrides it
+        // with a longer, softer ease-out settle (fast start, long
+        // deceleration tail): rapid repeats blend into one continuous glide,
+        // like the NUM reference. The core .notransition/.transition-reset
+        // kill-switches (touch drag, reset) stay in force via the :not()
+        // guards.
+        '.udx-content .scroll__body:not(.notransition):not(.transition-reset){-webkit-transition:-webkit-transform .45s cubic-bezier(.22,1,.36,1);transition:transform .45s cubic-bezier(.22,1,.36,1);}' +
         // Small clear band between the tab zone and the first poster row
         // (the core 2.5em mask padding read as a large empty block).
         // Top/side clearance so the first row's focus halo (-0.5em band) is
@@ -293,19 +303,20 @@
         '.udxf__overview{font-size:1.02em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~60px tall at the 1080p root font
         // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
-        // columns. Both buttons share ONE 1:1 reference gradient pill (user
-        // request 2026-11-04): green->blue surface, white icon + white
-        // regular-weight label, the reference proportions (big label in a
-        // compact bar). No per-role rules - both inherit this base untouched.
+        // columns. Default state: a TRANSPARENT dark-glass pill (the reference
+        // "MODS's" look - barely there over the backdrop); focus turns it into
+        // the 1:1 reference green->blue gradient pill (user request
+        // 2026-11-04, both states from the reference screenshots). White icon
+        // + white regular-weight label, the reference proportions (big label
+        // in a compact bar). No per-role rules - both inherit this base.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:rgba(24,26,28,.6);}' +
         '.udxf__act svg{flex:0 0 auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        // Focus: the NUM green halo - the same #57F570 ring the core draws
-        // around its focused cards - over the gradient (a core-style invert
-        // would erase the pill color) + a slight brightness lift.
-        // Transform-free, zero layout shift.
-        '.udxf__act.focus{box-shadow:0 0 0 .25em #57F570;filter:brightness(1.08);}' +
+        // Focus: the pill becomes the 1:1 reference green->blue gradient
+        // surface (the reference screenshot shows a clean gradient - no green
+        // ring, no brightness lift). Transform-free, zero layout shift.
+        '.udxf__act.focus{background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
@@ -483,7 +494,20 @@
         if (!scroll || !el || typeof scroll.position !== 'function' || typeof scroll.wheel !== 'function') return;
         var body = (typeof scroll.body === 'function') ? scroll.body(true) : null;
         if (!body || typeof body.getBoundingClientRect !== 'function') { if (scroll.update) scroll.update(el); return; }
-        var target = Math.min(0, body.getBoundingClientRect().top - el.getBoundingClientRect().top);
+        var brect = body.getBoundingClientRect();
+        var erect = el.getBoundingClientRect();
+        // An element already fully inside the scroll viewport must not
+        // trigger any scroll: aligning it to the viewport top would push the
+        // page above the top edge and crop what sits above it (on the detail
+        // page the initial focus on an action button scrolled the page down
+        // until the poster top was cut off - only an UP press corrected it;
+        // user feedback 2026-11-04). Unmeasured rects (height 0 - the test
+        // mock) keep the legacy align-to-top behaviour.
+        var view = (typeof scroll.render === 'function') ? scroll.render(true) : null;
+        var vrect = (view && view.getBoundingClientRect) ? view.getBoundingClientRect() : null;
+        if (vrect && erect.height > 0 && vrect.height > 0 &&
+            erect.top >= vrect.top && erect.bottom <= vrect.bottom) return;
+        var target = Math.min(0, brect.top - erect.top);
         var token = (scroll._udxSoft || 0) + 1;
         scroll._udxSoft = token;
         function tick() {

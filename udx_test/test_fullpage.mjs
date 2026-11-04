@@ -39,7 +39,11 @@
 //      glides with ONE core-native transition per focus move (scroll.update -
 //      the same call the core items-line uses; the old 150px-per-tick softTo
 //      step loop restarted the core transition every tick and read as a jerky
-//      crawl on the TV); cards win over the legacy fallback table rows.
+//      crawl on the TV); the catalog scroll body additionally rides a
+//      NUM-smooth 0.45s ease-out settle (cubic-bezier(.22,1,.36,1)) overriding
+//      the core 0.3s default-ease (snappy on a 1080p poster wall), the core
+//      notransition/transition-reset kill-switches stay in force; cards win
+//      over the legacy fallback table rows.
 //   6. All network fetches go to the public mirrors only (no external metadata
 //      service, no TorrServer/LAN); TMDB traffic goes through the core
 //      integration mock only.
@@ -653,6 +657,8 @@ check('css: grid row fills the full width with five equal cells (calc(20% - 0.5e
 check('css: vertical row distance - margin-bottom 2.5em between card rows (NUM reference air; was 7-27px uneven text-block slack)', /\.udx-content \.category-full \.card\{[^}]*margin-bottom:2\.5em/.test(src), 'missing row-gap rule');
 check('css: tab zone is flex flow above the grid (head not an overlay; no poster can be covered by the tabs)', /\.udx-content\{[^}]*display:flex[^}]*flex-direction:column/.test(src) && /\.udx-content__head\{flex:0 0 auto;[^}]*\}/.test(src) && src.indexOf('.udx-content__head{position:absolute') === -1, 'head must stay in flow');
 check('css: grid area is the flex remainder with a bounded scroll viewport (TV scroll driver clamps to offsetHeight)', /\.udx-content__list\{flex:1 1 auto;min-height:0;[^}]*\}/.test(src) && /\.udx-content__list>\.scroll\{height:100%;\}/.test(src), 'list/scroll must stay height-bounded');
+
+check('css: catalog glide is the NUM-smooth 0.45s ease-out settle (the core 0.3s default-ease reads as a snappy crawl on a 1080p poster wall; the core notransition/transition-reset kill-switches stay in force via :not() guards)', src.indexOf(".udx-content .scroll__body:not(.notransition):not(.transition-reset){-webkit-transition:-webkit-transform .45s cubic-bezier(.22,1,.36,1);transition:transform .45s cubic-bezier(.22,1,.36,1);}") !== -1, 'catalog glide override missing');
 check('css: clearance above the first row and at the sides so the focus halo is never clipped at the viewport edges', /\.udx-content \.scroll--mask \.scroll__content\{padding:1\.4em 0\.5em;\}/.test(src), 'missing mask clearance rule');
 check('css: card title matches the NUM reference scale and weight (1em regular)', /\.udx-content \.card__title\{[^}]*font-size:1em[^}]*font-weight:400/.test(src), 'missing title scale rule');
 check('css: an active poster gets the NUM green halo (#57F570 band around the poster box only - a whole-card ring would reach the next row); card__view must not clip the ::after band', /\.udx-content \.card\.focus \.card__view::after\{content:"";position:absolute;top:-0\.5em;left:-0\.5em;right:-0\.5em;bottom:-0\.5em;border:0\.3em solid #57F570;border-radius:1\.4em;z-index:-1;pointer-events:none;\}/.test(src) && /\.udx-content \.card\.hover \.card__view::after\{border-color:rgba\(87,245,112,\.5\);\}/.test(src) && !/\.udx-content \.card__view\{[^}]*overflow:hidden/.test(src), 'green poster halo rules missing or card__view clips the band');
@@ -823,9 +829,10 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     const px = hEm && fEm ? parseFloat(hEm[1]) * parseFloat(fEm[1]) * 16 : 0;
     check('strip: shared base height is in the 60-64px band at the 1080p root font', !!base && px >= 60 && px <= 64, 'height=' + px + 'px');
     check('strip: both controls share ONE dark pill - no per-role rules at all (no color/geometry override possible)', src.indexOf('.udxf__act--online{') === -1 && src.indexOf('.udxf__act--torrents{') === -1, 'role rules must be gone');
-    // Focus: the NUM green halo (#57F570, same ring as the core cards) over
-    // the dark pill; transform-free, zero layout shift.
-    check('strip: focus is the NUM green halo over the dark pill (same #57F570 ring as the core cards; no invert, no layout shift)', /\.udxf__act\.focus\{box-shadow:0 0 0 \.25em #57F570;filter:brightness\(1\.08\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
+    // Focus: the pill becomes the 1:1 reference green->blue gradient (the
+    // reference screenshot shows a clean gradient - no green ring);
+    // transform-free, zero layout shift.
+    check('strip: focus turns the pill into the 1:1 reference gradient (green->blue, clean surface without a green ring - per the reference screenshot)', /\.udxf__act\.focus\{background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
     check('focus: the green halo is one shared token across all custom surfaces (panel rows + list rows)', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row halo rules missing');
     check('css: the release side window is a narrow inset card (32% wide with the content-zone margins - top 4.5%, right 6%, bottom 1% - so it does not take half the screen and sits symmetric to the page)', /\.udxf__panel\{position:absolute;top:4\.5%;right:6%;bottom:1%;width:32%;z-index:30;[^}]*\}/.test(src), 'inset panel geometry missing');
     check('css: release rows are bounded content-width bars centered in the panel (never wider than it; a long label wraps inside the bar instead of being clipped)', /\.udxf__prow\{display:block;width:fit-content;max-width:100%;box-sizing:border-box;white-space:normal;margin:0 auto \.7em auto;height:auto;min-height:2\.8em;padding:\.55em 1\.1em;border-radius:\.7em;\}/.test(src), 'bounded row width rule missing');
@@ -836,9 +843,11 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:center;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
     check('css: the title is the NUM display size at regular weight (3em/400, not bold)', /\.udxf__title\{font-size:3em;font-weight:400;line-height:1\.12;color:#fff;margin-top:\.3em;\}/.test(src), 'title scale rule missing');
     check('css: the details strip keeps the full text at compact spacing (no clamp, tighter lines)', /\.udxf__overview\{font-size:1\.02em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__fact\{font-size:1em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
-    check('strip: both actions share ONE 1:1 reference gradient pill (green->blue surface, white regular-weight 1.3em label, compact ~60px bar, no dark matte, no per-role rules)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src) && src.indexOf('rgba(24,26,28,.62)') === -1, 'gradient pill missing or the old dark matte still present');
+    check('strip: the default state is ONE transparent dark-glass pill (the reference "MODS\'s" look - white icon + white regular-weight 1.3em label, compact ~60px bar, no per-role rules)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:rgba\(24,26,28,\.6\);\}/.test(src), 'transparent glass base missing');
     check('strip: both icon containers are identical 1em inline SVGs (reference proportion to the 1.3em label)', src.indexOf("ICON_PLAY = '<svg width=\"1em\" height=\"1em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1em\" height=\"1em\"") !== -1, 'icon container mismatch');
 })();
+
+check('softTo: a focus target already fully inside the scroll viewport triggers no scroll (the initial detail-page focus must not crop the poster top - the reported "press UP to fix the picture" bug)', src.indexOf('erect.height > 0 && vrect.height > 0') !== -1 && src.indexOf('erect.top >= vrect.top && erect.bottom <= vrect.bottom') !== -1, 'visibility guard missing');
 
 // ---------- Online control: in-page release side window, pick-gated handoff ----------
 // The button press ONLY opens the side window over the detail page (no
