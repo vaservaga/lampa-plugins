@@ -286,8 +286,7 @@
         '.udxf__poster{flex-shrink:0;width:19em;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
         '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
         '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
-        '.udxf__title{font-size:2.6em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
-        '.udxf__orig{font-size:1.4em;line-height:1.35;color:rgba(255,255,255,.6);margin-top:.5em;}' +
+        '.udxf__title{font-size:3em;font-weight:400;line-height:1.12;color:#fff;margin-top:.3em;}' +
         '.udxf__line{font-size:1em;color:rgba(255,255,255,.5);margin-top:.5em;}' +
         // Full overview - no line clamp; the compact spacing keeps even a long
         // one inside the 1080p page.
@@ -349,7 +348,11 @@
         // line, the site's own upload date below), core simple-button surface,
         // auto height for the two lines. Focus: white ring (the reference row
         // highlight), no invert.
-        '.udxf__prow{display:block;margin-bottom:.7em;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:.7em;}' +
+        // Bounded content-width bar (never a full-panel strip): the row hugs
+        // its quality • size text and can never outgrow the panel - an overly
+        // long label wraps inside the bar instead of being clipped at the
+        // panel edge.
+        '.udxf__prow{display:block;width:fit-content;max-width:100%;box-sizing:border-box;white-space:normal;margin-bottom:.7em;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:.7em;}' +
         '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}' +
         '.udxf__prow__main{font-size:1.05em;font-weight:600;color:#fff;line-height:1.35;}' +
         '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
@@ -795,6 +798,27 @@
         return String(title || '').replace(/\s*\((19|20)\d{2}\)\s*$/, '');
     }
 
+    // The full-bleed body class is shared by ALL Ultradox screens (catalog,
+    // detail, list). They stack: a back-navigation destroys the upper screen
+    // while the lower one stays alive, so a plain add-on-build /
+    // remove-on-destroy would re-show the core top bar on the survivor
+    // (detail -> back -> catalog). Reference count instead: each screen
+    // registers once on its first build and releases once in destroy; the
+    // class drops only when the last screen leaves.
+    var udxNoHeadCount = 0;
+    function udxNoHeadOn() {
+        var b = typeof document !== 'undefined' ? document.body : null;
+        if (!b || !b.classList) return;
+        ++udxNoHeadCount;
+        b.classList.add('udx-nohead');
+    }
+    function udxNoHeadOff() {
+        var b = typeof document !== 'undefined' ? document.body : null;
+        if (!b || !b.classList) return;
+        if (udxNoHeadCount > 0) --udxNoHeadCount;
+        if (!udxNoHeadCount) b.classList.remove('udx-nohead');
+    }
+
     // One compact quality token from the raw site value (e.g.
     // "WEB-DL/WEB-DLRip" -> "WEB-DL"): a single real token, no slash, no repeats.
     function qualityToken(type) {
@@ -1002,7 +1026,7 @@
         var L = window.Lampa;
         var items = [], rendered = 0, catId = null, catPath = null;
         var seen = {}, serverPage = 1, fetching = false, consecutiveEmpty = 0;
-        var last = null, scroll = null, grid = null, built = false, catBtns = [], loadToken = 0;
+        var last = null, scroll = null, grid = null, built = false, catBtns = [], loadToken = 0, noHead = false;
         var bgLayers = [null, null], bgFront = 0, bgShown = '', bgPending = '', bgToken = 0;
         var html = document.createElement('div');
 
@@ -1033,9 +1057,10 @@
         this.build = function () {
             if (this.activity) this.activity.loader(false);
 
-            // Full-bleed screen: hide the core top bar (same as detail/list).
-            var udxBodyC = typeof document !== 'undefined' ? document.body : null;
-            if (udxBodyC && udxBodyC.classList) udxBodyC.classList.add('udx-nohead');
+            // Full-bleed screen: hide the core top bar while this screen is
+            // alive (reference-counted - a back-navigation leaves the screen
+            // below alive, so its class must not drop).
+            if (!noHead) { noHead = true; udxNoHeadOn(); }
 
             if (!built) {
                 built = true;
@@ -1358,8 +1383,7 @@
         this.stop = function () {};
 
         this.destroy = function () {
-            var udxBodyC2 = typeof document !== 'undefined' ? document.body : null;
-            if (udxBodyC2 && udxBodyC2.classList) udxBodyC2.classList.remove('udx-nohead');
+            if (noHead) { noHead = false; udxNoHeadOff(); }
             if (scroll) scroll.destroy();
             html.remove();
             built = false;
@@ -1396,6 +1420,7 @@
         var item = object.item || {};
         var detail = null;
         var built = false;
+        var noHead = false;
         var onlineBtn = null, torrentsBtn = null;
         var lastAct = null;
         var tmdbSeasons = 0;
@@ -1435,10 +1460,9 @@
         this.build = function () {
             if (this.activity) this.activity.loader(false);
 
-            // Full-bleed page: hide the core top bar for the duration of this
-            // screen (the CSS rule keys off the body class).
-            var udxBody = typeof document !== 'undefined' ? document.body : null;
-            if (udxBody && udxBody.classList) udxBody.classList.add('udx-nohead');
+            // Full-bleed page: hide the core top bar while this screen is
+            // alive (reference-counted - back to the catalog must keep it).
+            if (!noHead) { noHead = true; udxNoHeadOn(); }
 
             if (!built) {
                 built = true;
@@ -1552,10 +1576,12 @@
 
             html.find('.udxf__title').text(stripYear(item.title));
 
+            // NUM reference order: year first, then a comma, then the country
+            // ("2026, США"); whichever of the two is present stands alone.
             var top = [];
-            if (d.country) top.push(d.country);
             if (d.year) top.push(d.year);
-            slotShow('.udxf__top', top.length ? top.join(' • ') : '');
+            if (d.country) top.push(d.country);
+            slotShow('.udxf__top', top.length ? top.join(', ') : '');
 
             var line = [];
             if (d.genre) line.push(d.genre);
@@ -1825,8 +1851,7 @@
         this.stop = function () {};
 
         this.destroy = function () {
-            var udxBody2 = typeof document !== 'undefined' ? document.body : null;
-            if (udxBody2 && udxBody2.classList) udxBody2.classList.remove('udx-nohead');
+            if (noHead) { noHead = false; udxNoHeadOff(); }
             if (scroll) scroll.destroy();
             if (panelScroll) panelScroll.destroy();
             html.remove();
@@ -1862,6 +1887,7 @@
         var item = object.item || {};
         var detail = object.detail || {};
         var built = false;
+        var noHead = false;
         var rows = [];
         var firstRow = null, lastRow = null, scroll = null, listBox = null;
         var html = document.createElement('div');
@@ -1895,9 +1921,9 @@
         this.build = function () {
             if (this.activity) this.activity.loader(false);
 
-            // Same full-bleed treatment as the detail page.
-            var udxBodyL = typeof document !== 'undefined' ? document.body : null;
-            if (udxBodyL && udxBodyL.classList) udxBodyL.classList.add('udx-nohead');
+            // Same full-bleed treatment as the detail page (reference-counted
+            // - back to the page below must keep the bar hidden).
+            if (!noHead) { noHead = true; udxNoHeadOn(); }
 
             if (!built) {
                 built = true;
@@ -2084,8 +2110,7 @@
         this.stop = function () {};
 
         this.destroy = function () {
-            var udxBodyL2 = typeof document !== 'undefined' ? document.body : null;
-            if (udxBodyL2 && udxBodyL2.classList) udxBodyL2.classList.remove('udx-nohead');
+            if (noHead) { noHead = false; udxNoHeadOff(); }
             if (scroll) scroll.destroy();
             html.remove();
             built = false;

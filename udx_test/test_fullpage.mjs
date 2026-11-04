@@ -530,7 +530,10 @@ const L = {
 
 globalThis.window = { Lampa: L, appready: true, plugin_ultradox_ready: false };
 globalThis.Lampa = L; // in the browser window.Lampa is the global binding
-globalThis.document = { addEventListener() {}, createElement: (t) => makeEl(t) };
+// The core top bar hides behind a body class; the mock body carries it so the
+// full-bleed lifecycle (reference count across stacked screens) is verifiable.
+const bodyClasses = new Set();
+globalThis.document = { addEventListener() {}, body: { classList: { add: (c) => bodyClasses.add(c), remove: (c) => bodyClasses.delete(c) } }, createElement: (t) => makeEl(t) };
 globalThis.$ = (arg) => (typeof arg === 'string' ? asQuery(parseHtml(arg)) : (arg && arg.tagName ? asQuery([arg]) : arg));
 globalThis.atob = (s) => Buffer.from(s, 'base64').toString('binary');
 
@@ -773,7 +776,7 @@ check('fullpage: backdrop visible', sh.find('.udxf__backdrop').classes.has('udxf
 check('fullpage: poster fallback not active for a valid backdrop', !sh.find('.udxf__backdrop').classes.has('udxf__backdrop--poster'));
 check('fullpage: no poster state on the root for a valid backdrop', sh.find('.udxf') !== null && !sh.find('.udxf').classes.has('udxf--poster'), String(sh.find('.udxf') && sh.find('.udxf').classes));
 check('fullpage: poster src equals the expected URL', sh.find('.udxf__poster') && sh.find('.udxf__poster').src === 'https://045.ultradox.click/upload/show.jpg', sh.find('.udxf__poster') ? sh.find('.udxf__poster').src : 'no poster element');
-check('fullpage: top line', sh.find('.udxf__top').text() === 'США • 2021', txt(sh, '.udxf__top'));
+check('fullpage: top line (NUM order: year first, comma, country)', sh.find('.udxf__top').text() === '2021, США', txt(sh, '.udxf__top'));
 check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', txt(sh, '.udxf__line'));
 check('fullpage: overview (technical tail cut)', sh.find('.udxf__overview').text() === 'Детективний серіал про агентку.');
 check('fullpage: director line with the exact source value', txt(sh, '.udxf__fact--director') === 'Режисер: Кацуо Фукудзава, Акико Като, Ёхэй Миядзаки', txt(sh, '.udxf__fact--director'));
@@ -819,11 +822,13 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     // the dark pill; transform-free, zero layout shift.
     check('strip: focus is the NUM green halo over the dark pill (same #57F570 ring as the core cards; no invert, no layout shift)', /\.udxf__act\.focus\{box-shadow:0 0 0 \.25em #57F570;filter:brightness\(1\.08\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
     check('focus: the green halo is one shared token across all custom surfaces (panel rows + list rows)', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row halo rules missing');
+    check('css: release rows are bounded content-width bars (never wider than the panel; a long label wraps inside the bar instead of being clipped)', /\.udxf__prow\{display:block;width:fit-content;max-width:100%;box-sizing:border-box;white-space:normal;margin-bottom:\.7em;height:auto;min-height:2\.8em;padding:\.55em 1\.1em;border-radius:\.7em;\}/.test(src), 'bounded row width rule missing');
     check('css: the detail page hides the core top bar (body.udx-nohead, full-bleed)', src.indexOf('body.udx-nohead .head{display:none;}') !== -1, 'missing no-head rule');
-    check('css: the body class is added by build and removed by destroy (ALL Ultradox screens: catalog, detail, list)', src.split("classList.add('udx-nohead')").length - 1 >= 3 && src.split("classList.remove('udx-nohead')").length - 1 >= 3, 'body class wiring missing');
+    check('css: the body class is reference-counted across ALL Ultradox screens (catalog, detail, list) so a back-navigation never re-shows the core bar on the surviving screen below', src.indexOf('function udxNoHeadOn()') !== -1 && src.indexOf('function udxNoHeadOff()') !== -1 && countTok(/udxNoHeadOn\(\);/g, src) >= 3 && countTok(/udxNoHeadOff\(\);/g, src) >= 3, 'reference-counted body class wiring missing');
     check('css: all Ultradox screens pin to the full screen (fixed inset 0 - the core layer--height box) so no band shows at the top and the backdrops reach the screen edges', src.indexOf('body.udx-nohead .udx-content,body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}') !== -1, 'missing full-bleed pin rule');
     check('css: the tab zone sits lowered from the screen top (34px top margin) now that the core bar is gone', /\.udx-content__head\{[^}]*padding:34px 20px 14px 20px;\}/.test(src), 'missing tab-zone top margin');
     check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:center;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
+    check('css: the title is the NUM display size at regular weight (3em/400, not bold)', /\.udxf__title\{font-size:3em;font-weight:400;line-height:1\.12;color:#fff;margin-top:\.3em;\}/.test(src), 'title scale rule missing');
     check('css: the details strip keeps the full text at compact spacing (no clamp, tighter lines)', /\.udxf__overview\{font-size:1\.02em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__fact\{font-size:1em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
     check('strip: both actions share the MODS-style dark pill (matte translucent surface, white icon + label, no brand gradients)', /\.udxf__act\{[^}]*color:#fff;[^}]*background:rgba\(24,26,28,\.62\);\}/.test(src) && src.indexOf('#3fd487') === -1 && src.indexOf('#8a5cf6') === -1, 'dark pill style missing or gradients still present');
     check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_PLAY = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
@@ -977,7 +982,7 @@ film.activity = { loader() {}, toggle() {} };
 film.create();
 
 const fm = film.render();
-check('fullpage(film): top line', fm.find('.udxf__top').text() === 'Франція • 2023', txt(fm, '.udxf__top'));
+check('fullpage(film): top line (NUM order: year first, comma, country)', fm.find('.udxf__top').text() === '2023, Франція', txt(fm, '.udxf__top'));
 check('fullpage(film): overview', fm.find('.udxf__overview').text() === 'Епічна історія космічної одесьи.');
 check('fullpage(film): director line (single name, no ellipsis)', txt(fm, '.udxf__fact--director') === 'Режисер: Мар Олид', txt(fm, '.udxf__fact--director'));
 check('fullpage(film): cast line shows every name (no cap, no ellipsis truncation)', txt(fm, '.udxf__fact--cast') === 'У ролях: Кира Миро, Сальва Рейна, Луна Фульхенсио, Ян Кортегосо, Адриана Биде, Антонио Пагудо, Марта Хазас', txt(fm, '.udxf__fact--cast'));
@@ -1238,6 +1243,7 @@ check('fullpage: failed fetch (empty model) -> fact rows hidden and empty', (fun
 // page (own payload) answers with its clear empty state - no selector, no
 // error, no execution
 let mErr = null;
+let lpeO = null; // module scope: the full-bleed lifecycle destroy needs it (declared in the try below)
 try {
     const mPushes0 = L.Activity.pushes.length;
     missO.handlers['hover:enter'].forEach((f) => f());
@@ -1250,7 +1256,7 @@ try {
     const pushedMTs = L.Activity.pushes[L.Activity.pushes.length - 1];
     check('fullpage(empty): "TorrServer" opens the core torrents search page with the bare-title search (no year in the failed detail)', !!pushedMTs && pushedMTs.component === 'torrents' && pushedMTs.search === 'Missing' && pushedMTs.search_one === 'Missing' && !!pushedMTs.movie && pushedMTs.movie.number_of_seasons === 0 && L.Select.last === selBefore, JSON.stringify(pushedMTs && { c: pushedMTs.component, s: pushedMTs.search }));
 
-    const lpeO = new LP_O({ title: MISSING_ITEM.title, component: 'ultradox_online', item: MISSING_ITEM, detail: missing.detail, seasons: missing.detail && missing.detail.seasons });
+    lpeO = new LP_O({ title: MISSING_ITEM.title, component: 'ultradox_online', item: MISSING_ITEM, detail: missing.detail, seasons: missing.detail && missing.detail.seasons });
     lpeO.activity = { loader() {}, toggle() {} };
     lpeO.create();
     const lpeRoot = lpeO.render();
@@ -1306,6 +1312,28 @@ for (const f of serialCard.handlers['hover:focus']) f();
 check('grid: repeated focus does not duplicate the type badge', findAll(filmCard, 'udx-kind').length === 1 && findAll(serialCard, 'udx-kind').length === 1, findAll(filmCard, 'udx-kind').length + ':' + findAll(serialCard, 'udx-kind').length);
 check('grid: repeated focus keeps the badge inside the poster container', inPoster(filmCard, 'udx-kind') && inPoster(serialCard, 'udx-kind'), 'badge moved out of .card__view');
 check('grid: repeated focus keeps the badge text intact', filmCard.find('.udx-kind').text() === 'Фільм' && serialCard.find('.udx-kind').text() === 'Серіал', txt(filmCard, '.udx-kind') + ':' + txt(serialCard, '.udx-kind'));
+
+// ---------- full-bleed lifecycle: the body class is reference-counted ----------
+// Back-navigation destroys the upper screen while the lower one stays alive:
+// the class must survive every destroy until the LAST Ultradox screen leaves
+// (a plain per-screen remove re-shows the core top bar on the survivor -
+// the reported detail -> back -> catalog stripe).
+console.log('fullpage: full-bleed body class lifecycle');
+check('fullpage: the class is present while any Ultradox screen is alive', bodyClasses.has('udx-nohead'), String(bodyClasses));
+[cat, series, lpO, film, lpFO, dead, lpD, nobg, shark, pp, multi, missing, lpeO, tfFail, tfThrow, series2].forEach((c) => c.destroy());
+check('fullpage: the class drops when the last screen leaves (all screens destroyed)', !bodyClasses.has('udx-nohead'), String(bodyClasses));
+const lcCat = new Comp({ category: 'serial' });
+lcCat.activity = { loader() {}, toggle() {} };
+lcCat.create();
+check('fullpage: a fresh catalog build hides the top bar again', bodyClasses.has('udx-nohead') && bodyClasses.size === 1, String(bodyClasses));
+const lcDetail = new FP({ item: { title: 'Lifecycle (2021)', serial: true, itemUrl: SERIES_URL, poster: '' } });
+lcDetail.activity = { loader() {}, toggle() {} };
+lcDetail.create();
+check('fullpage: a stacked detail keeps the single class state', bodyClasses.has('udx-nohead') && bodyClasses.size === 1, String(bodyClasses));
+lcDetail.destroy();
+check('fullpage: back to the catalog keeps the core top bar hidden (the reported regression)', bodyClasses.has('udx-nohead'), String(bodyClasses));
+lcCat.destroy();
+check('fullpage: leaving the catalog drops the class again', !bodyClasses.has('udx-nohead'), String(bodyClasses));
 
 // ---------- final verdict ----------
 check('torrent: L.Torrent.start counter equals the explicit row picks (' + picks + ')', L.Torrent.calls.length === picks, String(L.Torrent.calls.length));
