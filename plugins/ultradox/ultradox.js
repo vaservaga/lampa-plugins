@@ -70,9 +70,9 @@
     var ICON_ONLINE = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" stroke="currentColor" stroke-width="1.7"/></svg>';
     // Play mark for the "Онлайн" pill (the MODS reference shape: a white play
     // triangle sitting on the gradient disc).
-    var ICON_PLAY = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.2-6.8c.6-.4.6-1.4 0-1.8L9.6 4.3c-.7-.4-1.6.1-1.6.9z" fill="currentColor"/></svg>';
+    var ICON_PLAY = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.2-6.8c.6-.4.6-1.4 0-1.8L9.6 4.3c-.7-.4-1.6.1-1.6.9z" fill="currentColor"/></svg>';
     // List pictogram for the releases button: a plain list, no play hint.
-    var ICON_RELEASES = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.5 5.5h11M8.5 12h11M8.5 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="4.2" cy="5.5" r="1.5" fill="currentColor"/><circle cx="4.2" cy="12" r="1.5" fill="currentColor"/><circle cx="4.2" cy="18.5" r="1.5" fill="currentColor"/></svg>';
+    var ICON_RELEASES = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.5 5.5h11M8.5 12h11M8.5 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="4.2" cy="5.5" r="1.5" fill="currentColor"/><circle cx="4.2" cy="12" r="1.5" fill="currentColor"/><circle cx="4.2" cy="18.5" r="1.5" fill="currentColor"/></svg>';
 
     var CONTENT_HTML =
         '<div class="udx-content">' +
@@ -291,13 +291,14 @@
         // Full overview - no line clamp; the compact spacing keeps even a long
         // one inside the 1080p page.
         '.udxf__overview{font-size:1.02em;line-height:1.45;color:#fff;margin-top:.5em;}' +
-        // Compact horizontal action strip, ~62px tall at the 1080p root font
-        // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
-        // columns. MODS's-style pills (user request 2026-11-04, both buttons):
-        // one matte dark translucent surface, white icon + white label, no
-        // brand gradients (the old green/blue ones are gone).
+        // Compact horizontal action strip, ~60px tall at the 1080p root font
+        // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
+        // columns. Both buttons share ONE 1:1 reference gradient pill (user
+        // request 2026-11-04): green->blue surface, white icon + white
+        // regular-weight label, the reference proportions (big label in a
+        // compact bar). No per-role rules - both inherit this base untouched.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.4em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:rgba(24,26,28,.62);}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
         '.udxf__act svg{flex:0 0 auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
         // Focus: the NUM green halo - the same #57F570 ring the core draws
@@ -405,7 +406,7 @@
             ultradox_online: { uk: 'Онлайн', ru: 'Онлайн', en: 'Online', be: 'Анлайн' },
             ultradox_no_online: { uk: 'Немає онлайн-джерела', ru: 'Нет онлайн-источника', en: 'No online source', be: 'Няма анлайн-крыніцы' },
             ultradox_online_unavailable: { uk: 'Онлайн-джерело недоступне', ru: 'Онлайн-источник недоступен', en: 'Online source unavailable', be: 'Анлайн-крыніца недаступная' },
-            ultradox_torrserver: { uk: 'TorrServer', ru: 'TorrServer', en: 'TorrServer', be: 'TorrServer' },
+            ultradox_torrserver: { uk: 'Торренти', ru: 'Торренты', en: 'Torrents', be: 'Торэнты' },
             ultradox_releases: { uk: 'Релізи', ru: 'Релизы', en: 'Releases', be: 'Рэлізы' },
             ultradox_seasons: { uk: 'Сезонів', ru: 'Сезонов', en: 'Seasons', be: 'Сезонаў' },
             ultradox_director: { uk: 'Режисер', ru: 'Режиссёр', en: 'Director', be: 'Рэжысёр' },

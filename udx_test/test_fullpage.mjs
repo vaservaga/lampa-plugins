@@ -50,9 +50,9 @@
 //      a page rating GIF without a text value produces no rating text.
 //   9. Detail action strip (Phase 5): the old single "Дивитися" button and
 //      the old quality selector are gone; exactly one "Онлайн" + one
-//      "TorrServer" button over one shared builder, both MODS-style gradient
-//      pills (green->blue for "Онлайн", blue->violet for "TorrServer") with a
-//      white-ring focus; the press itself starts nothing and opens no
+//      "Торренти" button over one shared builder, both sharing ONE 1:1
+//      reference gradient pill (green->blue surface, white icon + white
+//      regular-weight label) with the NUM green halo focus; the press itself starts nothing and opens no
 //      L.Select: "Онлайн" -> the in-page release side window (the item's real
 //      releases as quality • size rows, the site's own upload date when the
 //      page carries it; BACK / a left move closes it) and the standard
@@ -831,8 +831,8 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:center;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
     check('css: the title is the NUM display size at regular weight (3em/400, not bold)', /\.udxf__title\{font-size:3em;font-weight:400;line-height:1\.12;color:#fff;margin-top:\.3em;\}/.test(src), 'title scale rule missing');
     check('css: the details strip keeps the full text at compact spacing (no clamp, tighter lines)', /\.udxf__overview\{font-size:1\.02em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__fact\{font-size:1em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
-    check('strip: both actions share the MODS-style dark pill (matte translucent surface, white icon + label, no brand gradients)', /\.udxf__act\{[^}]*color:#fff;[^}]*background:rgba\(24,26,28,\.62\);\}/.test(src) && src.indexOf('#3fd487') === -1 && src.indexOf('#8a5cf6') === -1, 'dark pill style missing or gradients still present');
-    check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_PLAY = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
+    check('strip: both actions share ONE 1:1 reference gradient pill (green->blue surface, white regular-weight 1.3em label, compact ~60px bar, no dark matte, no per-role rules)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src) && src.indexOf('rgba(24,26,28,.62)') === -1, 'gradient pill missing or the old dark matte still present');
+    check('strip: both icon containers are identical 1em inline SVGs (reference proportion to the 1.3em label)', src.indexOf("ICON_PLAY = '<svg width=\"1em\" height=\"1em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1em\" height=\"1em\"") !== -1, 'icon container mismatch');
 })();
 
 // ---------- Online control: in-page release side window, pick-gated handoff ----------
