@@ -353,17 +353,16 @@
         '.udxf__orig{font-size:1em;color:rgba(255,255,255,.5);margin-top:.3em;}' +
         '.udxf__seasons{font-size:1.05em;color:rgba(255,255,255,.5);margin-top:.8em;}' +
         // Release side window (the "Онлайн" target): a native-Lampa side-menu
-        // surface (dark) over the right part of the detail page. Narrow (24%,
-        // not half the screen) and inset with the SAME margins the content
-        // zone carries (top 4.5% / right 6% / bottom 1% - symmetric to the
-        // page, its right edge aligns with the content's right edge). 24% is
-        // the bound where the left edge (70%) clears the action strip: the
-        // right pill ("Торренти") ends at ~67% of the screen, so the wider
-        // 32% card overlapped it (user report 2026-11-05).
+        // surface (dark) at the right edge of the detail page. Per the user's
+        // drawn scheme (2026-11-05): flush with the top/right/bottom edges
+        // (top:0;right:0;bottom:0 - the top raised, the right/bottom insets
+        // gone), rounded 1.4em (the card halo radius), 24% wide so the left
+        // edge (76%) clears the action strip (the right pill ends at ~67%);
+        // the rows are full-width bars (text left), not fit-content pills.
         // display:none when closed so its selectors leave the spatial focus
         // map; the scroll viewport stays height-bounded (TV driver clamps
         // travel to the scroll element's offsetHeight).
-        '.udxf__panel{position:absolute;top:4.5%;right:6%;bottom:1%;width:24%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);}' +
+        '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:24%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);border-radius:1.4em;}' +
         '.udxf__panel--open{display:flex;}' +
         '.udxf__panel__head{flex:0 0 auto;padding:0 0 .9em;}' +
         '.udxf__panel__title{font-size:1.3em;font-weight:700;color:#fff;letter-spacing:.02em;}' +
@@ -373,11 +372,10 @@
         // line, the site's own upload date below), core simple-button surface,
         // auto height for the two lines. Focus: white ring (the reference row
         // highlight), no invert.
-        // Bounded content-width bar (never a full-panel strip): the row hugs
-        // its quality • size text, centered in the panel (symmetric margins
-        // both sides), and can never outgrow it - an overly long label wraps
-        // inside the bar instead of being clipped at the panel edge.
-        '.udxf__prow{display:block;width:fit-content;max-width:100%;box-sizing:border-box;white-space:normal;margin:0 auto .7em auto;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:1.4em;}' +
+        // Full-width bars in the panel (user's drawn scheme 2026-11-05): the
+        // row spans the panel content box, text left; an overly long label
+        // wraps inside the bar, rounded 1.4em like the panel/card halo.
+        '.udxf__prow{display:block;width:100%;box-sizing:border-box;white-space:normal;margin:0 0 .7em 0;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:1.4em;}' +
         '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}' +
         '.udxf__prow__main{font-size:1.05em;font-weight:600;color:#fff;line-height:1.35;}' +
         '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
