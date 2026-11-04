@@ -1333,7 +1333,16 @@
 
             card.on('hover:focus', function () {
                 last = card;
-                if (scroll) softTo(scroll, card);
+                // One core-native glide per focus move (the same scroll.update
+                // the core items-line issues on focus): a single eased
+                // transition to the same target softTo computed. The old
+                // 150px-per-110ms softTo step loop restarted the core
+                // transition on every tick and read as a jerky crawl on the TV
+                // (user feedback 2026-11-04: the feed scroll was janky).
+                if (scroll) {
+                    if (scroll.update) scroll.update(card, false);
+                    else softTo(scroll, card);
+                }
                 focusBackdrop(item.poster);
                 self.enrichYear(item, card);
             });

@@ -36,8 +36,10 @@
 //   5. Catalog card still renders and opens the FullPage on hover:enter; the
 //      old long-press playback trigger (hover:long) is gone; the scroll
 //      viewport is bounded (flex-bounded list + height:100% scroll) and focus
-//      glides through native-sized Scroll.wheel steps (softTo); cards win over
-//      the legacy fallback table rows.
+//      glides with ONE core-native transition per focus move (scroll.update -
+//      the same call the core items-line uses; the old 150px-per-tick softTo
+//      step loop restarted the core transition every tick and read as a jerky
+//      crawl on the TV); cards win over the legacy fallback table rows.
 //   6. All network fetches go to the public mirrors only (no external metadata
 //      service, no TorrServer/LAN); TMDB traffic goes through the core
 //      integration mock only.
@@ -566,8 +568,11 @@ check('catalog: exactly one card rendered', L.Template.calls.length === 1);
 const card = L.Template.calls[0];
 check('catalog: card title (trailing year stripped)', card && card.find('.card__title').text() === 'Show Name', card && card.find('.card__title').text());
 check('catalog: long-press playback trigger removed', card && !card.handlers['hover:long']);
+const catScroll = L.Scroll.last;
+const catUpdateBefore = catScroll.updateCalls;
+const catWheelBefore = catScroll.wheelCalls;
 card.handlers['hover:focus'].forEach((f) => f());
-check('catalog: hover:focus does not throw', true);
+check('catalog: focus glides with ONE core-native transition (scroll.update, no wheel-step loop)', catScroll.updateCalls === catUpdateBefore + 1 && catScroll.lastUpdate === card && catScroll.wheelCalls === catWheelBefore, JSON.stringify({ update: catScroll.updateCalls, lastUpdate: catScroll.lastUpdate === card, wheel: catScroll.wheelCalls }));
 card.handlers['hover:enter'].forEach((f) => f());
 const pushed = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('catalog: enter opens FullPage with item', pushed && pushed.component === 'ultradox_full' && pushed.item && pushed.item.itemUrl === SERIES_URL);
