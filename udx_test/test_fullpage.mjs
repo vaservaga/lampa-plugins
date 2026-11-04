@@ -42,9 +42,15 @@
 //      the Navigator walks row by row and the way UP re-glides the page back;
 //      the earlier top-align pinned the row to the top and an UP press jumped
 //      to the tabs with the grid left scrolled down); focusing a category
-//      button glides the grid back to its top; the catalog scroll body keeps
-//      the STOCK core transition (no plugin override - it must scroll exactly
-//      like the core build); cards win over the legacy fallback table rows.
+//      button glides the grid back to its top; every rendered card registers
+//      in the navigation collection unconditionally (the own() gate raced the
+//      loader window and left rows unregistered - the spatial Navigator then
+//      skipped them: an UP press from a deep row jumped straight to the
+//      category tabs) and the UP handler steps to the row above when the
+//      Navigator would otherwise leave the grid for a tab; the catalog scroll
+//      body keeps the STOCK core transition (no plugin override - it must
+//      scroll exactly like the core build); cards win over the legacy
+//      fallback table rows.
 //   6. All network fetches go to the public mirrors only (no external metadata
 //      service, no TorrServer/LAN); TMDB traffic goes through the core
 //      integration mock only.
@@ -201,6 +207,13 @@ function makeEl(tag) {
         },
         addClass(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.add(x)); return el; },
         removeClass(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.delete(x)); return el; },
+        // Real DOM elements carry classList; the plugin guards on it (e.g. the
+        // catalog UP handler checks dest.classList.contains('udx-cat')).
+        classList: {
+            contains(c) { return el.classes.has(String(c)); },
+            add(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.add(x)); return el.classList; },
+            remove(c) { String(c).split(/\s+/).filter(Boolean).forEach((x) => el.classes.delete(x)); return el.classList; }
+        },
         on(ev, fn) { (el.handlers[ev] || (el.handlers[ev] = [])).push(fn); return el; },
         css(o) { Object.assign(el.style, o); return el; },
         getBoundingClientRect() { return { top: el._top || 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }; },
@@ -488,12 +501,13 @@ const L = {
         toggles: {},
         configs: {},
         focusCalls: [],
+        appends: [],
         add(name, cfg) { this.configs[name] = cfg; },
         toggle(n) { this.toggles[n] = (this.toggles[n] || 0) + 1; },
         collectionSet() {},
         collectionFocus(el, root) { this.focusCalls.push({ el: el, root: root }); },
         own() { return false; },
-        collectionAppend() {}
+        collectionAppend(el) { this.appends.push(el); }
     },
     Select: { last: null, show(cfg) { this.last = cfg; } },
     Noty: { msgs: [], show(m) { this.msgs.push(m); } },
@@ -591,13 +605,57 @@ check('catalog: focus glides with ONE core-native CENTERED transition (scroll.up
         check('catalog: focusing a category button glides the grid back to the top (scroll.update(firstCard, false))', catScroll.updateCalls === uBefore + 1 && catScroll.lastUpdate === card && catScroll.lastCenter === false, JSON.stringify({ update: catScroll.updateCalls - uBefore, lastUpdate: catScroll.lastUpdate === card, center: catScroll.lastCenter }));
     }
 }
+{
+    // Registration is unconditional: the earlier own()-gated append raced the
+    // loader window (while activity.loader(true) is up the active controller
+    // is not ours), so a whole card batch could stay OUT of the navigation
+    // collection; the spatial Navigator then skips unregistered rows and an
+    // UP press from a deep row jumps straight to the category tabs (user
+    // report 2026-11-04).
+    check('catalog: every rendered card registers itself in the navigation collection unconditionally (no own() gate)', L.Controller.appends.indexOf(card) !== -1, 'appends: ' + L.Controller.appends.length);
+
+    // UP safety net: even with a residual registration gap, the up handler
+    // steps to the card above the focus when the Navigator would otherwise
+    // leave the grid for a category tab (from the top row the tab stays the
+    // correct target).
+    cat.start();
+    check('catalog: start registered the content controller', typeof L.Controller.configs['content'] === 'object' && typeof L.Controller.configs['content'].up === 'function', JSON.stringify(Object.keys(L.Controller.configs)));
+    for (let i = 0; i < 8; i++) cat.appendCard({ title: 'Pad ' + i, itemUrl: 'http://mock.local/p' + i, type: '', size: '', poster: '' });
+    const gridEl = findAll(cat.render(), 'category-full')[0];
+    const kids = gridEl.children;
+    check('catalog: grid carries nine cards for the UP fallback test', kids.length === 9, String(kids.length));
+    const upTab = findAll(cat.render(), 'udx-cat')[0];
+    const navMock = {
+        _moved: null,
+        _focused: kids[5],
+        canmove(d) { return d === 'up' ? upTab : false; },
+        move(d) { this._moved = d; },
+        focus(el) { this._focused = el; },
+        getFocusedElement() { return this._focused; }
+    };
+    const savedNav = globalThis.Navigator;
+    globalThis.Navigator = navMock;
+    try {
+        L.Controller.configs['content'].up();
+        check('catalog: UP while the Navigator would land on a category tab steps to the card above the focus instead (row-by-row, registering it first)', navMock._focused === kids[0] && navMock._moved === null && L.Controller.appends.indexOf(kids[0]) !== -1, JSON.stringify({ focused: navMock._focused === kids[0], moved: navMock._moved, registered: L.Controller.appends.indexOf(kids[0]) !== -1 }));
+        navMock._focused = kids[0];
+        navMock._moved = null;
+        L.Controller.configs['content'].up();
+        check('catalog: UP from the top row still targets the category tab (NavMove, core behaviour)', navMock._moved === 'up' && navMock._focused === kids[0], JSON.stringify({ moved: navMock._moved }));
+    } finally {
+        globalThis.Navigator = savedNav;
+    }
+}
 card.handlers['hover:enter'].forEach((f) => f());
 const pushed = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('catalog: enter opens FullPage with item', pushed && pushed.component === 'ultradox_full' && pushed.item && pushed.item.itemUrl === SERIES_URL);
 check('catalog: no Torrent.start', L.Torrent.calls.length === 0, String(L.Torrent.calls.length));
 
 // ---------- NUM-parity card: badges + year + rating ----------
-check('catalog: release_year under the title', L.Template.lastParams && L.Template.lastParams.release_year === '2021', JSON.stringify(L.Template.lastParams));
+// Assert on the rendered card element (the template's replaceVars mirror puts
+// {release_year} into .card__age), not L.Template.lastParams - later appendCard
+// calls overwrite lastParams and would break the assertion.
+check('catalog: release_year under the title', card.find('.card__age').text() === '2021', card.find('.card__age').text());
 check('catalog: type badge top-left', findAll(card, 'udx-kind').length === 1 && card.find('.udx-kind').text() === 'Серіал', findAll(card, 'udx-kind').length + ':' + txt(card, '.udx-kind'));
 check('catalog: quality chip only for real quality tokens', card.find('.udx-chip') === null, String(card.find('.udx-chip')));
 check('catalog: no rating element rendered on the card (external ratings removed)', findAll(card, 'udx-rate').length === 0 && card.find('.udx-rate') === null, String(findAll(card, 'udx-rate').length));

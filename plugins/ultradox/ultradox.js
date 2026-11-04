@@ -1410,11 +1410,20 @@
             });
 
             card.on('visible', function () {
-                if (L.Controller.own && L.Controller.own(self)) L.Controller.collectionAppend(card);
+                if (L.Controller.collectionAppend) L.Controller.collectionAppend(card);
             });
 
             if (!last) last = card;
-            if (L.Controller.own && L.Controller.own(this)) L.Controller.collectionAppend(card);
+            // Unconditional registration (Navigator.add dedupes, so the
+            // re-register from 'visible' is a no-op): the earlier own()-gated
+            // append raced the loader window - while activity.loader(true) is
+            // up the active controller is not ours and a whole card batch
+            // could stay OUT of the navigation collection. The spatial
+            // Navigator then skips the unregistered rows: from a deep row a
+            // single UP press jumped straight to the category tabs (user
+            // report 2026-11-04: "з 5-6 ряду перекидує зразу на кнопку
+            // категорії").
+            if (L.Controller.collectionAppend) L.Controller.collectionAppend(card);
             grid.append(card);
         };
 
@@ -1436,7 +1445,28 @@
                 // Up at the top edge simply stays: the top bar is hidden on
                 // our screens, so there is nothing to focus above the grid.
                 up: function () {
-                    if (NavCanMove('up')) NavMove('up');
+                    var dest = NavCanMove('up');
+                    if (!dest) return;
+                    // Safety net for a registration gap: if the spatial
+                    // Navigator would leave the grid for a category tab while
+                    // a grid row still sits above the focus, step to that row
+                    // instead (registering it first - Navigator.focus refuses
+                    // elements outside the collection). From the top row the
+                    // tab stays the correct UP target (core behaviour).
+                    if (dest.classList && dest.classList.contains('udx-cat') && grid && grid.children.length > 5) {
+                        var kids = grid.children;
+                        var cur = (typeof Navigator !== 'undefined' && Navigator.getFocusedElement) ? Navigator.getFocusedElement() : null;
+                        var idx = cur ? Array.prototype.indexOf.call(kids, cur) : -1;
+                        if (idx >= 5) {
+                            var above = kids[idx - 5];
+                            if (above) {
+                                if (L.Controller.collectionAppend) L.Controller.collectionAppend(above);
+                                if (typeof Navigator !== 'undefined' && Navigator.focus) Navigator.focus(above);
+                                return;
+                            }
+                        }
+                    }
+                    NavMove('up');
                 },
                 down: function () { NavMove('down'); },
                 back: function () { L.Activity.backward(); }
