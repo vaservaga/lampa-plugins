@@ -194,7 +194,9 @@
         // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
         // band measured on the NUM reference at 1920x1080); one value for all
         // three category tabs.
-        '.udx-content .card__view{position:relative;overflow:hidden;margin-bottom:0.5em;}' +
+        // No overflow:hidden here: the focus ring below is a ::after band that
+        // extends -0.5em OUTSIDE the poster box; clipping would erase it.
+        '.udx-content .card__view{position:relative;margin-bottom:0.5em;}' +
         // NUM reference title: one scale up, regular weight (the earlier 0.9em
         // semibold read smaller and heavier than the reference grid).
         '.udx-content .card__title{margin-top:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:2.5em;font-size:1em;line-height:1.2em;font-weight:400;color:#fff;}' +
@@ -203,11 +205,15 @@
         // Catalog-addition date (latest release upload date, real data): shown
         // after the release year, dimmer still, so the two dates stay distinct.
         '.udx-content .card__age .udx-ad{color:rgba(255,255,255,.45);}' +
-        // Focus: the native core ring (app.css .card.focus/.card.hover
-        // .card__view::after - white 0.3em around the poster box ONLY),
-        // exactly as in the NUM DOM. No card-level ring: the grid rows are
-        // stacked without a vertical gap, so a ring around the whole card
-        // (poster + text block) would extend into the next row.
+        // Focus halo (user request 2026-11-04): the core's white ring
+        // (.card.focus .card__view::after) re-drawn in the NUM green
+        // (#57F570) - the halo the reference shows around an active poster.
+        // Same geometry as the core band (0.3em border, -0.5em offset,
+        // z-index -1 behind the poster, radius 1.4em); only the color differs.
+        // Poster box only - a whole-card ring would reach into the next row
+        // (the grid rows are stacked without a vertical gap).
+        '.udx-content .card.focus .card__view::after{content:"";position:absolute;top:-0.5em;left:-0.5em;right:-0.5em;bottom:-0.5em;border:0.3em solid #57F570;border-radius:1.4em;z-index:-1;pointer-events:none;}' +
+        '.udx-content .card.hover .card__view::after{border-color:rgba(87,245,112,.5);}' +
         // No glass top panel on Ultradox screens (user correction 2026-11-04):
         // the core .head keeps its native Lampa surface; nothing is painted
         // on top of the content zone.
@@ -215,10 +221,21 @@
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
-        // Full-bleed detail page (user request 2026-11-04): the core top bar
-        // is hidden while the detail page is open - FullPage.build adds the
-        // body class, FullPage.destroy removes it (the catalog keeps the bar).
+        // Full-bleed detail/list pages (user request 2026-11-04): the core top
+        // bar is hidden while one of our pages is open (build adds the body
+        // class, destroy removes it; the catalog keeps the bar), and the page
+        // root is pinned to the full screen. The pin matters twice:
+        // 1) the core content area starts below the head offset, so an
+        //    in-flow page leaves a band of the previous screen (catalog
+        //    ambience backdrop) visible at the top;
+        // 2) the core gives .wrap/.wrap__content an explicit 100vh height
+        //    (layer--height) and will-change:transform, so a fixed child is
+        //    positioned against that full-screen box - inset 0 = the whole
+        //    viewport in every build. The explicit viewport height also makes
+        //    the inner .scroll{height:100%} resolve to a real box, so the TV
+        //    scroll driver's maxOffset clamp works for long content.
         'body.udx-nohead .head{display:none;}' +
+        'body.udx-nohead .udxf,body.udx-nohead .udxl{position:fixed;top:0;left:0;right:0;bottom:0;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         // NUM-style backdrop: the image is ALWAYS a soft-blurred atmosphere
         // (never a flat dark surface). The fanart is blurred lightly and kept
@@ -1854,6 +1871,10 @@
         this.build = function () {
             if (this.activity) this.activity.loader(false);
 
+            // Same full-bleed treatment as the detail page.
+            var udxBodyL = typeof document !== 'undefined' ? document.body : null;
+            if (udxBodyL && udxBodyL.classList) udxBodyL.classList.add('udx-nohead');
+
             if (!built) {
                 built = true;
                 html.append($(LIST_HTML));
@@ -2039,6 +2060,8 @@
         this.stop = function () {};
 
         this.destroy = function () {
+            var udxBodyL2 = typeof document !== 'undefined' ? document.body : null;
+            if (udxBodyL2 && udxBodyL2.classList) udxBodyL2.classList.remove('udx-nohead');
             if (scroll) scroll.destroy();
             html.remove();
             built = false;
