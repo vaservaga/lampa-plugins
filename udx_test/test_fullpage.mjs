@@ -879,6 +879,41 @@ check('fullpage: BACK with the release window closed leaves the page', (function
 })(), String(L.Activity.backwardCalls));
 check('fullpage: strip labels stay static after a pick (no quality state)', txt(oBtn, '.udxf__act__label') === L.Lang.translate('ultradox_online') && txt(tBtn, '.udxf__act__label') === L.Lang.translate('ultradox_torrserver'), txt(oBtn, '.udxf__act__label') + ' / ' + txt(tBtn, '.udxf__act__label'));
 
+// The core Navigator never scrolls on its own: when focus has nowhere to go
+// the page controller drives the scroll itself - one native 150px wheel step
+// per press (the core list-page feel), clamped at the edges; up reaches the
+// top before it falls through to the core header toggle.
+check('fullpage: down steps the page scroll in native 150px wheel steps when focus has nowhere to go', (function () {
+    const cfg = L.Controller.configs.content;
+    const s = seriesScrolls.main;
+    s._softTarget = null;
+    s._pos = -450;
+    cfg.down(); cfg.down(); cfg.down();
+    return s.lastWheel === 150 && s.position() === -900;
+})(), JSON.stringify({ wheel: seriesScrolls.main.lastWheel, pos: seriesScrolls.main.position() }));
+check('fullpage: up steps the scroll back to the top and only then toggles the core head', (function () {
+    const cfg = L.Controller.configs.content;
+    const s = seriesScrolls.main;
+    while (s.position() < 0) cfg.up();
+    if (s.position() !== 0) return false;
+    const heads = L.Controller.toggles.head || 0;
+    cfg.up();
+    return (L.Controller.toggles.head || 0) === heads + 1;
+})(), JSON.stringify({ pos: seriesScrolls.main.position(), head: L.Controller.toggles.head || 0 }));
+check('fullpage: with the release window open the keys scroll the window list, not the page behind', (function () {
+    const cfg = L.Controller.configs.content;
+    const s = seriesScrolls.main;
+    const p = seriesScrolls.panel;
+    s._softTarget = null; p._softTarget = null;
+    oBtn.handlers['hover:enter'].forEach((f) => f());
+    if (!seriesPanel.classes.has('udxf__panel--open')) return false;
+    s._pos = -900; p._pos = -300;
+    cfg.down();
+    if (p.lastWheel !== 150 || p.position() !== -450 || s.position() !== -900) return false;
+    cfg.up();
+    return p.lastWheel === -150 && p.position() === -300 && s.position() === -900;
+})(), JSON.stringify({ main: seriesScrolls.main.position(), panel: seriesScrolls.panel.position(), pw: seriesScrolls.panel.lastWheel }));
+
 // re-opening through either control must not duplicate strip/controls/listeners
 const stripCount = findAll(sh, 'udxf__actions').length;
 const oCount = findAll(sh, 'udxf__act--online').length;

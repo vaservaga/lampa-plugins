@@ -1736,11 +1736,23 @@
                     else L.Controller.toggle('menu');
                 },
                 right: function () { NavMove('right'); },
+                // The core Navigator is spatial only: when focus has nowhere
+                // to go the page drives its own scroll in native-sized 150px
+                // wheel steps (the core list-page feel), clamped at the edges.
+                // Up steps back to the top first and only then falls through
+                // to the core header; an open release window scrolls its own
+                // list, never the page behind.
                 up: function () {
                     if (NavCanMove('up')) NavMove('up');
+                    else if (panelOpen && panelScroll && panelScroll.position() < 0) panelScroll.wheel(-SOFT_STEP);
+                    else if (scroll && scroll.position() < 0) scroll.wheel(-SOFT_STEP);
                     else L.Controller.toggle('head');
                 },
-                down: function () { NavMove('down'); },
+                down: function () {
+                    if (NavCanMove('down')) NavMove('down');
+                    else if (panelOpen && panelScroll) panelScroll.wheel(SOFT_STEP);
+                    else if (scroll) scroll.wheel(SOFT_STEP);
+                },
                 // BACK with the release window open closes it (focus returns
                 // to the action strip); only a closed window leaves the page.
                 back: function () {
