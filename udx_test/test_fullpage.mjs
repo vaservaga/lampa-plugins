@@ -651,8 +651,8 @@ check('css: focus is the native core poster ring (NUM DOM: .card__view::after, w
 check('css: year line dimmed like the NUM reference (title stays white)', /\.udx-content \.card__age\{[^}]*color:rgba\(255,255,255,\.5\);\}/.test(src) && /\.udx-content \.card__age \.udx-ad\{color:rgba\(255,255,255,\.45\);\}/.test(src), 'missing dim year color');
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 check('css: .udx-kind pinned inside the poster (left/top 10px, no negative offset) and clipped to it', /\.udx-kind\{position:absolute;left:10px;top:10px;[^}]*max-width:calc\(100% - 20px\);[^}]*overflow:hidden;[^}]*white-space:nowrap/.test(src), 'missing .udx-kind containment rule');
-check('css: poster fallback soft-blurs the stretched poster (hides upscale blocks) and darkens it', /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.5\)[^}]*saturate\(\.88\)/.test(src) && src.indexOf('blur(22px)') === -1, 'missing .udxf__backdrop--poster rule');
-check('css: list-page poster fallback shares the same soft-blur treatment', /\.udxl__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.5\)[^}]*saturate\(\.88\)/.test(src), 'missing .udxl__backdrop--poster rule');
+check('css: the backdrop is always a soft-blurred image (NUM-style): fanart lightly blurred, poster fallback blurred bright (not a flat dark surface)', /\.udxf__backdrop--on\{opacity:1;transform:scale\(1\.06\);filter:blur\(6px\) brightness\(\.72\) saturate\(\.9\);\}/.test(src) && /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src) && src.indexOf('blur(22px)') === -1, 'missing backdrop blur rules');
+check('css: list-page poster fallback shares the same bright soft-blur treatment', /\.udxl__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src), 'missing .udxl__backdrop--poster rule');
 check('css: detail scroll viewport is height-bounded (the TV scroll driver clamps travel to html offsetHeight)', /\.udxf__slot \.scroll\{position:relative;height:100%;overflow:hidden;\}/.test(src), 'missing bounded scroll rule');
 check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
 check('css: single permanent veil overlay (left+bottom gradients, Lampa black-based alphas)', /\.udx-bg__veil\{[^}]*z-index:1[^}]*linear-gradient\(90deg,rgba\(0,0,0,\.78\),rgba\(0,0,0,\.30\) 60%\),linear-gradient\(to top,rgba\(0,0,0,\.70\),rgba\(0,0,0,0\) 42%\)/.test(src), 'missing .udx-bg__veil rule');
@@ -821,7 +821,12 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     // role, white icon + label; the focus is a full-width white ring over the
     // gradient (a core-style invert would erase the pill color) + brightness
     // lift, transform-free, zero layout shift.
-    check('strip: focus is a white ring over the gradient (no invert, no layout shift)', /\.udxf__act\.focus\{box-shadow:0 0 0 \.28em rgba\(255,255,255,\.95\);filter:brightness\(1\.12\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
+    check('strip: focus is the NUM green halo over the gradient (same #57F570 ring as the core cards; no invert, no layout shift)', /\.udxf__act\.focus\{box-shadow:0 0 0 \.25em #57F570;filter:brightness\(1\.08\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
+    check('focus: the green halo is one shared token across all custom surfaces (panel rows + list rows)', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row halo rules missing');
+    check('css: the detail page hides the core top bar (body.udx-nohead, full-bleed)', src.indexOf('body.udx-nohead .head{display:none;}') !== -1, 'missing no-head rule');
+    check('css: the body class is added by build and removed by destroy', src.indexOf("udxBody.classList.add('udx-nohead')") !== -1 && src.indexOf("udxBody2.classList.remove('udx-nohead')") !== -1, 'body class wiring missing');
+    check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:center;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
+    check('css: the details strip keeps the full text at compact spacing (no clamp, tighter lines)', /\.udxf__overview\{font-size:1\.02em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__fact\{font-size:1em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
     check('strip: both roles carry the MODS gradient surfaces', /\.udxf__act--online\{background:linear-gradient\(90deg,#3fd487,#2f7ff0\);\}/.test(src) && /\.udxf__act--torrents\{background:linear-gradient\(90deg,#2f7ff0,#8a5cf6\);\}/.test(src), 'role styles missing');
     check('strip: both icon containers are identical 1.3em inline SVGs (own marks)', src.indexOf("ICON_PLAY = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.3em\" height=\"1.3em\"") !== -1, 'icon container mismatch');
 })();
@@ -891,15 +896,16 @@ check('fullpage: down steps the page scroll in native 150px wheel steps when foc
     cfg.down(); cfg.down(); cfg.down();
     return s.lastWheel === 150 && s.position() === -900;
 })(), JSON.stringify({ wheel: seriesScrolls.main.lastWheel, pos: seriesScrolls.main.position() }));
-check('fullpage: up steps the scroll back to the top and only then toggles the core head', (function () {
+check('fullpage: up steps the scroll back to the top and stays there (the top bar is hidden on this page)', (function () {
     const cfg = L.Controller.configs.content;
     const s = seriesScrolls.main;
     while (s.position() < 0) cfg.up();
     if (s.position() !== 0) return false;
+    const wheels = s.wheelCalls;
     const heads = L.Controller.toggles.head || 0;
     cfg.up();
-    return (L.Controller.toggles.head || 0) === heads + 1;
-})(), JSON.stringify({ pos: seriesScrolls.main.position(), head: L.Controller.toggles.head || 0 }));
+    return s.wheelCalls === wheels && (L.Controller.toggles.head || 0) === heads;
+})(), JSON.stringify({ pos: seriesScrolls.main.position(), wheels: seriesScrolls.main.wheelCalls, head: L.Controller.toggles.head || 0 }));
 check('fullpage: with the release window open the keys scroll the window list, not the page behind', (function () {
     const cfg = L.Controller.configs.content;
     const s = seriesScrolls.main;

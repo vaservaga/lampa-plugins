@@ -215,12 +215,20 @@
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
         '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
+        // Full-bleed detail page (user request 2026-11-04): the core top bar
+        // is hidden while the detail page is open - FullPage.build adds the
+        // body class, FullPage.destroy removes it (the catalog keeps the bar).
+        'body.udx-nohead .head{display:none;}' +
         '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
-        '.udxf__backdrop--on{opacity:1;}' +
+        // NUM-style backdrop: the image is ALWAYS a soft-blurred atmosphere
+        // (never a flat dark surface). The fanart is blurred lightly and kept
+        // bright enough to read as the artwork; scale hides the blur edge.
+        '.udxf__backdrop--on{opacity:1;transform:scale(1.06);filter:blur(6px) brightness(.72) saturate(.9);}' +
         // Poster-as-backdrop fallback: a small poster stretched full-screen
-        // shows upscale block artifacts, so a soft blur + darker tone hides
-        // them (atmospheric NUM-style backdrop); the zone veil does the rest.
-        '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.5) saturate(.88);}' +
+        // shows upscale block artifacts, so a stronger blur hides them; the
+        // tone is bright (not a flat dark fill) so it reads as a blurred
+        // poster - the zone veil keeps the text legible.
+        '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.62) saturate(.92);}' +
         // Valid-backdrop veil (NUM-style): dark text zone on the left, the
         // scene stays clearly visible toward the right, soft bottom fade.
         '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.42) 46%,rgba(0,0,0,.06) 82%),linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0) 46%);}' +
@@ -240,34 +248,38 @@
         // fixed viewport height the page can never scroll.
         '.udxf__slot .scroll{position:relative;height:100%;overflow:hidden;}' +
         '.udxf__content{min-height:100%;}' +
-        // Compact zone (explicit user request 2026-11-04): the top block must
-        // leave room for the overview on a 1920x1080 screen without scrolling;
-        // the scroll viewport below stays height-bounded for long text.
-        '.udxf__zone{display:flex;align-items:center;min-height:30em;padding:7% 6% 2% 5%;box-sizing:border-box;}' +
+        // Compact geometry (user request 2026-11-04): the whole page - zone,
+        // pills and the full "Детально" strip - must fit a 1920x1080 screen
+        // without scrolling: no min-height dead space under the poster, tight
+        // padding and line spacing. The scroll viewport below stays
+        // height-bounded as a safety net for unusually long text.
+        '.udxf__zone{display:flex;align-items:center;padding:4.5% 6% 1% 5%;box-sizing:border-box;}' +
         '.udxf__poster{flex-shrink:0;width:19em;border-radius:1em;background:#3E3E3E;box-shadow:0 1em 2.4em rgba(0,0,0,.55);}' +
         '.udxf__meta{margin-left:2.5em;min-width:0;max-width:64%;}' +
         '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
         '.udxf__title{font-size:2.6em;font-weight:700;line-height:1.12;color:#fff;margin-top:.3em;}' +
         '.udxf__orig{font-size:1.4em;line-height:1.35;color:rgba(255,255,255,.6);margin-top:.5em;}' +
-        '.udxf__line{font-size:1.1em;color:rgba(255,255,255,.5);margin-top:.7em;}' +
-        // Full overview - no line clamp (the page scrolls when it is long).
-        '.udxf__overview{font-size:1.15em;line-height:1.55;color:#fff;margin-top:.7em;}' +
+        '.udxf__line{font-size:1em;color:rgba(255,255,255,.5);margin-top:.5em;}' +
+        // Full overview - no line clamp; the compact spacing keeps even a long
+        // one inside the 1080p page.
+        '.udxf__overview{font-size:1.02em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~62px tall at the 1080p root font
         // (3.7em of the 1.05em button font), 1em gap, two-line wrap on narrow
         // columns. MODS-style gradient pills (user request 2026-11-04, both
         // buttons, the reference shot shape): a saturated disc, white icon +
         // label, no glass. "Онлайн" carries the green->blue mark from the
         // reference; "TorrServer" the blue->violet one.
-        '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:1.2em;}' +
+        '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:.8em;}' +
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:3.7em;padding:0 1.25em;border-radius:1em;font-size:1.05em;font-weight:600;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         '.udxf__act svg{flex:0 0 auto;opacity:.92;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxf__act--online{background:linear-gradient(90deg,#3fd487,#2f7ff0);}' +
         '.udxf__act--torrents{background:linear-gradient(90deg,#2f7ff0,#8a5cf6);}' +
-        // Focus: the full-width white ring over the gradient (a core-style
-        // invert would erase the pill color) + a slight brightness lift.
+        // Focus: the NUM green halo - the same #57F570 ring the core draws
+        // around its focused cards - over the gradient (a core-style invert
+        // would erase the pill color) + a slight brightness lift.
         // Transform-free, zero layout shift.
-        '.udxf__act.focus{box-shadow:0 0 0 .28em rgba(255,255,255,.95);filter:brightness(1.12);}' +
+        '.udxf__act.focus{box-shadow:0 0 0 .25em #57F570;filter:brightness(1.08);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
@@ -281,9 +293,9 @@
         '.card__view>.card__quality{left:10px!important;bottom:10px!important;}' +
         // Full-width details strip under the top zone: heading, the complete
         // overview, director and the full cast (wrapped, never truncated).
-        '.udxf__details{padding:0 6% 4% 5%;}' +
-        '.udxf__details-head{font-size:1.5em;font-weight:700;line-height:1.3;color:#fff;margin-top:.9em;}' +
-        '.udxf__fact{font-size:1.1em;line-height:1.55;color:rgba(255,255,255,.6);margin-top:.8em;}' +
+        '.udxf__details{padding:0 6% 1% 5%;}' +
+        '.udxf__details-head{font-size:1.3em;font-weight:700;line-height:1.3;color:#fff;margin-top:.6em;}' +
+        '.udxf__fact{font-size:1em;line-height:1.45;color:rgba(255,255,255,.6);margin-top:.5em;}' +
         // Focus target: the whole strip receives the down-navigation focus
         // (scroll.update); no visible ring - the full-width white box-shadow
         // read as two horizontal lines across the screen.
@@ -312,14 +324,14 @@
         // auto height for the two lines. Focus: white ring (the reference row
         // highlight), no invert.
         '.udxf__prow{display:block;margin-bottom:.7em;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:.7em;}' +
-        '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #fff;}' +
+        '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}' +
         '.udxf__prow__main{font-size:1.05em;font-weight:600;color:#fff;line-height:1.35;}' +
         '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
         '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxl__backdrop--on{opacity:1;}' +
-        '.udxl__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.5) saturate(.88);}' +
+        '.udxl__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.62) saturate(.92);}' +
         // List-screen veil (NUM-style): dark card zone on the left, the
         // backdrop stays visible behind the rows on the right.
         '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.34) 55%,rgba(0,0,0,.08) 85%),linear-gradient(to top,rgba(0,0,0,.50),rgba(0,0,0,0) 46%);}' +
@@ -343,7 +355,7 @@
         // (the background is restated so the core .simple-button.focus invert
         // never turns the row solid white).
         '.udxl__row{display:flex;align-items:center;gap:1.2em;width:100%;margin:.5em 0;padding:.65em 1.1em;border-radius:.3em;background:rgba(0,0,0,.3);text-align:left;box-sizing:border-box;}' +
-        '.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #fff;}' +
+        '.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}' +
         '.udxl__row__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}' +
         '.udxl__row__main{font-size:1.05em;font-weight:600;line-height:1.35;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxl__row__sub{font-size:.9em;line-height:1.35;color:rgba(255,255,255,.5);margin-top:.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
@@ -1382,6 +1394,11 @@
         this.build = function () {
             if (this.activity) this.activity.loader(false);
 
+            // Full-bleed page: hide the core top bar for the duration of this
+            // screen (the CSS rule keys off the body class).
+            var udxBody = typeof document !== 'undefined' ? document.body : null;
+            if (udxBody && udxBody.classList) udxBody.classList.add('udx-nohead');
+
             if (!built) {
                 built = true;
                 html.append($(DETAIL_HTML));
@@ -1739,14 +1756,13 @@
                 // The core Navigator is spatial only: when focus has nowhere
                 // to go the page drives its own scroll in native-sized 150px
                 // wheel steps (the core list-page feel), clamped at the edges.
-                // Up steps back to the top first and only then falls through
-                // to the core header; an open release window scrolls its own
-                // list, never the page behind.
+                // The top bar is hidden on this page, so up at the very top
+                // simply stays; an open release window scrolls its own list,
+                // never the page behind.
                 up: function () {
                     if (NavCanMove('up')) NavMove('up');
                     else if (panelOpen && panelScroll && panelScroll.position() < 0) panelScroll.wheel(-SOFT_STEP);
                     else if (scroll && scroll.position() < 0) scroll.wheel(-SOFT_STEP);
-                    else L.Controller.toggle('head');
                 },
                 down: function () {
                     if (NavCanMove('down')) NavMove('down');
@@ -1768,6 +1784,8 @@
         this.stop = function () {};
 
         this.destroy = function () {
+            var udxBody2 = typeof document !== 'undefined' ? document.body : null;
+            if (udxBody2 && udxBody2.classList) udxBody2.classList.remove('udx-nohead');
             if (scroll) scroll.destroy();
             if (panelScroll) panelScroll.destroy();
             html.remove();
