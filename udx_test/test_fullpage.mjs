@@ -89,10 +89,11 @@
 //      right, no opaque layer); a pixhost-hosted poster URL never reaches the
 //      background-image (neutral fallback, left <img> untouched); the neutral
 //      case leaves no image and no state classes.
-//   11. Russian-productions filter regression: a live country lookup removes
-//      a "Россия" item, keeps a non-Russian one, keeps items whose detail
-//      fetch fails (fail-safe), and caches successful lookups (a repeat load
-//      re-fetches nothing that was already resolved).
+//   11. Russian-productions filter (render-first): the list paints as soon
+//      as its data arrives (no loader gate on the per-item detail fetches) -
+//      a "Россия" card is pruned from the grid once its lookup resolves, a
+//      non-Russian one stays, a failed detail fetch keeps its card
+//      (fail-safe), and successful lookups are cached.
 //
 // Run from the lampa-plugins root:  node udx_test/test_fullpage.mjs
 
@@ -419,8 +420,33 @@ const SERIALHD_HTML =
     '</div>' +
     '</body></html>';
 
+// The /hd/ list for the render-first filter check: one card whose detail
+// page says "Россия" (must be pruned from the grid once the lookup resolves)
+// and one whose detail URL answers no route (the failed lookup keeps its
+// card - fail-safe).
+const HD_LIST_URL = 'https://045.ultradox.click/hd/';
+const HD_RUSSIAN_URL = 'https://045.ultradox.click/nerufilm/ru-1.html';
+const HD_RUSSIAN_HTML =
+    '<html><body><ul>' +
+    '<li itemprop="contributor"><span> Страна: </span> Россия</li>' +
+    '</ul></body></html>';
+// No route on purpose: the country lookup fails and the item must stay.
+const HD_FAILSAFE_URL = 'https://045.ultradox.click/nerufilm/fail-1.html';
+// Each item sits in its own wrapper div (the live shape: parse()'s trailing
+// "</div></div>" pairs the item close with its wrapper close, so unwrapped
+// siblings would collapse into a single match).
+const HD_LIST_HTML =
+    '<html><body><div class="top__slider">' +
+    '<div><div class="top__slider_div__item"><a href="/nerufilm/ru-1.html"><img src="/upload/ru.jpg"></a>' +
+    '<span>Russian Film (2020)</span><span class="short-quality">BDRip</span></div></div>' +
+    '<div><div class="top__slider_div__item"><a href="/nerufilm/fail-1.html"><img src="/upload/f.jpg"></a>' +
+    '<span>Fail Safe Film (2021)</span><span class="short-quality">WEB-DL</span></div></div>' +
+    '</div></body></html>';
+
 const ROUTES = new Map([
     ['https://045.ultradox.click/serial/', CATALOG_HTML],
+    [HD_LIST_URL, HD_LIST_HTML],
+    [HD_RUSSIAN_URL, HD_RUSSIAN_HTML],
     [SERIES_URL, SERIES_HTML],
     [FILM_URL, FILM_HTML],
     [SERIALHD_URL, SERIALHD_HTML],
@@ -652,6 +678,22 @@ card.handlers['hover:enter'].forEach((f) => f());
 const pushed = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('catalog: enter opens FullPage with item', pushed && pushed.component === 'ultradox_full' && pushed.item && pushed.item.itemUrl === SERIES_URL);
 check('catalog: no Torrent.start', L.Torrent.calls.length === 0, String(L.Torrent.calls.length));
+
+// ---------- catalog: render-first country filter (the page paints as soon as
+// the list data arrives; the "Россия" card is pruned from the grid once its
+// lookup resolves; a failed lookup keeps its card - fail-safe) ----------
+console.log('catalog: render-first country filter');
+const filterCat = new Comp({ category: 'hd' });
+filterCat.activity = { loader() {}, toggle() {} };
+filterCat.create();
+{
+    const fGrid = findAll(filterCat.render(), 'category-full')[0];
+    const titles = fGrid.children.map((c) => (c.find('.card__title') ? c.find('.card__title').text() : ''));
+    const renderedTitles = L.Template.calls.map((c) => c.find('.card__title').text());
+    check('catalog: both cards were painted before the lookups settled (render-first, no loader gate)', renderedTitles.indexOf('Russian Film') !== -1 && renderedTitles.indexOf('Fail Safe Film') !== -1, JSON.stringify(renderedTitles));
+    check('catalog: the "Россия" item leaves the grid once its lookup resolves', titles.indexOf('Russian Film') === -1, JSON.stringify(titles));
+    check('catalog: a failed country lookup keeps its card (fail-safe, the feed never empties)', titles.length === 1 && titles[0] === 'Fail Safe Film', JSON.stringify(titles));
+}
 
 // ---------- NUM-parity card: badges + year + rating ----------
 // Assert on the rendered card element (the template's replaceVars mirror puts
@@ -1438,7 +1480,7 @@ check('grid: repeated focus keeps the badge text intact', filmCard.find('.udx-ki
 // detail -> back -> catalog re-showing/hiding the bar - cannot happen).
 console.log('fullpage: core top bar lifecycle');
 check('fullpage: the top bar stays while any Ultradox screen is alive (no body class touched)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
-[cat, series, lpO, film, lpFO, dead, lpD, nobg, shark, pp, multi, missing, lpeO, tfFail, tfThrow, series2].forEach((c) => c.destroy());
+[cat, filterCat, series, lpO, film, lpFO, dead, lpD, nobg, shark, pp, multi, missing, lpeO, tfFail, tfThrow, series2].forEach((c) => c.destroy());
 check('fullpage: the top bar stays when the last screen leaves (all screens destroyed)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 const lcCat = new Comp({ category: 'serial' });
 lcCat.activity = { loader() {}, toggle() {} };

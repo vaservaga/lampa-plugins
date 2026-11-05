@@ -763,18 +763,27 @@
         return out;
     }
 
+    // Render-first country filter: the items are ALREADY painted by the time
+    // this runs (user report 2026-11-05: the section page sat on the loader a
+    // long time because every open gated the first paint on up to PAGE detail
+    // fetches). Each lookup resolves independently; done(kept, dropped) fires
+    // once all lookups settle so the caller prunes the "Россия" cards from
+    // the grid (a failed lookup keeps its item - the filter must never empty
+    // the feed on network failure).
     function filterRussianProductions(items, done) {
-        if (!HIDE_RUSSIAN_PRODUCTIONS || !items.length) { done(items); return; }
+        if (!HIDE_RUSSIAN_PRODUCTIONS || !items.length) { done(items, []); return; }
         var remaining = items.length;
         var kept = new Array(items.length);
+        var dropped = [];
         var next = 0;
         var inFlight = 0;
         var MAX_COUNTRY_REQUESTS = 4;
         function complete(index, russian) {
             if (!russian) kept[index] = items[index];
+            else dropped.push(items[index]);
             remaining--;
             inFlight--;
-            if (!remaining) { done(kept.filter(function (item) { return !!item; })); return; }
+            if (!remaining) { done(kept.filter(function (item) { return !!item; }), dropped); return; }
             launch();
         }
         // The cache value is { r: russian, y: release year, a: 'dd.mm' }: the
@@ -1194,9 +1203,11 @@
             if (items.length < PAGE) self.loadMore();
         };
 
-        // Fetch one more server page, dedup by itemUrl, apply the country filter and
-        // append the new items. Guards: single in-flight fetch, hard page cap, and a
-        // stop after two consecutive pages that add nothing new.
+        // Fetch one more server page, dedup by itemUrl and append the new
+        // items (rendered immediately - the country filter prunes the
+        // "Россия" cards in the background once the lookups settle).
+        // Guards: single in-flight fetch, hard page cap, and a stop after two
+        // consecutive pages that add nothing new.
         this.loadMore = function () {
             if (fetching) return;
             if (serverPage > MAX_PAGE || consecutiveEmpty >= 2) {
@@ -1224,11 +1235,24 @@
                     else self.fill();
                     return;
                 }
-                filterRussianProductions(fresh, function (kept) {
-                    if (token !== loadToken) { fetching = false; return; }
-                    fetching = false;
-                    if (self.activity) self.activity.loader(false);
-                    if (kept.length) { consecutiveEmpty = 0; for (var k = 0; k < kept.length; k++) items.push(kept[k]); }
+                // Paint first: the page appears as soon as its list data
+                // arrives (the core feed behaves exactly this way). The
+                // country lookups run in the background instead - gating the
+                // first render on up to PAGE slow detail round trips is what
+                // made a section sit on the loader for a long time (user
+                // report 2026-11-05). Items that resolve as "Россия" are
+                // pruned from the grid as they settle; a failed lookup keeps
+                // its item (fail-safe, unchanged).
+                consecutiveEmpty = 0;
+                for (var f = 0; f < fresh.length; f++) items.push(fresh[f]);
+                fetching = false;
+                if (self.activity) self.activity.loader(false);
+                self.fill();
+                filterRussianProductions(fresh, function (kept, dropped) {
+                    if (token !== loadToken) return;
+                    for (var d = 0; d < dropped.length; d++) self.pruneItem(dropped[d]);
+                    if (!dropped.length) return;
+                    if (kept.length) consecutiveEmpty = 0;
                     else consecutiveEmpty++;
                     if (!items.length && (serverPage > MAX_PAGE || consecutiveEmpty >= 2)) self.showEmpty();
                     else self.fill();
@@ -1421,7 +1445,36 @@
             // report 2026-11-04: "з 5-6 ряду перекидує зразу на кнопку
             // категорії").
             if (L.Controller.collectionAppend) L.Controller.collectionAppend(card);
+            item._card = card;
             grid.append(card);
+        };
+
+        // Render-first filter: drop one card from the grid when its country
+        // lookup resolves as a Russian production (the items are painted
+        // before the lookups settle). Splices the item, removes its card, and
+        // hands a lost focus to the neighbouring card so the spatial Navigator
+        // always has a target.
+        this.pruneItem = function (item) {
+            var idx = -1, i;
+            for (i = 0; i < items.length; i++) if (items[i] === item) { idx = i; break; }
+            if (idx === -1) return;
+            var cardEl = item._card;
+            var alt = null;
+            if (cardEl === last) {
+                // The grid carries only cards (showEmpty appends its marker
+                // only to an empty grid), so the direct siblings are cards.
+                alt = (cardEl.nextElementSibling || cardEl.previousElementSibling) || null;
+            }
+            if (cardEl && typeof cardEl.remove === 'function') cardEl.remove();
+            if (idx < rendered) rendered--;
+            items.splice(idx, 1);
+            if (cardEl === last) {
+                last = alt;
+                if (last) {
+                    if (L.Controller.collectionAppend) L.Controller.collectionAppend(last);
+                    try { if (typeof Navigator !== 'undefined' && Navigator.focus) Navigator.focus(last); } catch (e) {}
+                }
+            }
         };
 
         this.start = function () {
