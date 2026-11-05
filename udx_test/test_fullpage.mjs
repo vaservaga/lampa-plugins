@@ -695,6 +695,41 @@ filterCat.create();
     check('catalog: a failed country lookup keeps its card (fail-safe, the feed never empties)', titles.length === 1 && titles[0] === 'Fail Safe Film', JSON.stringify(titles));
 }
 
+// ---------- catalog: DOWN at the feed bottom triggers loadMore ----------
+// The core Scroll onEnd only fires from webview scroll events/transitions,
+// which the TV remote flow does not reliably produce, so the feed stopped at
+// the first top-up batch (the site serves 16 cards/page, the top-up stops at
+// PAGE=20 -> 16+16 = 32 cards = 6 rows; user report 2026-11-05 "6 рядів в
+// категорії, далі не опускається"). The reliable TV trigger: focus at the
+// bottom edge (the Navigator cannot move) -> the down handler calls loadMore
+// (self-guarded: in-flight fetch / page cap / two consecutive empty pages).
+console.log('catalog: DOWN at the feed bottom loads the next page');
+filterCat.start();
+check('static: the catalog down handler falls back to loadMore when the Navigator has no down target', (function () {
+    const i = codeOnly.indexOf('else self.loadMore();');
+    return i !== -1 && codeOnly.slice(Math.max(0, i - 400), i).indexOf("NavCanMove('down')") !== -1;
+})(), 'down loadMore fallback missing');
+{
+    let lmCalls = 0;
+    const origLoadMore = filterCat.loadMore;
+    filterCat.loadMore = function () { lmCalls++; origLoadMore.apply(this, arguments); };
+    const savedNav2 = globalThis.Navigator;
+    const fBefore = fetches.length;
+    try {
+        globalThis.Navigator = { _moved: null, canmove: () => false, move(d) { this._moved = d; }, focus() {}, getFocusedElement: () => null };
+        L.Controller.configs['content'].down();
+        check('catalog: DOWN at the bottom edge (the Navigator cannot move) triggers loadMore exactly once', lmCalls === 1, 'loadMore calls: ' + lmCalls);
+        check('catalog: the triggered loadMore takes the real guard-checked path (the fixture feed is stopped, no wire traffic)', fetches.length === fBefore, 'fetch delta: ' + (fetches.length - fBefore));
+        const navCan = { _moved: null, canmove: () => true, move(d) { this._moved = d; }, focus() {}, getFocusedElement: () => null };
+        globalThis.Navigator = navCan;
+        L.Controller.configs['content'].down();
+        check('catalog: DOWN with a place to go still moves the focus and does NOT load', navCan._moved === 'down' && lmCalls === 1 && fetches.length === fBefore, JSON.stringify({ moved: navCan._moved, loadMore: lmCalls, fetchDelta: fetches.length - fBefore }));
+    } finally {
+        globalThis.Navigator = savedNav2;
+        filterCat.loadMore = origLoadMore;
+    }
+}
+
 // ---------- NUM-parity card: badges + year + rating ----------
 // Assert on the rendered card element (the template's replaceVars mirror puts
 // {release_year} into .card__age), not L.Template.lastParams - later appendCard

@@ -1485,6 +1485,7 @@
 
         this.start = function () {
             if (L.Activity.active() && L.Activity.active().activity !== this.activity) return;
+            var self = this;
 
             L.Controller.add('content', {
                 link: this,
@@ -1526,7 +1527,21 @@
                     }
                     NavMove('up');
                 },
-                down: function () { NavMove('down'); },
+                // Bottom edge of the rendered feed: the Navigator has no
+                // where to go - that IS the load-more trigger. The core
+                // Scroll onEnd (the only other trigger) fires from webview
+                // scroll events/transitions, which the TV remote flow does
+                // not reliably produce, so the feed stopped at the first
+                // top-up batch (the site serves 16 cards/page, the top-up
+                // stops at PAGE=20 -> 16+16 = 32 cards = 6 rows - user
+                // report 2026-11-05 "6 рядів в категорії, далі не
+                // опускається"). loadMore is self-guarded (single in-flight
+                // fetch, page cap, two consecutive empty pages), so repeat
+                // presses are no-ops while a page is in flight.
+                down: function () {
+                    if (NavCanMove('down')) NavMove('down');
+                    else self.loadMore();
+                },
                 back: function () { L.Activity.backward(); }
             });
 
