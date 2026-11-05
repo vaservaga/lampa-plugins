@@ -745,6 +745,23 @@ check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-b
 check('css: no directional veil - the ambience backdrop is one uniform image all around (the left-darkening gradient read as a black band over the top-left)', src.indexOf('.udx-bg__veil') === -1, 'veil must be gone');
 check('css: the ambience backdrop layers are actually visible (no display:none - opacity alone is the off state; a display:none layer never showed on the TV) and stay under the content', !/\.udx-bg\{[^}]*display:none/.test(src) && /\.udx-content__head\{[^}]*z-index:20/.test(src) && /\.udx-content__list\{[^}]*position:relative;z-index:1/.test(src), 'bg layers hidden or above content');
 check('css: the catalog scroll gets a real bounded viewport via the core layer--wheight (frameUpdate sets innerHeight - head - navi)', src.indexOf("scEl.addClass('layer--wheight')") !== -1, 'scroll must get layer--wheight');
+// Ambience under the head (user request 2026-11-05: "значки, а не сама
+// панель"): the core .head is transparent and .wrap__content reserves 4em of
+// padding under it (the body background #1d1f20 read as a flat dark bar with
+// a seam). Every screen root pulls UP into that zone (margin-top:-4em) and
+// grows by the same 4em (height:calc(100% + 4em)) so its background shows
+// through the transparent head while the bottom stays flush; the in-flow
+// content is shifted back down (padding-top:4em / .udxf__slot top:4em) so
+// every element keeps its validated position.
+check('css: all three screen roots extend their ambience under the transparent head (margin-top:-4em into the .wrap__content 4em zone, height grown by the same 4em so the bottom stays flush)', (function () {
+    function root(sel) { const m = src.match(new RegExp('\\' + sel + '\\{([^}]*)\\}')); return m ? m[1] : ''; }
+    const cat = root('.udx-content'), det = root('.udxf'), list = root('.udxl');
+    return /margin-top:-4em/.test(cat) && /padding-top:4em/.test(cat) && /height:calc\(100% \+ 4em\)/.test(cat)
+        && /margin-top:-4em/.test(det) && /height:calc\(100% \+ 4em\)/.test(det)
+        && /margin-top:-4em/.test(list) && /padding-top:4em/.test(list) && /height:calc\(100% \+ 4em\)/.test(list);
+})(), 'roots must pull their background up 4em');
+check('css: the detail scroll viewport starts 4em down (the head zone is ambience, not content - the page keeps its validated 1080p geometry)', /\.udxf__slot\{position:absolute;top:4em;left:0;right:0;bottom:0;z-index:2;\}/.test(src), 'slot must keep its validated position');
+check('css: the detail/list backdrops still span the full root (top:0/bottom:0 - they now cover the head zone too)', /\.udxf__backdrop\{position:absolute;top:0;left:0;right:0;bottom:0;[^}]*\}/.test(src) && /\.udxl__backdrop\{position:absolute;top:0;left:0;right:0;bottom:0;[^}]*\}/.test(src), 'backdrops must cover the extended root');
 check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(0,0,0,\.86\),rgba\(0,0,0,\.58\) 46%,rgba\(0,0,0,\.1\) 80%\),linear-gradient\(to top,rgba\(0,0,0,\.66\),rgba\(0,0,0,0\) 46%\);}/.test(src), 'missing .udxf--poster veil rule');
 check('css: poster-state veil has no fully opaque layer (the image stays visible)', (function () {
     const m = src.match(/\.udxf--poster \.udxf__gradient\{([^}]*)\}/);

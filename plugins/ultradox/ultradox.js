@@ -149,7 +149,19 @@
         // No custom background of our own (user correction 2026-11-04): the
         // catalog shows Lampa's native background (the core body surface)
         // exactly like the NUM reference screen - nothing painted over it.
-        '.udx-content{position:relative;width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;}' +
+        // Ambience under the head (user request 2026-11-05: "значки, а не
+        // сама панель" - the icons float over the page atmosphere, no flat
+        // dark bar): the core .head is transparent (fixed, no background) and
+        // .wrap__content reserves 4em of padding under it, so the body
+        // background #1d1f20 reads as a solid bar with a seam at its bottom
+        // edge. The screen roots pull UP into that 4em zone (margin-top:-4em)
+        // and grow by the same 4em (height:calc(100% + 4em)) so the bottom
+        // stays flush; their backgrounds (the .udx-bg layers / the backdrop +
+        // veil) then show through the transparent head. In-flow content is
+        // shifted back down by padding-top:4em (catalog + list); the detail
+        // content is absolute, so its viewport keeps position via
+        // .udxf__slot top:4em - every element stays where it was validated.
+        '.udx-content{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;padding-top:4em;display:flex;flex-direction:column;}' +
         // The blurred poster backdrop layers and the dark veil stay in the DOM
         // (the crossfade state machine keeps running harmlessly) but are
         // hidden: any dark layer on top of the body background reads as a
@@ -239,7 +251,11 @@
         '.udx-chip{position:absolute;left:10px;bottom:10px;z-index:2;display:flex;align-items:stretch;max-width:calc(100% - 20px);overflow:hidden;border-bottom-left-radius:0.55em;pointer-events:none;}' +
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
-        '.udxf{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
+        // Same under-the-head extension as the catalog (user request
+        // 2026-11-05): the fanart/veil backdrop covers the 4em zone under the
+        // transparent core head; the content (the absolute .udxf__slot
+        // viewport) stays at its validated position via top:4em below.
+        '.udxf{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;background:#1d1f20;}' +
         // The core top bar stays visible on every Ultradox screen (user
         // request 2026-11-05): the screens sit in flow in the core content
         // area below the head, exactly like a core page. The core gives
@@ -270,7 +286,10 @@
         // poster is large (~22em wide at the 1080p root font), the title is a
         // display size (3em), the meta block sits to the right of the poster,
         // and the "Детально" strip spans the full width below both.
-        '.udxf__slot{position:absolute;top:0;left:0;right:0;bottom:0;z-index:2;}' +
+        // The scroll viewport starts 4em DOWN (the head zone is ambience, not
+        // content - see the root rule): the page keeps its validated geometry
+        // (fits 1080p without scrolling) while the backdrop fills the head.
+        '.udxf__slot{position:absolute;top:4em;left:0;right:0;bottom:0;z-index:2;}' +
         // Hard height bound on the core scroll element: the TV scroll driver
         // clamps travel to maxOffset(body vs html offsetHeight) - without a
         // fixed viewport height the page can never scroll.
@@ -380,7 +399,11 @@
         '.udxf__prow__main{font-size:1.05em;font-weight:600;color:#fff;line-height:1.35;}' +
         '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
-        '.udxl{position:relative;width:100%;height:100%;overflow:hidden;background:#1d1f20;}' +
+        // Same under-the-head extension as the catalog/detail (user request
+        // 2026-11-05): the backdrop/veil cover the 4em zone under the
+        // transparent core head; padding-top:4em keeps the in-flow .udxl__body
+        // (height:100% of the reduced content box) at its validated position.
+        '.udxl{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;padding-top:4em;background:#1d1f20;}' +
         '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
         '.udxl__backdrop--on{opacity:1;}' +
         '.udxl__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.62) saturate(.92);}' +
