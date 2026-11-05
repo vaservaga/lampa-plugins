@@ -360,6 +360,10 @@
         '.udxf__details{padding:0 6% 1% 5%;}' +
         '.udxf__details-head{font-size:1.3em;font-weight:700;line-height:1.3;color:#fff;margin-top:.6em;}' +
         '.udxf__fact{font-size:1em;line-height:1.45;color:rgba(255,255,255,.6);margin-top:.5em;}' +
+        // The director line sits a touch lower in the meta column (user
+        // request 2026-11-05: the fact pair read too high under the rating
+        // line); the cast line keeps its .5em gap below the director.
+        '.udxf__fact--director{margin-top:1em;}' +
         // Focus target: the whole strip receives the down-navigation focus
         // (scroll.update); no visible ring - the full-width white box-shadow
         // read as two horizontal lines across the screen.
@@ -392,13 +396,15 @@
         '.udxf__panel__list>.scroll{position:relative;height:100%;overflow:hidden;}' +
         // Rows: the former full release page shape (quality • size on the main
         // line, the site's own upload date below), core simple-button surface,
-        // auto height for the two lines. Focus: white ring (the reference row
-        // highlight), no invert.
+        // auto height for the two lines. Focus: a darkened bar only - NO
+        // green halo (user request 2026-11-05: the quality pick should sit
+        // without the focus ring); the list-page rows (.udxl__row) keep it.
         // Full-width bars in the panel (user's drawn scheme 2026-11-05): the
         // row spans the panel content box, text left; an overly long label
-        // wraps inside the bar, rounded 1.4em like the panel/card halo.
-        '.udxf__prow{display:block;width:100%;box-sizing:border-box;white-space:normal;margin:0 0 .7em 0;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:1.4em;}' +
-        '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}' +
+        // wraps inside the bar. Less rounded than the card halo (user request
+        // 2026-11-05: "не такі заокруглені"): 0.7em, not the 1.4em pill.
+        '.udxf__prow{display:block;width:100%;box-sizing:border-box;white-space:normal;margin:0 0 .7em 0;height:auto;min-height:2.8em;padding:.55em 1.1em;border-radius:0.7em;}' +
+        '.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;}' +
         '.udxf__prow__main{font-size:1.05em;font-weight:600;color:#fff;line-height:1.35;}' +
         '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
