@@ -20,10 +20,11 @@
 //   2. The detail page builds from the fetched page in the NUM reference
 //      layout 1:1: backdrop, the large poster on the left, the meta block
 //      (top line, large title, original title, rating badge, runtime • genre
-//      line, seasons), the two action pills, then the full-width "Детально"
-//      details strip with the complete overview, director and the FULL cast
-//      (no name cap, no ellipsis, no line clamp) inside a scroll viewport;
-//      the real release list keeps label/size/magnet as UI data.
+//      line, seasons, the director and the FULL cast lines - no name cap, no
+//      ellipsis, no line clamp), then the two action pills above them, then
+//      the full-width "Детально" details strip with the complete overview
+//      inside a scroll viewport; the real release list keeps
+//      label/size/magnet as UI data.
 //   3. The "Онлайн" press opens the in-page release side window (a right-hand
 //      panel over the detail page); an explicit row pick there runs the
 //      standard TorrServer flow (L.Torrent.start with the picked release's
@@ -883,6 +884,19 @@ check('fullpage: overview (technical tail cut)', sh.find('.udxf__overview').text
 check('fullpage: director line with the exact source value', txt(sh, '.udxf__fact--director') === 'Режисер: Кацуо Фукудзава, Акико Като, Ёхэй Миядзаки', txt(sh, '.udxf__fact--director'));
 check('fullpage: cast line shows every name (full list, no cap, no ellipsis truncation)', txt(sh, '.udxf__fact--cast') === 'У ролях: Сакай Масато, Абэ Хироси, Никайдо Фуми, Ниномия Кадзунари, Тори Мацузака, Рё Рюсэй, Кенто Хаяси, Рин Таканаси, Рей Дан, Кодзи Якушо', txt(sh, '.udxf__fact--cast'));
 check('fullpage: fact rows rendered exactly once each', findAll(sh, 'udxf__fact--director').length === 1 && findAll(sh, 'udxf__fact--cast').length === 1, findAll(sh, 'udxf__fact--director').length + ':' + findAll(sh, 'udxf__fact--cast').length);
+check('fullpage: director + cast rows sit in the meta column ABOVE the action pills (user request 2026-11-05: moved out of the details strip)', (function () {
+    const d = sh.find('.udxf__fact--director');
+    const c = sh.find('.udxf__fact--cast');
+    const a = sh.find('.udxf__actions');
+    if (!d || !c || !a) return false;
+    const meta = d._parent;
+    if (!meta || !meta.classes.has('udxf__meta') || c._parent !== meta || a._parent !== meta) return false;
+    const iD = meta.children.indexOf(d);
+    const iC = meta.children.indexOf(c);
+    const iA = meta.children.indexOf(a);
+    return iD !== -1 && iC !== -1 && iA !== -1 && iD < iC && iC < iA;
+})(), 'facts must precede the pills inside .udxf__meta');
+check('fullpage: the details strip keeps the heading + overview only (the fact rows are gone from it)', findAll(sh, 'udxf__details').length === 1 && sh.find('.udxf__details').children.length === 2 && sh.find('.udxf__details').children[0].classes.has('udxf__details-head') && sh.find('.udxf__details').children[1].classes.has('udxf__overview'), JSON.stringify((sh.find('.udxf__details') || {}).children ? sh.find('.udxf__details').children.map((c) => [...c.classes]) : null));
 // ---------- detail action strip: two controls, one shared select path ----------
 check('fullpage: old single "Дивитися" button removed', sh.find('.udx-f__play') === null && findAll(sh, 'udx-f__play').length === 0, String(findAll(sh, 'udx-f__play').length));
 check('fullpage: exactly one action strip after the facts', findAll(sh, 'udxf__actions').length === 1, String(findAll(sh, 'udxf__actions').length));
@@ -924,7 +938,7 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     // transform-free, zero layout shift.
     check('strip: focus turns the pill into the 1:1 reference gradient (green->blue, clean surface without a green ring - per the reference screenshot)', /\.udxf__act\.focus\{background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
     check('focus: the green halo is one shared token across all custom surfaces (panel rows + list rows)', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;box-shadow:0 0 0 .22em #57F570;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row halo rules missing');
-    check('css: the release side window sits flush at the top/right/bottom edges (the drawn scheme: top raised, right/bottom insets gone), 24% wide so the left edge (76%) clears the action strip (the right pill ends at ~67%), rounded 1.4em like the card halo', /\.udxf__panel\{position:absolute;top:0;right:0;bottom:0;width:24%;z-index:30;[^}]*border-radius:1\.4em;\}/.test(src), 'edge-flush rounded panel geometry missing');
+    check('css: the release side window sits flush at the top/right/bottom edges (the drawn scheme: top raised, right/bottom insets gone), 28% wide (widened from 24% per user report 2026-11-05: the row green focus halo pressed the panel edge) so the left edge (72%) still clears the action strip (the right pill ends at ~67%), rounded 1.4em like the card halo', /\.udxf__panel\{position:absolute;top:0;right:0;bottom:0;width:28%;z-index:30;[^}]*border-radius:1\.4em;\}/.test(src), 'edge-flush rounded panel geometry missing');
     check('css: release rows are full-width bars in the panel (text left, a long label wraps inside the bar), rounded 1.4em like the catalog card halo', /\.udxf__prow\{display:block;width:100%;box-sizing:border-box;white-space:normal;margin:0 0 \.7em 0;height:auto;min-height:2\.8em;padding:\.55em 1\.1em;border-radius:1\.4em;\}/.test(src), 'full-width row rule missing');
     check('css: the core top bar stays visible on every Ultradox screen (no body.udx-nohead hide rule, no fixed-inset full-bleed pin - the screens sit in flow below the head like a core page, user request 2026-11-05)', src.indexOf('udx-nohead') === -1 && src.indexOf('udxNoHeadOn') === -1, 'the no-head mechanism must be gone');
     check('css: the tab zone keeps the normal top padding (14px, the same rhythm as the sides/bottom) now that the core bar is back on the catalog', /\.udx-content__head\{[^}]*padding:14px 20px 14px 20px;\}/.test(src), 'missing tab-zone top margin');

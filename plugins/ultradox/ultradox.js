@@ -9,11 +9,12 @@
  * the title; category buttons in the head (simple-button); full detail page
  * in the NUM reference layout 1:1 (validated backdrop, large poster on the
  * left, meta block: country • year, large title, original title, rating
- * badge, runtime • genre line, seasons, exactly two action pills - left
+ * badge, runtime • genre line, seasons, the director and the full cast
+ * lines, then exactly two action pills above - left
  * "Онлайн", right "TorrServer" - both on the native Lampa button surface
  * (core glass + the focus invert); below them a
- * full-width "Детально" details strip with the complete overview, director
- * and the full cast - no text truncation - inside a scroll viewport) with
+ * full-width "Детально" details strip with the complete overview - no text
+ * truncation - inside a scroll viewport) with
  * exactly two actions:
  *   left  "Онлайн"    -> ultradox_torrents: the item's real releases
  *                        (NUM-style: the item's info card on the left, the
@@ -114,6 +115,8 @@
                     '<div class="udxf__rate hide"></div>' +
                     '<div class="udxf__line"></div>' +
                     '<div class="udxf__seasons hide"></div>' +
+                    '<div class="udxf__fact udxf__fact--director hide"></div>' +
+                    '<div class="udxf__fact udxf__fact--cast hide"></div>' +
                     '<div class="udxf__actions">' +
                         '<div class="simple-button selector udxf__act udxf__act--online">' + ICON_PLAY + '<span class="udxf__act__label udxf__olab"></span></div>' +
                         '<div class="simple-button selector udxf__act udxf__act--torrents">' + ICON_RELEASES + '<span class="udxf__act__label udxf__tlab"></span></div>' +
@@ -123,8 +126,6 @@
             '<div class="udxf__details selector">' +
                 '<div class="udxf__details-head"></div>' +
                 '<div class="udxf__overview"></div>' +
-                '<div class="udxf__fact udxf__fact--director"></div>' +
-                '<div class="udxf__fact udxf__fact--cast"></div>' +
             '</div>' +
         '</div>';
 
@@ -375,13 +376,15 @@
         // surface (dark) at the right edge of the detail page. Per the user's
         // drawn scheme (2026-11-05): flush with the top/right/bottom edges
         // (top:0;right:0;bottom:0 - the top raised, the right/bottom insets
-        // gone), rounded 1.4em (the card halo radius), 24% wide so the left
-        // edge (76%) clears the action strip (the right pill ends at ~67%);
-        // the rows are full-width bars (text left), not fit-content pills.
+        // gone), rounded 1.4em (the card halo radius); 28% wide (widened from
+        // 24% per user report 2026-11-05: the row's green focus halo pressed
+        // the panel's left edge) so the left edge (72%) still clears the
+        // action strip (the right pill ends at ~67%); the rows are
+        // full-width bars (text left), not fit-content pills.
         // display:none when closed so its selectors leave the spatial focus
         // map; the scroll viewport stays height-bounded (TV driver clamps
         // travel to the scroll element's offsetHeight).
-        '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:24%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);border-radius:1.4em;}' +
+        '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:28%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);border-radius:1.4em;}' +
         '.udxf__panel--open{display:flex;}' +
         '.udxf__panel__head{flex:0 0 auto;padding:0 0 .9em;}' +
         '.udxf__panel__title{font-size:1.3em;font-weight:700;color:#fff;letter-spacing:.02em;}' +
@@ -1675,8 +1678,10 @@
             if (d.translation) line.push(d.translation);
             slotShow('.udxf__line', line.length ? line.join(' • ') : '');
 
-            // "Детально" heading of the details strip (always visible, NUM
-            // reference) and the complete overview (no line clamp).
+            // Director + cast lines in the meta column (above the action
+            // pills - user request 2026-11-05) and the "Детально" heading of
+            // the details strip (always visible, NUM reference) with the
+            // complete overview (no line clamp).
             slotShow('.udxf__details-head', L.Lang.translate('ultradox_details'));
             slotShow('.udxf__overview', d.overview || '');
             slotShow('.udxf__fact--director', d.director ? L.Lang.translate('ultradox_director') + ': ' + d.director : '');
