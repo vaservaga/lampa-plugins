@@ -77,15 +77,16 @@
 
     var CONTENT_HTML =
         '<div class="udx-content">' +
+            '<div class="udx-bg udx-bg--first" aria-hidden="true"></div>' +
+            '<div class="udx-bg udx-bg--second" aria-hidden="true"></div>' +
             '<div class="udx-content__head">' +
                 '<div class="udx-content__cats"></div>' +
             '</div>' +
             '<div class="udx-content__list"></div>' +
         '</div>';
 
-    // NUM 1:1 detail layout: the ambience is the CORE .background canvas
-    // (Lampa.Background, set from fill()); the scroll viewport (.udxf__slot)
-    // sits transparently over it; the scroll content is built separately
+    // NUM 1:1 detail layout: the backdrop + gradient sit under a scroll
+    // viewport (.udxf__slot); the scroll content is built separately
     // (ZONE_HTML) so the same node is never parented twice - the top zone
     // (poster + meta block with the two action pills) and the full-width
     // details strip below it. The release side window (user request
@@ -95,6 +96,8 @@
     // move closes it.
     var DETAIL_HTML =
         '<div class="udxf">' +
+            '<div class="udxf__backdrop" aria-hidden="true"></div>' +
+            '<div class="udxf__gradient" aria-hidden="true"></div>' +
             '<div class="udxf__slot"></div>' +
             '<div class="udxf__panel" aria-hidden="true">' +
                 '<div class="udxf__panel__list"></div>' +
@@ -131,6 +134,8 @@
     // rows on the right (NUM-style).
     var LIST_HTML =
         '<div class="udxl">' +
+            '<div class="udxl__backdrop" aria-hidden="true"></div>' +
+            '<div class="udxl__veil" aria-hidden="true"></div>' +
             '<div class="udxl__body">' +
                 '<div class="udxl__card">' +
                     '<img class="udxl__poster" alt="">' +
@@ -142,30 +147,44 @@
         '</div>';
 
     var STYLE_HTML = '<style id="ultradox-style">' +
-        // The ambience is the CORE .background canvas (Lampa.Background,
-        // global and fixed full-viewport): Ultradox hands it the focused
-        // card's poster / the film's fanart, and the core module owns the
-        // load, blur, darkening and dual-canvas crossfade - exactly like the
-        // stock sections, nothing painted by the plugin (user request
-        // 2026-11-06). The screen roots stay transparent so the canvas shows
-        // through.
+        // Plugin-painted ambience (user clarification 2026-11-07): each screen
+        // blurs + darkens its OWN Ultradox poster/fanart as a plain CSS
+        // background layer behind the content. The core .background canvas
+        // stays untouched (it keeps serving the stock sections): it cannot
+        // show these posters with web security on - the core forces
+        // crossOrigin=Anonymous on its background Image and the poster host
+        // sends no Access-Control-Allow-Origin, so the core canvas would just
+        // fail to load them. A plain background-image display needs no CORS.
+        // The layers live INSIDE the screen roots, so leaving Ultradox
+        // destroys them with the activity DOM - nothing is left covering the
+        // other screens (the core canvas never received an Ultradox image).
         // Ambience under the head (user request 2026-11-05: "значки, а не
         // сама панель" - the icons float over the page atmosphere, no flat
         // dark bar): the core .head is transparent (fixed, no background) and
         // .wrap__content reserves 4em of padding under it. The screen roots
         // pull UP into that 4em zone (margin-top:-4em) and grow by the same
-        // 4em (height:calc(100% + 4em)) so the bottom stays flush; the
-        // in-flow content is shifted back down by padding-top:4em (catalog +
+        // 4em (height:calc(100% + 4em)) so the bottom stays flush; their
+        // backdrop layers (top:0/bottom:0) then cover the head zone too.
+        // In-flow content is shifted back down by padding-top:4em (catalog +
         // list); the detail content is absolute, so its viewport keeps
         // position via .udxf__slot top:4em - every element stays where it
         // was validated.
         '.udx-content{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;padding-top:4em;display:flex;flex-direction:column;}' +
+        // Ambience backdrop: two permanent crossfading layers behind the grid
+        // (focus on a card swaps the image, NUM-style). display must stay
+        // visible - the OFF state is opacity:0 only (a display:none layer was
+        // never shown at all on the TV); the content (z 20/1) stays above.
+        // No directional veil (user request 2026-11-04): the backdrop is one
+        // uniform image all around - the darkening gradient read as a black
+        // band over the top-left of the screen.
+        '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
+        '.udx-bg--on{opacity:1;}' +
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
         // cannot affect the card geometry. No glass band here: the tabs float
-        // over the core .background canvas (the page ambience, see the root
-        // rule), nothing painted on top of the content zone.
+        // over the plain Lampa background (+ the blurred backdrop behind),
+        // nothing painted on top of the content zone.
         // The core top bar is visible on the catalog again (user request
         // 2026-11-05), so the tab zone keeps the normal top padding (the old
         // 34px margin compensated for the hidden bar).
@@ -241,12 +260,11 @@
         '.udx-chip span{font-size:0.75em;line-height:1.5;padding:0 0.55em;white-space:nowrap;}' +
         '.udx-chip__quality{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;background:#ffe216;color:#000;}' +
         // Same under-the-head extension as the catalog (user request
-        // 2026-11-05): the core .background canvas covers the 4em zone under
-        // the transparent core head (fixed full-viewport, the root paints
-        // nothing); the content (the absolute .udxf__slot viewport) stays at
-        // its validated position via top:4em below. The root stays
-        // transparent so the canvas shows through.
-        '.udxf{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;}' +
+        // 2026-11-05): the fanart/veil backdrop covers the 4em zone under the
+        // transparent core head; the content (the absolute .udxf__slot
+        // viewport) stays at its validated position via top:4em below. The
+        // opaque root is the neutral surface when no image is usable.
+        '.udxf{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;background:#1d1f20;}' +
         // The core top bar stays visible on every Ultradox screen (user
         // request 2026-11-05): the screens sit in flow in the core content
         // area below the head, exactly like a core page. The core gives
@@ -254,17 +272,32 @@
         // .udxf/.udxl height:100% resolves against a real box and the inner
         // .scroll{height:100%} viewport stays bounded for the TV scroll
         // driver's maxOffset clamp.
-        // No plugin-painted backdrop/veil here: the film's fanart (or the
-        // poster fallback) goes to the core .background canvas, whose own
-        // blur + darkening multiply gradient keeps the text zone legible -
-        // the exact treatment of every stock detail screen.
+        '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
+        // NUM-style backdrop: the image is ALWAYS a soft-blurred atmosphere
+        // (never a flat dark surface). The fanart is blurred lightly and kept
+        // bright enough to read as the artwork; scale hides the blur edge.
+        '.udxf__backdrop--on{opacity:1;transform:scale(1.06);filter:blur(6px) brightness(.72) saturate(.9);}' +
+        // Poster-as-backdrop fallback: a small poster stretched full-screen
+        // shows upscale block artifacts, so a stronger blur hides them; the
+        // tone is bright (not a flat dark fill) so it reads as a blurred
+        // poster - the zone veil keeps the text legible.
+        '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.62) saturate(.92);}' +
+        // Valid-backdrop veil (NUM-style): dark text zone on the left, the
+        // scene stays clearly visible toward the right, soft bottom fade.
+        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.42) 46%,rgba(0,0,0,.06) 82%),linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0) 46%);}' +
+        // Poster-fallback state (.udxf--poster on the root): the poster doubles
+        // as the backdrop, so the veil darkens the left text zone and the bottom
+        // rows (title/overview/actions) and fades to clear artwork toward the
+        // right and the top - no layer is opaque, so the image stays visible
+        // as atmosphere on the right.
+        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(0,0,0,.86),rgba(0,0,0,.58) 46%,rgba(0,0,0,.1) 80%),linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0) 46%);}' +
         // NUM reference geometry (measured from the NUM detail screen): the
         // poster is large (~22em wide at the 1080p root font), the title is a
         // display size (3em), the meta block sits to the right of the poster,
         // and the "Детально" strip spans the full width below both.
         // The scroll viewport starts 4em DOWN (the head zone is ambience, not
         // content - see the root rule): the page keeps its validated geometry
-        // (fits 1080p without scrolling) while the core canvas fills the head.
+        // (fits 1080p without scrolling) while the backdrop fills the head.
         '.udxf__slot{position:absolute;top:4em;left:0;right:0;bottom:0;z-index:2;}' +
         // Hard height bound on the core scroll element: the TV scroll driver
         // clamps travel to maxOffset(body vs html offsetHeight) - without a
@@ -382,12 +415,17 @@
         '.udxf__prow__sub{font-size:.9em;color:rgba(255,255,255,.55);margin-top:.25em;line-height:1.3;}' +
         // Full-page list screens (NUM-style: info card left, real rows right).
         // Same under-the-head extension as the catalog/detail (user request
-        // 2026-11-05): the core .background canvas covers the 4em zone under
-        // the transparent core head (fixed full-viewport, the root paints
-        // nothing); padding-top:4em keeps the in-flow .udxl__body (height:100%
-        // of the reduced content box) at its validated position. The root
-        // stays transparent so the canvas shows through.
-        '.udxl{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;padding-top:4em;}' +
+        // 2026-11-05): the backdrop/veil cover the 4em zone under the
+        // transparent core head; padding-top:4em keeps the in-flow .udxl__body
+        // (height:100% of the reduced content box) at its validated position.
+        // The opaque root is the neutral surface when no image is usable.
+        '.udxl{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;padding-top:4em;background:#1d1f20;}' +
+        '.udxl__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
+        '.udxl__backdrop--on{opacity:1;}' +
+        '.udxl__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.62) saturate(.92);}' +
+        // List-screen veil (NUM-style): dark card zone on the left, the
+        // backdrop stays visible behind the rows on the right.
+        '.udxl__veil{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,.34) 55%,rgba(0,0,0,.08) 85%),linear-gradient(to top,rgba(0,0,0,.50),rgba(0,0,0,0) 46%);}' +
         '.udxl__body{position:relative;z-index:2;height:100%;display:flex;align-items:center;padding:0 5%;box-sizing:border-box;gap:2em;}' +
         // The card column is exactly the poster (bigger: 13em); the title and
         // meta hang below it absolutely, so centering the column in the body
@@ -706,23 +744,6 @@
         var host = url.match(/^https?:\/\/([^\/?#]+)/i);
         if (host && /(^|\.)pixhost\.cc$/i.test(host[1])) return '';
         return url;
-    }
-
-    // Native background (user request 2026-11-06): Ultradox hands its image
-    // to the CORE .background canvas via Lampa.Background.change - the same
-    // mechanism the stock feed uses (Items$2 card.onFocus ->
-    // Background.change(cardImgBackground(card_data))). The core module owns
-    // the 1s debounce, the <=30-image memory cache and the dual-canvas
-    // crossfade, so fast D-pad moves coalesce exactly like in the stock
-    // sections; the plugin adds no loader/cache/scheduler of its own. The
-    // call is guarded: a runtime without the API keeps the plain body
-    // surface (no black screen, no second background system). '' is a
-    // documented core no-op (the last image simply persists, as between any
-    // two stock screens), so an item without a usable image passes '' and
-    // leaves the canvas untouched.
-    function setBackground(url) {
-        var A = window.Lampa;
-        if (A && A.Background && A.Background.change) A.Background.change(url || '');
     }
 
     // Compact release label from a torrent file name: season/episode (series),
@@ -1102,6 +1123,7 @@
         var items = [], rendered = 0, catId = null, catPath = null;
         var seen = {}, serverPage = 1, fetching = false, consecutiveEmpty = 0;
         var last = null, scroll = null, grid = null, built = false, catBtns = [], loadToken = 0;
+        var bgLayers = [null, null], bgFront = 0, bgShown = '', bgPending = '';
         var html = document.createElement('div');
 
         this.create = function () {
@@ -1134,6 +1156,8 @@
             if (!built) {
                 built = true;
                 html.append($(CONTENT_HTML));
+                bgLayers[0] = html.find('.udx-bg--first');
+                bgLayers[1] = html.find('.udx-bg--second');
 
                 scroll = new Lampa.Scroll({ mask: true, over: true });
                 scroll.onEnd = (function () { this.loadMore(); }).bind(this);
@@ -1204,12 +1228,49 @@
             rendered = 0;
             if (grid) grid.empty();
             if (scroll) scroll.reset();
-            // The background lives in the core canvas now: like between any
-            // two stock screens, the last image simply persists until a card
-            // focus hands over the next one - no plugin-side reset.
+            // Category switch: both ambience layers back to off until the next
+            // card focus hands over a poster (a stale category's image must
+            // not sit behind the new feed).
+            if (bgLayers[0]) bgLayers[0].removeClass('udx-bg--on');
+            if (bgLayers[1]) bgLayers[1].removeClass('udx-bg--on');
+            bgFront = 0;
+            bgShown = '';
+            bgPending = '';
             if (this.activity) this.activity.toggle();
             this.fill();
         };
+
+        // The catalog ambience (NUM-style): the focused card's own poster,
+        // blurred + darkened by the .udx-bg CSS, crossfaded behind the grid.
+        // Two permanent layers swap an opacity class; the OFF state is
+        // opacity:0 only. A single preload gate per new URL keeps a dead image
+        // from erasing the current backdrop (the site does serve removed
+        // uploads) and coalesces fast D-pad moves - a superseded load never
+        // lands. Plain display load: no crossOrigin, so it works with web
+        // security fully on (the core .background canvas cannot show these
+        // posters - see the STYLE_HTML header). No cache of its own: the
+        // host serves max-age=10y, the browser cache does the rest.
+        function focusBackdrop(url) {
+            if (!url || !bgLayers[0] || !bgLayers[1]) return;
+            if (url === bgShown || url === bgPending) return;
+            var target = bgLayers[1 - bgFront];
+            var other = bgLayers[bgFront];
+            bgPending = url;
+            var img = new Image();
+            img.onload = function () {
+                if (bgPending !== url) return;
+                bgPending = '';
+                target.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")';
+                target.addClass('udx-bg--on');
+                other.removeClass('udx-bg--on');
+                bgFront = 1 - bgFront;
+                bgShown = url;
+            };
+            img.onerror = function () {
+                if (bgPending === url) bgPending = '';
+            };
+            img.src = url;
+        }
 
         // Append every loaded-but-not-yet-shown item, then top up with more server
         // pages until the first screen is filled. Scrolling further (scroll.onEnd)
@@ -1415,12 +1476,10 @@
                     if (scroll.update) scroll.update(card, true);
                     else softTo(scroll, card);
                 }
-                // The stock feed's own focus reaction: hand the poster to the
-                // core canvas (Background.change, 1s debounce + image cache -
-                // fast D-pad moves coalesce exactly like in the core feed).
-                // A poster-less item passes '' (core no-op: the last image
-                // persists, as between any two stock screens).
-                setBackground(item.poster);
+                // Ambience: the focused card's own poster crossfades behind
+                // the grid (focusBackdrop - NUM-style blurred backdrop). A
+                // poster-less item keeps the current backdrop untouched.
+                focusBackdrop(item.poster);
                 self.enrichYear(item, card);
             });
 
@@ -1713,15 +1772,31 @@
                 if (!(phost && /(^|\.)pixhost\.cc$/i.test(phost[1]))) posterBackdrop = pstr;
             }
 
-            // Native background: hand the film's own fanart (validated by
-            // validBackdrop in parseDetail - the pixhost "Picture removed"
-            // placeholder is rejected there) or the poster fallback (the
-            // pixhost guard above) to the core .background canvas - the stock
-            // sections' mechanism. '' when nothing is usable: the core
-            // change('') is a no-op and the canvas keeps its last image (the
-            // stock behaviour between any two screens); the core's 1s debounce
-            // coalesces fast detail-to-detail moves like on stock screens.
-            setBackground(d.backdrop || posterBackdrop);
+            // Ambience: the film's own fanart (validated by validBackdrop in
+            // parseDetail - the pixhost "Picture removed" placeholder is
+            // rejected there) or the poster fallback (the pixhost guard above)
+            // as the blurred backdrop layer; the opaque root stays the neutral
+            // surface when nothing is usable.
+            var bg = html.find('.udxf__backdrop');
+            // Reset first: the previous page's image and states never survive
+            // a fill(); the branch below applies exactly one state.
+            if (bg) {
+                bg.style.backgroundImage = '';
+                bg.removeClass('udxf__backdrop--on');
+                bg.removeClass('udxf__backdrop--poster');
+            }
+            if (udxRoot) udxRoot.removeClass('udxf--poster');
+            if (d.backdrop && bg) {
+                bg.style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
+                bg.addClass('udxf__backdrop--on');
+            } else if (posterBackdrop && bg) {
+                // Poster as backdrop: the plain image only - all darkening
+                // lives in the zone veil (.udxf--poster state), not embedded
+                // into the background-image here.
+                bg.style.backgroundImage = 'url("' + posterBackdrop.replace(/"/g, '%22') + '")';
+                bg.addClass('udxf__backdrop--poster');
+                if (udxRoot) udxRoot.addClass('udxf--poster');
+            }
 
             html.find('.udxf__title').text(stripYear(item.title));
 
@@ -2105,10 +2180,22 @@
                 var phost = pstr.match(/^https?:\/\/([^\/?#]+)/i);
                 if (!(phost && /(^|\.)pixhost\.cc$/i.test(phost[1]))) posterBackdrop = pstr;
             }
-            // Native background: the same core .background canvas the detail
-            // page uses (see the FullPage fill() comment) - fanart first, the
-            // non-pixhost poster as fallback, '' = core no-op.
-            setBackground(d.backdrop || posterBackdrop);
+            // Ambience: the same blurred backdrop the detail page uses -
+            // fanart first, the non-pixhost poster as fallback; the opaque
+            // root stays the neutral surface when nothing is usable.
+            var bg = html.find('.udxl__backdrop');
+            if (bg) {
+                bg.style.backgroundImage = '';
+                bg.removeClass('udxl__backdrop--on');
+                bg.removeClass('udxl__backdrop--poster');
+            }
+            if (d.backdrop && bg) {
+                bg.style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
+                bg.addClass('udxl__backdrop--on');
+            } else if (posterBackdrop && bg) {
+                bg.style.backgroundImage = 'url("' + posterBackdrop.replace(/"/g, '%22') + '")';
+                bg.addClass('udxl__backdrop--poster');
+            }
 
             html.find('.udxl__title').text(stripYear(item.title));
             var meta = [];

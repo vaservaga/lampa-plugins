@@ -18,8 +18,7 @@
 //      online route); TMDB is reached only through the core integration
 //      (window.Lampa.TMDB.api).
 //   2. The detail page builds from the fetched page in the NUM reference
-//      layout 1:1: the core .background canvas fed with the item's fanart
-//      (or the non-pixhost poster fallback), the large poster on the left, the meta block
+//      layout 1:1: backdrop, the large poster on the left, the meta block
 //      (top line, large title, original title, rating badge, runtime • genre
 //      line, seasons, the director and the FULL cast lines - no name cap, no
 //      ellipsis, no line clamp), then the two action pills above them, then
@@ -82,15 +81,14 @@
 //      driven from its own payload; an empty release list shows the clear
 //      in-page empty state. Both controls share one base geometry (60-64px
 //      tall at the 1080p root font, identical padding/radius/icon container).
-//   10. Native ambience (Lampa.Background): Ultradox paints NO background of
-//      its own (no .udx-bg/.udxf__backdrop/.udxl__backdrop layers, no blur/
-//      scale CSS, transparent roots) - every ambience switch is a real
-//      Lampa.Background.change() call with the right URL: card focus hands
-//      the poster (a poster-less item passes '' - the documented core no-op),
-//      detail/list builds hand the fanart or the non-pixhost poster
-//      fallback (the pixhost "Picture removed" placeholder guard survives in
-//      parseDetail + the poster host check; it never reaches the canvas), and
-//      the whole recorded log must equal the exact fixture sequence.
+//   10. Backdrop fallbacks: fill() resets the previous image/states first,
+//      then applies exactly one state - a valid backdrop stays a plain url()
+//      with --on and no .udxf--poster; the poster fallback is a plain url()
+//      (no embedded gradient, no pixhost "Picture removed" placeholder) with
+//      the .udxf--poster root state (zone veil darkens left+bottom, fades
+//      right, no opaque layer); a pixhost-hosted poster URL never reaches the
+//      background-image (neutral fallback, left <img> untouched); the neutral
+//      case leaves no image and no state classes.
 //   11. Russian-productions filter (render-first): the list paints as soon
 //      as its data arrives (no loader gate on the per-item detail fetches) -
 //      a "Россия" card is pruned from the grid once its lookup resolves, a
@@ -592,11 +590,6 @@ const L = {
     // local online sources; the plugin may call it only with the site's own
     // #iframe_block-player embed URL.
     Player: { plays: [], play(entry) { this.plays.push(entry); } },
-    // The core global background (Lampa.Background): the plugin may only hand
-    // it URLs - the core module owns the load, the image cache and the
-    // dual-canvas crossfade. The recorder captures every change() for the
-    // ambience assertions (URL + call order).
-    Background: { calls: [], change(url) { this.calls.push(String(url)); } },
     Reguest: class {
         timeout() {}
         native(url, ok, err) {
@@ -889,12 +882,12 @@ check('css: an active poster gets the NUM green halo (#57F570 band around the po
 check('css: year line dimmed like the NUM reference (title stays white)', /\.udx-content \.card__age\{[^}]*color:rgba\(255,255,255,\.5\);\}/.test(src) && /\.udx-content \.card__age \.udx-ad\{color:rgba\(255,255,255,\.45\);\}/.test(src), 'missing dim year color');
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 check('css: .udx-kind pinned inside the poster (left/top 10px, no negative offset) and clipped to it', /\.udx-kind\{position:absolute;left:10px;top:10px;[^}]*max-width:calc\(100% - 20px\);[^}]*overflow:hidden;[^}]*white-space:nowrap/.test(src), 'missing .udx-kind containment rule');
-check('css: no plugin-painted ambience layers left (the ambience is the core .background canvas; any plugin blur/scale/veil layer would be a second background system)', src.indexOf('.udx-bg') === -1 && src.indexOf('.udxf__backdrop') === -1 && src.indexOf('.udxf__gradient') === -1 && src.indexOf('.udxl__backdrop') === -1 && src.indexOf('.udxl__veil') === -1 && src.indexOf('filter:blur') === -1 && src.indexOf('transform:scale(1.') === -1, 'plugin ambience layer rules remain');
-check('css: the screen roots stay transparent (the core canvas shows through exactly like a core page - no opaque surface of the plugin own)', !/\.udxf\{[^}]*background/.test(src) && !/\.udxl\{[^}]*background/.test(src) && src.indexOf('background:#1d1f20') === -1, 'opaque root background remains');
+check('css: the backdrop is always a soft-blurred image (NUM-style): fanart lightly blurred, poster fallback blurred bright (not a flat dark surface)', /\.udxf__backdrop--on\{opacity:1;transform:scale\(1\.06\);filter:blur\(6px\) brightness\(\.72\) saturate\(\.9\);\}/.test(src) && /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src) && src.indexOf('blur(22px)') === -1, 'missing backdrop blur rules');
+check('css: list-page poster fallback shares the same bright soft-blur treatment', /\.udxl__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src), 'missing .udxl__backdrop--poster rule');
 check('css: detail scroll viewport is height-bounded (the TV scroll driver clamps travel to html offsetHeight)', /\.udxf__slot \.scroll\{position:relative;height:100%;overflow:hidden;\}/.test(src), 'missing bounded scroll rule');
-check('css: no directional veil and no ambience veil left (the core canvas owns its own darkening multiply gradient)', src.indexOf('.udx-bg__veil') === -1 && src.indexOf('.udxl__veil') === -1, 'veil rules must be gone');
-check('css: the content stays above the canvas (tab zone z 20, list z 1, detail slot z 2 - the core canvas sits behind .wrap regardless)', /\.udx-content__head\{[^}]*z-index:20/.test(src) && /\.udx-content__list\{[^}]*position:relative;z-index:1/.test(src) && /\.udxf__slot\{[^}]*z-index:2/.test(src), 'content stacking must stay above the canvas');
-check('static: the plugin talks to the core background ONLY through a guarded Lampa.Background.change (no Image preload, no plugin cache/scheduler of its own)', /function setBackground\(url\)\s*\{\s*var A = window\.Lampa;\s*if \(A && A\.Background && A\.Background\.change\) A\.Background\.change\(url \|\| ''\);/.test(codeOnly) && codeOnly.indexOf('new Image()') === -1, 'guarded Background.change helper missing or a plugin-side loader remains');
+check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
+check('css: no directional veil - the ambience backdrop is one uniform image all around (the left-darkening gradient read as a black band over the top-left)', src.indexOf('.udx-bg__veil') === -1, 'veil must be gone');
+check('css: the ambience backdrop layers are actually visible (no display:none - opacity alone is the off state; a display:none layer never showed on the TV) and stay under the content', !/\.udx-bg\{[^}]*display:none/.test(src) && /\.udx-content__head\{[^}]*z-index:20/.test(src) && /\.udx-content__list\{[^}]*position:relative;z-index:1/.test(src), 'bg layers hidden or above content');
 check('css: the catalog scroll gets a real bounded viewport via the core layer--wheight (frameUpdate sets innerHeight - head - navi)', src.indexOf("scEl.addClass('layer--wheight')") !== -1, 'scroll must get layer--wheight');
 // Ambience under the head (user request 2026-11-05: "значки, а не сама
 // панель"): the core .head is transparent and .wrap__content reserves 4em of
@@ -912,28 +905,52 @@ check('css: all three screen roots extend their ambience under the transparent h
         && /margin-top:-4em/.test(list) && /padding-top:4em/.test(list) && /height:calc\(100% \+ 4em\)/.test(list);
 })(), 'roots must pull their background up 4em');
 check('css: the detail scroll viewport starts 4em down (the head zone is ambience, not content - the page keeps its validated 1080p geometry)', /\.udxf__slot\{position:absolute;top:4em;left:0;right:0;bottom:0;z-index:2;\}/.test(src), 'slot must keep its validated position');
-check('css: the under-head extension is layout-only now (the core canvas is fixed full-viewport and covers the head zone itself; the validated -4em geometry is preserved)', src.indexOf('margin-top:-4em') !== -1 && src.indexOf('height:calc(100% + 4em)') !== -1 && src.indexOf('top:4em') !== -1, 'roots must keep the validated under-head geometry');
-check('static: the pixhost "Picture removed" placeholder guard survives (validBackdrop validates the fanart in parseDetail; the non-pixhost poster host check runs before the canvas hand-off)', src.indexOf('pixhost\\.cc') !== -1 && /if \(og && validBackdrop\(og\[1\]\)\) out\.backdrop = og\[1\];/.test(codeOnly) && /setBackground\(d\.backdrop \|\| posterBackdrop\)/.test(codeOnly), 'pixhost guard or the fanart/poster selection gone');
+check('css: the detail/list backdrops still span the full root (top:0/bottom:0 - they now cover the head zone too)', /\.udxf__backdrop\{position:absolute;top:0;left:0;right:0;bottom:0;[^}]*\}/.test(src) && /\.udxl__backdrop\{position:absolute;top:0;left:0;right:0;bottom:0;[^}]*\}/.test(src), 'backdrops must cover the extended root');
+check('css: poster-state zone veil darkens left + bottom and fades right/top', /\.udxf--poster \.udxf__gradient\{background:linear-gradient\(90deg,rgba\(0,0,0,\.86\),rgba\(0,0,0,\.58\) 46%,rgba\(0,0,0,\.1\) 80%\),linear-gradient\(to top,rgba\(0,0,0,\.66\),rgba\(0,0,0,0\) 46%\);}/.test(src), 'missing .udxf--poster veil rule');
+check('css: poster-state veil has no fully opaque layer (the image stays visible)', (function () {
+    const m = src.match(/\.udxf--poster \.udxf__gradient\{([^}]*)\}/);
+    return m && !/rgba\(\d+,\s*\d+,\s*\d+,\s*1(?:\.0)?\)/.test(m[1]) && m[1].indexOf('rgba(0,0,0,.1) 80%') !== -1 && m[1].indexOf('rgba(0,0,0,0) 46%') !== -1;
+})(), 'opaque layer or missing fade stop');
+check('css: poster fallback uses the plain url() only (no embedded gradient)', /bg\.style\.backgroundImage = 'url\("'\s*\+\s*posterBackdrop/.test(src) && src.indexOf('rgba(0,0,0,.78),rgba(0,0,0,0) 42%') === -1, 'gradient still embedded in the poster fallback');
+check('css: fill() resets the previous image and all states before applying one', /if \(bg\) \{\s*bg\.style\.backgroundImage = '';\s*bg\.removeClass\('udxf__backdrop--on'\);\s*bg\.removeClass\('udxf__backdrop--poster'\);\s*\}/.test(src) && /if \(udxRoot\) udxRoot\.removeClass\('udxf--poster'\);/.test(src), 'reset-first block missing');
+check('css: a pixhost-hosted poster URL is kept out of the backdrop background', src.indexOf('var posterBackdrop = \'\';') !== -1 && src.indexOf('pixhost\\.cc') !== -1, 'pixhost poster guard missing');
 
-// ---------- catalog ambience: the core .background canvas (Lampa.Background) ----------
-// No plugin layers anymore: focusing a card hands the poster to the core
-// canvas exactly like the stock feed (Items$2 card.onFocus ->
-// Background.change(cardImgBackground(card_data))). The core module owns the
-// 1s debounce, the <=30-image memory cache and the dual-canvas crossfade, so
-// the plugin performs no preload of its own and fast moves coalesce in the
-// core - the same ambience behaviour as every stock section.
-console.log('catalog ambience: the core .background canvas (Lampa.Background.change)');
+// ---------- catalog dynamic backdrop: two permanent layers + crossfade ----------
+console.log('catalog backdrop: two-layer crossfade');
 const croot = cat.render();
-check('catbg: no plugin-owned ambience layers in the catalog DOM', findAll(croot, 'udx-bg').length === 0 && findAll(croot, 'udx-bg__veil').length === 0, String(findAll(croot, 'udx-bg').length));
-const bgLog = L.Background.calls;
-check('catbg: the first card focus (above) handed its poster to the core canvas (the stock-feed focus call)', bgLog.length === 1 && bgLog[0] === 'https://045.ultradox.click/upload/show.jpg', JSON.stringify(bgLog));
-check('catbg: no plugin-side image loader ran (zero Image objects - the core canvas owns the load)', images.length === 0, String(images.length));
+const bgAll = findAll(croot, 'udx-bg');
+check('catbg: exactly two permanent background layers (no veil element)', bgAll.length === 2 && findAll(croot, 'udx-bg__veil').length === 0, bgAll.length + ':' + findAll(croot, 'udx-bg__veil').length);
+check('catbg: start neutral (both layers off, no image set)', bgAll.every((l) => !l.classes.has('udx-bg--on') && l.style.backgroundImage === undefined));
 
-filmCard.handlers['hover:focus'].forEach((f) => f());
-check('catbg: next focus hands the next poster (one change() per focus move)', bgLog.length === 2 && bgLog[1] === 'https://045.ultradox.click/upload/a.jpg', JSON.stringify(bgLog));
+// the catalog smoke hover:focus above already requested the first poster;
+// nothing may be applied before its onload succeeds
+check('catbg: first poster preloaded via Image, not applied before onload', images.length === 1 && images[0].src === 'https://045.ultradox.click/upload/show.jpg' && bgAll.every((l) => l.style.backgroundImage === undefined), images.map((i) => i.src).join('|'));
 
+images[0]._fireLoad();
+check('catbg: first valid poster activates exactly one layer', (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/show.jpg")';
+})(), JSON.stringify(bgAll.map((l) => [String(l.classes), l.style.backgroundImage])));
+
+const imgNext = images.length;
 filmCard.handlers['hover:focus'].forEach((f) => f());
-check('catbg: re-focus passes the same URL (the core change() dedupes internally on url == src)', bgLog.length === 3 && bgLog[2] === 'https://045.ultradox.click/upload/a.jpg', JSON.stringify(bgLog));
+check('catbg: next poster preloads into the inactive layer, current stays', images.length === imgNext + 1 && images[imgNext].src === 'https://045.ultradox.click/upload/a.jpg' && (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/show.jpg")';
+})(), images.map((i) => i.src).join('|'));
+
+images[imgNext]._fireLoad();
+check('catbg: crossfade swapped the active layer on the same two nodes', (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/a.jpg")' && findAll(croot, 'udx-bg').length === 2;
+})(), JSON.stringify(bgAll.map((l) => [String(l.classes), l.style.backgroundImage])));
+
+const imgSame = images.length;
+filmCard.handlers['hover:focus'].forEach((f) => f());
+check('catbg: same URL -> no new preload, no state change', images.length === imgSame && (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/a.jpg")';
+})());
 
 serialCard.handlers['hover:focus'].forEach((f) => f());
 // Focus fetched the year-less serial's item page: the line under the title now
@@ -945,27 +962,43 @@ check('grid: focused year-less serial gains real year + catalog date (no fabrica
     const kids = age.children;
     return kids.length === 2 && kids[0].text() === '2026' && kids[1].text() === ' \u2022 12.10' && kids[1].classes.has('udx-ad');
 })(), (() => { const a = serialCard.find('.card__age'); return a ? JSON.stringify(a.children.map((c) => c.text())) : 'no age line'; })());
-check('catbg: the serial focus handed its poster', bgLog.length === 4 && bgLog[3] === 'https://045.ultradox.click/upload/b.jpg', JSON.stringify(bgLog));
 // Refocusing an enriched card must not refetch or duplicate the line.
 const fetchesAfterEnrich = fetches.length;
 serialCard.handlers['hover:focus'].forEach((f) => f());
 check('grid: refocus of an enriched card does not refetch or duplicate the line', fetches.length === fetchesAfterEnrich && findAll(serialCard, 'card__age').length === 1, String(fetches.length - fetchesAfterEnrich) + ' new fetches, ' + findAll(serialCard, 'card__age').length + ' age lines');
-check('catbg: refocus re-passes the same poster (core dedupe)', bgLog.length === 5 && bgLog[4] === 'https://045.ultradox.click/upload/b.jpg', JSON.stringify(bgLog));
-
+const staleImg = images[images.length - 1];
 sharkCard.handlers['hover:focus'].forEach((f) => f());
-check('catbg: another card, another poster', bgLog.length === 6 && bgLog[5] === 'https://045.ultradox.click/upload/c.jpg', JSON.stringify(bgLog));
+const freshImg = images[images.length - 1];
+staleImg._fireLoad();
+check('catbg: stale onload ignored by the generation guard', staleImg.src === 'https://045.ultradox.click/upload/b.jpg' && (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/a.jpg")';
+})(), staleImg.src);
+freshImg._fireLoad();
+check('catbg: newer poster lands after the stale one drops', (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/c.jpg")';
+})(), JSON.stringify(bgAll.map((l) => [String(l.classes), l.style.backgroundImage])));
 
+const imgNoPoster = images.length;
 unknownCard.handlers['hover:focus'].forEach((f) => f());
-check('catbg: a poster-less item passes \'\' (the core change(\'\') is a documented no-op; the canvas keeps its last image - the stock persistence between screens)', bgLog.length === 7 && bgLog[6] === '', JSON.stringify(bgLog));
+check('catbg: missing poster -> current background untouched', images.length === imgNoPoster && (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/c.jpg")';
+})());
 
 serialCard.handlers['hover:focus'].forEach((f) => f());
-check('catbg: back to a known poster, exactly one call', bgLog.length === 8 && bgLog[7] === 'https://045.ultradox.click/upload/b.jpg', JSON.stringify(bgLog));
+const failImg = images[images.length - 1];
+check('catbg: retry after a failed load preloads again', failImg.src === 'https://045.ultradox.click/upload/b.jpg', failImg.src);
+failImg._fireError();
+check('catbg: failed load does not erase the current background', (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/c.jpg")';
+})());
 
 const fetchesBeforeBg = fetches.length;
 card.handlers['hover:focus'].forEach((f) => f());
 check('catbg: hover:focus causes no fetch / loadMore / torrent', fetches.length === fetchesBeforeBg && L.Torrent.calls.length === 0, String(fetches.length - fetchesBeforeBg) + ' new fetches');
-check('catbg: the initial card focus re-passes its poster', bgLog.length === 9 && bgLog[8] === 'https://045.ultradox.click/upload/show.jpg', JSON.stringify(bgLog));
-check('catbg: still no plugin-side image loader after all the focus moves', images.length === 0, String(images.length));
 
 // ---------- catalog: background date fill for year-less serials (user report
 // 2026-11-06: the Серіали cards carried no date at all while the film tabs
@@ -976,9 +1009,8 @@ check('catbg: still no plugin-side image loader after all the focus moves', imag
 // on the rendered card - no focus involved. A refocus then neither refetches
 // nor duplicates. The film card's rendered year line survives the same
 // background lookup untouched (fill-only, never overwrites real list data).
-// (Runs after the catbg block: its focus hand-offs to the core canvas are
-// asserted there; this section only adds one more focus -> change() call,
-// checked by the round-trip sequence check below.)
+// (Runs after the catbg block: the refocus check below preloads a backdrop
+// image, which the catbg assertions' absolute image counter must not see.)
 console.log('catalog: background date fill for year-less serials');
 const bgCat = new Comp({ category: 'webrips' });
 bgCat.activity = { loader() {}, toggle() {} };
@@ -1000,7 +1032,6 @@ bgCat.create();
     const fetchesBeforeFocus = fetches.length;
     serialBg.handlers['hover:focus'].forEach((f) => f());
     check('bgfill: focusing the filled serial refetches nothing and duplicates nothing', fetches.length === fetchesBeforeFocus && findAll(serialBg, 'card__age').length === 1, String(fetches.length - fetchesBeforeFocus) + ' new fetches, ' + findAll(serialBg, 'card__age').length + ' age lines');
-    check('bgfill: the focus handed the serial poster to the core canvas (the tenth change() in the log)', L.Background.calls.length === 10 && L.Background.calls[9] === 'https://045.ultradox.click/upload/bg.jpg', JSON.stringify(L.Background.calls.slice(-2)));
 }
 
 // ---------- 2/3/4. FullPage: detail build + series release selection ----------
@@ -1018,8 +1049,11 @@ check('fullpage: build() completed without TypeError (Shield crash case)', build
 
 const sh = series.render();
 check('fullpage: title text (year suffix stripped)', sh.find('.udxf__title').text() === 'Show Name', txt(sh, '.udxf__title'));
-check('fullpage: the detail hands its fanart to the core canvas (the validated og:image; the pixhost guard lives in parseDetail)', L.Background.calls[L.Background.calls.length - 1] === 'https://045.ultradox.click/upload/show-fanart.jpg', L.Background.calls[L.Background.calls.length - 1]);
-check('fullpage: no plugin backdrop element left in the detail DOM (the canvas is core-owned, the root keeps no state class)', findAll(sh, 'udxf__backdrop').length === 0 && findAll(sh, 'udxf__gradient').length === 0 && sh.find('.udxf') !== null && !sh.find('.udxf').classes.has('udxf--poster'), String(findAll(sh, 'udxf__backdrop').length));
+check('fullpage: exactly one backdrop element', findAll(sh, 'udxf__backdrop').length === 1, String(findAll(sh, 'udxf__backdrop').length));
+check('fullpage: backdrop image set', sh.find('.udxf__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/show-fanart.jpg")', sh.find('.udxf__backdrop') ? sh.find('.udxf__backdrop').style.backgroundImage : 'no backdrop element');
+check('fullpage: backdrop visible', sh.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
+check('fullpage: poster fallback not active for a valid backdrop', !sh.find('.udxf__backdrop').classes.has('udxf__backdrop--poster'));
+check('fullpage: no poster state on the root for a valid backdrop', sh.find('.udxf') !== null && !sh.find('.udxf').classes.has('udxf--poster'), String(sh.find('.udxf') && sh.find('.udxf').classes));
 check('fullpage: poster src equals the expected URL', sh.find('.udxf__poster') && sh.find('.udxf__poster').src === 'https://045.ultradox.click/upload/show.jpg', sh.find('.udxf__poster') ? sh.find('.udxf__poster').src : 'no poster element');
 check('fullpage: top line (NUM order: year first, comma, country)', sh.find('.udxf__top').text() === '2021, США', txt(sh, '.udxf__top'));
 check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', txt(sh, '.udxf__line'));
@@ -1228,7 +1262,6 @@ const lpo = lpO.render();
 const rowsO = findAll(lpo, 'udxl__row');
 check('fullpage: the page lists the site\'s real embed (the #iframe_block-player iframe)', rowsO.length === 1 && rowsO[0].find('.udxl__row__main').text() === L.Lang.translate('ultradox_online') && txt(rowsO[0], '.udxl__row__sub') === 'vid1793313812.sevstar933krop.com', rowsO.map((r) => r.find('.udxl__row__main').text() + ':' + txt(r, '.udxl__row__sub')).join('|'));
 check('fullpage: the online row shows the item quality token in the right cell (NUM-style quality choice)', rowsO.length === 1 && rowsO[0].find('.udxl__row__q') !== null && txt(rowsO[0], '.udxl__row__q') === 'WEB-DL', 'q=' + (rowsO[0] ? txt(rowsO[0], '.udxl__row__q') : 'no row'));
-check('fullpage: the online page hands the item fanart to the core canvas (one change() per screen build, no plugin layer left)', L.Background.calls[L.Background.calls.length - 1] === 'https://045.ultradox.click/upload/show-fanart.jpg' && findAll(lpo, 'udxl__backdrop').length === 0 && findAll(lpo, 'udxl__veil').length === 0, L.Background.calls[L.Background.calls.length - 1]);
 const oTorr = L.Torrent.calls.length;
 rowsO[0].handlers['hover:enter'].forEach((f) => f());
 check('fullpage: the explicit row pick opens the site embed through Lampa.Player.play exactly once', L.Player.plays.length === playsBeforeOnline + 1, String(L.Player.plays.length - playsBeforeOnline));
@@ -1253,7 +1286,7 @@ check('fullpage(film): cast line shows every name (no cap, no ellipsis truncatio
 check('fullpage(film): page rating gif produces no rating text (no value in HTML)', !/рейтинг/i.test(allText(fm)), allText(fm).slice(0, 160));
 check('fullpage(film): no poster -> element removed (no undefined src)', findAll(fm, 'udxf__poster').length === 0, String(findAll(fm, 'udxf__poster').length));
 check('fullpage(film): no imdb id -> enrichment slots stay hidden', (function () { const r = fm.find('.udxf__rate'); const o = fm.find('.udxf__orig'); const s = fm.find('.udxf__seasons'); return !!(r && o && s) && r.classes.has('hide') && o.classes.has('hide') && s.classes.has('hide') && r.text() === '' && o.text() === '' && s.text() === ''; })(), JSON.stringify([txt(fm, '.udxf__rate'), txt(fm, '.udxf__orig'), txt(fm, '.udxf__seasons')]));
-check('fullpage(film): the film fanart handed to the core canvas (no duplicate node, no plugin layer left)', L.Background.calls[L.Background.calls.length - 1] === 'https://045.ultradox.click/upload/movie-fanart.jpg' && findAll(fm, 'udxf__backdrop').length === 0 && findAll(fm, 'udxf__gradient').length === 0, L.Background.calls[L.Background.calls.length - 1]);
+check('fullpage(film): valid backdrop set exactly once (no duplicate node)', findAll(fm, 'udxf__backdrop').length === 1 && fm.find('.udxf__backdrop').style.backgroundImage === 'url("https://045.ultradox.click/upload/movie-fanart.jpg")' && fm.find('.udxf__backdrop').classes.has('udxf__backdrop--on'), fm.find('.udxf__backdrop') ? fm.find('.udxf__backdrop').style.backgroundImage : 'no backdrop element');
 
 const foBtn = fm.find('.udxf__act--online');
 const ftBtn = fm.find('.udxf__act--torrents');
@@ -1294,7 +1327,6 @@ lpFO.activity = { loader() {}, toggle() {} };
 lpFO.create();
 const lpoFilm = lpFO.render();
 check('fullpage(film): no online embed -> clear in-page empty state, no player call, no new torrent', findAll(lpoFilm, 'udx-empty').length === 1 && findAll(lpoFilm, 'udx-empty')[0].text() === L.Lang.translate('ultradox_no_online') && L.Player.plays.length === fPlays && L.Torrent.calls.length === fTorrAfterPick, JSON.stringify({ empty: findAll(lpoFilm, 'udx-empty').map((e) => e.text()), plays: L.Player.plays.length - fPlays }));
-check('fullpage(film): the film online page hands its fanart to the core canvas (no plugin layer left)', L.Background.calls[L.Background.calls.length - 1] === 'https://045.ultradox.click/upload/movie-fanart.jpg' && findAll(lpoFilm, 'udxl__backdrop').length === 0, L.Background.calls[L.Background.calls.length - 1]);
 
 // ---------- FullPage: dead online embed -> message, no player call ----------
 // A page whose #iframe_block-player embed answers with an error (the live
@@ -1322,7 +1354,6 @@ let deadErr = null;
 try { dead.create(); } catch (e) { deadErr = e; }
 check('fullpage(dead embed): build() did not throw', deadErr === null, deadErr && deadErr.constructor.name + ': ' + deadErr.message);
 const dr = dead.render();
-check('fullpage(dead embed): no fanart, no poster -> \'\' handed to the core canvas (documented no-op: the last image persists - the stock behaviour between screens)', L.Background.calls[L.Background.calls.length - 1] === '' && findAll(dr, 'udxf__backdrop').length === 0, String(L.Background.calls[L.Background.calls.length - 1]));
 const dOBtn = dr.find('.udxf__act--online');
 const dPlays = L.Player.plays.length;
 const dTorr = L.Torrent.calls.length;
@@ -1337,7 +1368,6 @@ lpD.activity = { loader() {}, toggle() {} };
 lpD.create();
 const rowsD = findAll(lpD.render(), 'udxl__row');
 check('fullpage(dead embed): the dead embed is listed (read-only, never started)', rowsD.length === 1 && txt(rowsD[0], '.udxl__row__sub') === 'vid1799999999.sevstar933krop.com' && L.Player.plays.length === dPlays && L.Torrent.calls.length === dTorr, rowsD.map((r) => txt(r, '.udxl__row__sub')).join('|'));
-check('fullpage(dead embed): the dead-item online page also hands \'\' to the core canvas (no image available at all)', L.Background.calls[L.Background.calls.length - 1] === '' && findAll(lpD.render(), 'udxl__backdrop').length === 0, String(L.Background.calls[L.Background.calls.length - 1]));
 rowsD[0].handlers['hover:enter'].forEach((f) => f());
 check('fullpage(dead embed): dead URL never reaches the player', L.Player.plays.length === dPlays, String(L.Player.plays.length - dPlays));
 check('fullpage(dead embed): clear "unavailable" message shown', L.Noty.msgs.length === dNoties + 1 && L.Noty.msgs[L.Noty.msgs.length - 1] === L.Lang.translate('ultradox_online_unavailable'), JSON.stringify(L.Noty.msgs.slice(dNoties)));
@@ -1361,7 +1391,7 @@ let nobgErr = null;
 try { nobg.create(); } catch (e) { nobgErr = e; }
 const nf = nobg.render();
 check('fullpage(no backdrop): build() did not throw', nobgErr === null, nobgErr && nobgErr.constructor.name + ': ' + nobgErr.message);
-check('fullpage(no backdrop): no usable image -> \'\' handed to the core canvas (documented no-op: the canvas keeps its last image; no black surface painted by the plugin, no state class left)', L.Background.calls[L.Background.calls.length - 1] === '' && findAll(nf, 'udxf__backdrop').length === 0 && nf.find('.udxf') !== null && !nf.find('.udxf').classes.has('udxf--poster'), String(L.Background.calls[L.Background.calls.length - 1]));
+check('fullpage(no backdrop): element present but stays off, image explicitly cleared (neutral fallback)', nf.find('.udxf__backdrop') !== null && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--on') && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && nf.find('.udxf__backdrop').style.backgroundImage === '' && nf.find('.udxf') !== null && !nf.find('.udxf').classes.has('udxf--poster'));
 check('fullpage(no backdrop): no undefined/broken image left', (function () {
     const imgs = [];
     (function walk(n) { for (const c of n.children || []) { if (c && c.tagName === 'IMG') imgs.push(c); if (c && c.children) walk(c); } })(nf);
@@ -1395,11 +1425,13 @@ let sharkErr = null;
 try { shark.create(); } catch (e) { sharkErr = e; }
 const sp = shark.render();
 check('fullpage(pixhost): build() did not throw', sharkErr === null, sharkErr && sharkErr.constructor.name + ': ' + sharkErr.message);
-check('fullpage(pixhost): the pixhost og:image is rejected and the non-pixhost poster goes to the core canvas (the "Picture removed" placeholder never reaches the background)', (function () {
-    const c = L.Background.calls;
-    return c[c.length - 1] === 'https://045.ultradox.click/upload/c.jpg' && !c.some((u) => u.indexOf('pixhost') !== -1);
-})(), JSON.stringify(L.Background.calls.slice(-2)));
-check('fullpage(pixhost): no plugin backdrop element left and no poster state class on the root (the canvas is core-owned)', findAll(sp, 'udxf__backdrop').length === 0 && sp.find('.udxf') !== null && !sp.find('.udxf').classes.has('udxf--poster'), String(findAll(sp, 'udxf__backdrop').length) + ':' + String(sp.find('.udxf') && sp.find('.udxf').classes));
+check('fullpage(pixhost): visible backgroundImage is the plain poster url (no placeholder text, no embedded gradient)', (function () {
+    const b = sp.find('.udxf__backdrop');
+    return b !== null && b.style.backgroundImage === 'url("https://045.ultradox.click/upload/c.jpg")' && b.style.backgroundImage.indexOf('gradient') === -1 && b.style.backgroundImage.indexOf('Picture removed') === -1;
+})(), sp.find('.udxf__backdrop') ? String(sp.find('.udxf__backdrop').style.backgroundImage) : 'no backdrop element');
+check('fullpage(pixhost): only the poster fallback modifier applied', sp.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && !sp.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
+check('fullpage(pixhost): poster state on the root enables the zone veil', sp.find('.udxf') !== null && sp.find('.udxf').classes.has('udxf--poster'), String(sp.find('.udxf') && sp.find('.udxf').classes));
+check('fullpage(pixhost): exactly one backdrop element (no second node)', findAll(sp, 'udxf__backdrop').length === 1, String(findAll(sp, 'udxf__backdrop').length));
 check('fullpage(pixhost): poster kept', sp.find('.udxf__poster') && sp.find('.udxf__poster').src === 'https://045.ultradox.click/upload/c.jpg', sp.find('.udxf__poster') ? sp.find('.udxf__poster').src : 'no poster element');
 check('fullpage(pixhost): title kept', txt(sp, '.udxf__title') === 'Любитель акул встречает девушку', txt(sp, '.udxf__title'));
 check('fullpage(pixhost): overview kept', txt(sp, '.udxf__overview') === 'Детектив про любителля акул.', txt(sp, '.udxf__overview'));
@@ -1434,10 +1466,10 @@ const pp = new FP({ item: { title: 'Pixhost Poster (2024)', serial: false, itemU
 pp.activity = { loader() {}, toggle() {} };
 pp.create();
 const pr = pp.render();
-check('fullpage(pixhost poster): both sources are pixhost -> \'\' handed to the core canvas (the placeholder URLs stay out of the background entirely; no state class left)', (function () {
-    const c = L.Background.calls;
-    return c[c.length - 1] === '' && !c.some((u) => u.indexOf('pixhost') !== -1) && pr.find('.udxf') !== null && !pr.find('.udxf').classes.has('udxf--poster');
-})(), JSON.stringify(L.Background.calls.slice(-1)));
+check('fullpage(pixhost poster): neutral fallback - the pixhost URL stays out of the background-image', (function () {
+    const b = pr.find('.udxf__backdrop');
+    return b !== null && b.style.backgroundImage === '' && !b.classes.has('udxf__backdrop--on') && !b.classes.has('udxf__backdrop--poster') && pr.find('.udxf') !== null && !pr.find('.udxf').classes.has('udxf--poster');
+})(), pr.find('.udxf__backdrop') ? String(pr.find('.udxf__backdrop').style.backgroundImage) + ':' + String(pr.find('.udxf__backdrop').classes) : 'no backdrop element');
 check('fullpage(pixhost poster): the left poster element keeps the raw URL untouched', pr.find('.udxf__poster') && pr.find('.udxf__poster').src === 'https://t3.pixhost.cc/6852/removed-placeholder.jpg', pr.find('.udxf__poster') ? pr.find('.udxf__poster').src : 'no poster element');
 
 // ---------- FullPage: multi-release detail -> every release listed ----------
@@ -1564,11 +1596,10 @@ check('metadata: repeated detail renders one strip only (no duplication)', findA
 // ---------- 6. network: public mirrors only ----------
 check('network: only public mirrors + the item own embed probed (no external metadata service)', fetches.every((u) => MIRRORS.some((m) => u.indexOf(m) === 0) || u === SERIES_EMBED || u === DEAD_EMBED), JSON.stringify(fetches));
 
-// The whole ambience log must be EXACTLY the fixture sequence: nine catalog
-// focus hand-offs, the bgfill focus, then one canvas hand-off per screen
-// build (detail fanart/poster fallback, list pages, the '' no-ops where no
-// usable image exists). No other system touched the background.
-check('round-trip: the ambience log is exactly the fixture sequence (one core-canvas hand-off per focus move and screen build - no second background system)', JSON.stringify(L.Background.calls) === JSON.stringify(['https://045.ultradox.click/upload/show.jpg', 'https://045.ultradox.click/upload/a.jpg', 'https://045.ultradox.click/upload/a.jpg', 'https://045.ultradox.click/upload/b.jpg', 'https://045.ultradox.click/upload/b.jpg', 'https://045.ultradox.click/upload/c.jpg', '', 'https://045.ultradox.click/upload/b.jpg', 'https://045.ultradox.click/upload/show.jpg', 'https://045.ultradox.click/upload/bg.jpg', 'https://045.ultradox.click/upload/show-fanart.jpg', 'https://045.ultradox.click/upload/show-fanart.jpg', 'https://045.ultradox.click/upload/movie-fanart.jpg', 'https://045.ultradox.click/upload/movie-fanart.jpg', '', '', '', 'https://045.ultradox.click/upload/c.jpg', '', '', '', '', 'https://045.ultradox.click/upload/show-fanart.jpg', 'https://045.ultradox.click/upload/show-fanart.jpg', 'https://045.ultradox.click/upload/show-fanart.jpg']), JSON.stringify(L.Background.calls));
+check('catbg: last valid catalog background survives the detail round-trip', (function () {
+    const on = bgAll.filter((l) => l.classes.has('udx-bg--on'));
+    return on.length === 1 && on[0].style.backgroundImage === 'url("https://045.ultradox.click/upload/c.jpg")';
+})(), JSON.stringify(bgAll.map((l) => [String(l.classes), l.style.backgroundImage])));
 
 // ---------- type badge under repeated focus: no duplicate, no shift ----------
 for (const f of filmCard.handlers['hover:focus']) f();
@@ -1602,10 +1633,6 @@ lcCat.destroy();
 check('fullpage: leaving the catalog keeps the top bar visible', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 
 // ---------- final verdict ----------
-check('background: the whole session used only the core canvas (every recorded change() is a fixture fanart/poster URL or the \'\' no-op; the pixhost placeholder and any plugin layer never appear)', (function () {
-    const c = L.Background.calls;
-    return c.length > 0 && c.every((u) => u === '' || /^https:\/\/045\.ultradox\.click\/upload\//.test(u)) && !c.some((u) => u.indexOf('pixhost') !== -1);
-})(), JSON.stringify(L.Background.calls));
 check('torrent: L.Torrent.start counter equals the explicit row picks (' + picks + ')', L.Torrent.calls.length === picks, String(L.Torrent.calls.length));
 check('player: every L.Player.play corresponds to an explicit embed row pick (1)', L.Player.plays.length === 1 && L.Player.plays[0].url === SERIES_EMBED, JSON.stringify(L.Player.plays.map((p) => p.url)));
 console.log(failures ? 'FAIL (' + failures + ' check(s) failed)' : 'PASS');
