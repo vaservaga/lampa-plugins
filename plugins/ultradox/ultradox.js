@@ -199,14 +199,17 @@
         // line for any container width (round(0.2W) x 5 can exceed W by a
         // pixel and wrap the fifth card; flex-basis:0 puts all items on ONE
         // line - neither is safe, the explicit sub-100% width is).
-        // margin-bottom is the vertical distance between rows (NUM reference
-        // rhythm ~50-60px of air before the next poster; without it the gap
-        // was only the reserved text-block slack, 7-27px depending on the
-        // title line count - uneven).
+        // margin-bottom is the vertical distance between rows (user reference
+        // screenshot 2026-11-06, "така відстань ... між постерами": the band
+        // from the year line to the next row's poster top measures 168px at a
+        // card pitch of 326px - our card pitch (~345px) matches it, so the
+        // same absolute air: 7em + the age line's 0.36em reserved slack =
+        // 7.36em ~ 168px at the TV root font 1920/84.17 = 22.8px; the earlier
+        // 2.5em read as a cramped 65px against that reference).
         // Five equal cells, slightly sub-20% (a thin inter-column gap, cards
         // a touch smaller per user request 2026-11-04 - no rounded-percent
         // wrap, not a single 20-item line; NUM reference).
-        '.udx-content .category-full .card{width:calc(20% - 0.5em);flex-shrink:0;margin-bottom:2.5em;}' +
+        '.udx-content .category-full .card{width:calc(20% - 0.5em);flex-shrink:0;margin-bottom:7em;}' +
         // Poster-to-title gap: 0.5em = 8px at the 16px root font (the 8-12px
         // band measured on the NUM reference at 1920x1080); one value for all
         // three category tabs.
@@ -226,8 +229,9 @@
         // (#57F570) - the halo the reference shows around an active poster.
         // Same geometry as the core band (0.3em border, -0.5em offset,
         // z-index -1 behind the poster, radius 1.4em); only the color differs.
-        // Poster box only - a whole-card ring would reach into the next row
-        // (the grid rows are stacked without a vertical gap).
+        // Poster box only - a whole-card ring would reach into the next row's
+        // title zone (the row air is the 7em margin below the card, the halo
+        // must stay under it).
         '.udx-content .card.focus .card__view::after{content:"";position:absolute;top:-0.5em;left:-0.5em;right:-0.5em;bottom:-0.5em;border:0.3em solid #57F570;border-radius:1.4em;z-index:-1;pointer-events:none;}' +
         '.udx-content .card.hover .card__view::after{border-color:rgba(87,245,112,.5);}' +
         // No glass top panel on Ultradox screens (user correction 2026-11-04):
