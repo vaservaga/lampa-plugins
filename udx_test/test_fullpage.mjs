@@ -770,6 +770,39 @@ check('static: the catalog down handler falls back to loadMore when the Navigato
     }
 }
 
+// ---------- catalog: fullscreen-loader discipline (user report 2026-11-06) ----------
+// The core activity loader (.activity--load -> .activity__body opacity:0 plus
+// the full-screen spinner) must cover only the FIRST page, when the grid is
+// still empty. Incremental top-ups over an already-painted grid must keep
+// every loaded card visible while the next page fetches in the background
+// (the core feed appends the same way - Next$1.onLoadNext never hides the
+// list); the old unconditional loader(true) blanked the whole feed for the
+// entire fetch on every bottom-edge DOWN ("scrolling 1-2 rows the UI
+// vanishes, only the central spinner remains").
+console.log('catalog: loader discipline (first page vs incremental top-up)');
+check('static: loadMore shows the activity loader ONLY when the grid is empty (!items.length guard)', (function () {
+    const i = codeOnly.indexOf('this.loadMore = function');
+    if (i === -1) return false;
+    const seg = codeOnly.slice(i, codeOnly.indexOf('this.showEmpty = function', i));
+    return /if \(this\.activity && !items\.length\) this\.activity\.loader\(true\);/.test(seg) && seg.indexOf('.activity.loader(false)') !== -1;
+})(), 'loadMore loader guard missing');
+{
+    const seq = [];
+    let lmRuns = 0;
+    const recCat = new Comp({ category: 'serial' });
+    recCat.activity = { loader(s) { seq.push(!!s); }, toggle() {} };
+    const origLm = recCat.loadMore;
+    recCat.loadMore = function () { lmRuns++; return origLm.apply(this, arguments); };
+    recCat.create();
+    recCat.loadMore = origLm;
+    const trues = seq.filter((s) => s).length;
+    const gEl = findAll(recCat.render(), 'category-full')[0];
+    const gridKids = gEl ? gEl.children.length : -1;
+    check('catalog: the first page over the empty grid keeps the fullscreen spinner (exactly two loader-on events: create + the first loadMore; ends off)', trues === 2 && seq[0] === true && seq[seq.length - 1] === false, JSON.stringify(seq));
+    check('catalog: incremental top-ups over the filled grid never hide it again (several loadMore runs, no further loader-on, cards stay in the DOM)', lmRuns >= 3 && trues === 2 && gridKids >= 1, JSON.stringify({ runs: lmRuns, trues, gridKids, seq }));
+    recCat.destroy();
+}
+
 // ---------- NUM-parity card: badges + year + rating ----------
 // Assert on the rendered card element (the template's replaceVars mirror puts
 // {release_year} into .card__age), not L.Template.lastParams - later appendCard

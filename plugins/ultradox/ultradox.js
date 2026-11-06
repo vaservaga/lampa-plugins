@@ -1230,7 +1230,16 @@
             }
             var self = this, token = loadToken, pg = serverPage;
             fetching = true;
-            if (this.activity) this.activity.loader(true);
+            // Never hide an already-painted catalog: the fullscreen activity
+            // loader (.activity--load -> .activity__body opacity:0) is for the
+            // first page only (empty grid). An incremental top-up over a
+            // non-empty grid must keep every loaded card visible while the
+            // next page fetches in the background (the core feed appends the
+            // same way without hiding the list - Next$1.onLoadNext); the old
+            // unconditional loader(true) blanked the whole feed for the whole
+            // fetch on every bottom-edge DOWN (user report 2026-11-06:
+            // "scrolling 1-2 rows the UI vanishes, only the spinner remains").
+            if (this.activity && !items.length) this.activity.loader(true);
             loadList(catPath, pg, function (raw) {
                 if (token !== loadToken) { fetching = false; return; }
                 serverPage = pg + 1;
