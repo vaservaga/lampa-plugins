@@ -99,7 +99,6 @@
             '<div class="udxf__gradient" aria-hidden="true"></div>' +
             '<div class="udxf__slot"></div>' +
             '<div class="udxf__panel" aria-hidden="true">' +
-                '<div class="udxf__panel__head"><span class="udxf__panel__title"></span></div>' +
                 '<div class="udxf__panel__list"></div>' +
             '</div>' +
         '</div>';
@@ -320,10 +319,10 @@
         // Display-size title (user request 2026-11-04: match the reference -
         // a large regular-weight display title over the meta line).
         '.udxf__title{font-size:4em;font-weight:400;line-height:1.1;color:#fff;margin-top:.25em;}' +
-        '.udxf__line{font-size:1em;color:rgba(255,255,255,.5);margin-top:.5em;}' +
+        '.udxf__line{font-size:1.08em;color:rgba(255,255,255,.5);margin-top:.5em;}' +
         // Full overview - no line clamp; the compact spacing keeps even a long
         // one inside the 1080p page.
-        '.udxf__overview{font-size:1.02em;line-height:1.45;color:#fff;margin-top:.5em;}' +
+        '.udxf__overview{font-size:1.1em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~60px tall at the 1080p root font
         // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
         // columns. Default state: a TRANSPARENT dark-glass pill (the reference
@@ -359,7 +358,7 @@
         // overview, director and the full cast (wrapped, never truncated).
         '.udxf__details{padding:0 6% 1% 5%;}' +
         '.udxf__details-head{font-size:1.3em;font-weight:700;line-height:1.3;color:#fff;margin-top:.6em;}' +
-        '.udxf__fact{font-size:1em;line-height:1.45;color:rgba(255,255,255,.6);margin-top:.5em;}' +
+        '.udxf__fact{font-size:1.08em;line-height:1.45;color:rgba(255,255,255,.6);margin-top:.5em;}' +
         // The director line sits a touch lower in the meta column (user
         // request 2026-11-05: the fact pair read too high under the rating
         // line); the cast line keeps its .5em gap below the director.
@@ -390,8 +389,6 @@
         // travel to the scroll element's offsetHeight).
         '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:28%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);border-radius:1.4em;}' +
         '.udxf__panel--open{display:flex;}' +
-        '.udxf__panel__head{flex:0 0 auto;padding:0 0 .9em;}' +
-        '.udxf__panel__title{font-size:1.3em;font-weight:700;color:#fff;letter-spacing:.02em;}' +
         '.udxf__panel__list{flex:1 1 auto;min-height:0;position:relative;}' +
         '.udxf__panel__list>.scroll{position:relative;height:100%;overflow:hidden;}' +
         // Rows: the former full release page shape (quality • size on the main
@@ -458,7 +455,6 @@
             ultradox_no_online: { uk: 'Немає онлайн-джерела', ru: 'Нет онлайн-источника', en: 'No online source', be: 'Няма анлайн-крыніцы' },
             ultradox_online_unavailable: { uk: 'Онлайн-джерело недоступне', ru: 'Онлайн-источник недоступен', en: 'Online source unavailable', be: 'Анлайн-крыніца недаступная' },
             ultradox_torrserver: { uk: 'Торренти', ru: 'Торренты', en: 'Torrents', be: 'Торэнты' },
-            ultradox_releases: { uk: 'Релізи', ru: 'Релизы', en: 'Releases', be: 'Рэлізы' },
             ultradox_seasons: { uk: 'Сезонів', ru: 'Сезонов', en: 'Seasons', be: 'Сезонаў' },
             ultradox_director: { uk: 'Режисер', ru: 'Режиссёр', en: 'Director', be: 'Рэжысёр' },
             ultradox_cast: { uk: 'У ролях', ru: 'В ролях', en: 'Starring', be: 'У ролях' },
@@ -1642,12 +1638,11 @@
                 html.find('.udxf__slot').append(scroll.render(true));
                 onlineBtn = html.find('.udxf__act--online');
                 torrentsBtn = html.find('.udxf__act--torrents');
-                // The release side window: title, the row list inside its own
+                // The release side window: the row list inside its own
                 // height-bounded scroll viewport (the TV driver clamps travel
                 // to the scroll element's offsetHeight).
                 panelEl = html.find('.udxf__panel');
                 if (panelEl) {
-                    panelEl.find('.udxf__panel__title').text(L.Lang.translate('ultradox_releases'));
                     panelBox = document.createElement('div');
                     panelBox.addClass('udxf__prows');
                     panelScroll = new Lampa.Scroll({ mask: true, over: true });
