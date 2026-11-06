@@ -432,6 +432,36 @@ const HD_RUSSIAN_HTML =
     '</ul></body></html>';
 // No route on purpose: the country lookup fails and the item must stay.
 const HD_FAILSAFE_URL = 'https://045.ultradox.click/nerufilm/fail-1.html';
+
+// The /webrips/ list for the background date-fill check: one year-less serial
+// whose detail page carries the site's own "Год:" + newest "Загрузил" date
+// (the line must appear WITHOUT any focus, from the country-check piggyback)
+// and one film whose LIST title already holds the year (the rendered year
+// line must survive the same background lookup untouched).
+const WEBRIPS_URL = 'https://045.ultradox.click/webrips/';
+const WEBRIPS_SERIAL_URL = 'https://045.ultradox.click/serial-hd/bg-1.html';
+const WEBRIPS_SERIAL_HTML =
+    '<html><body><ul>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 2024</li>' +
+    '</ul>' +
+    '<div id="torrent_1_info"><div class="info_d-size">2 GB</div>' +
+    '<div class="bord_a1">Загрузил: tester (05 Окт 2025)</div>' +
+    '<a href="magnet:?xt=urn:btih:2222222222222222222222222222222222222222&amp;dn=Bg.2024.WEB-DLRip.mkv&amp;xl=2000000000"></a>' +
+    '</div></body></html>';
+const WEBRIPS_FILM_URL = 'https://045.ultradox.click/nerufilm/bg-film-1.html';
+const WEBRIPS_FILM_HTML =
+    '<html><body><ul>' +
+    '<li itemprop="contributor"><span> Страна: </span> Франция</li>' +
+    '<li><span>Год:</span> 1999</li>' +
+    '</ul></body></html>';
+const WEBRIPS_LIST_HTML =
+    '<html><body><div class="top__slider">' +
+    '<div><div class="top__slider_div__item"><a href="/serial-hd/bg-1.html"><img src="/upload/bg.jpg"></a>' +
+    '<span>Бездатный сериал (1 сезон)</span><span class="short-quality">WEB-DL</span></div></div>' +
+    '<div><div class="top__slider_div__item"><a href="/nerufilm/bg-film-1.html"><img src="/upload/bgf.jpg"></a>' +
+    '<span>Двойной агент (2025)</span><span class="short-quality">BDRip</span></div></div>' +
+    '</div></body></html>';
 // Each item sits in its own wrapper div (the live shape: parse()'s trailing
 // "</div></div>" pairs the item close with its wrapper close, so unwrapped
 // siblings would collapse into a single match).
@@ -447,6 +477,9 @@ const ROUTES = new Map([
     ['https://045.ultradox.click/serial/', CATALOG_HTML],
     [HD_LIST_URL, HD_LIST_HTML],
     [HD_RUSSIAN_URL, HD_RUSSIAN_HTML],
+    [WEBRIPS_URL, WEBRIPS_LIST_HTML],
+    [WEBRIPS_SERIAL_URL, WEBRIPS_SERIAL_HTML],
+    [WEBRIPS_FILM_URL, WEBRIPS_FILM_HTML],
     [SERIES_URL, SERIES_HTML],
     [FILM_URL, FILM_HTML],
     [SERIALHD_URL, SERIALHD_HTML],
@@ -933,6 +966,40 @@ check('catbg: failed load does not erase the current background', (function () {
 const fetchesBeforeBg = fetches.length;
 card.handlers['hover:focus'].forEach((f) => f());
 check('catbg: hover:focus causes no fetch / loadMore / torrent', fetches.length === fetchesBeforeBg && L.Torrent.calls.length === 0, String(fetches.length - fetchesBeforeBg) + ' new fetches');
+
+// ---------- catalog: background date fill for year-less serials (user report
+// 2026-11-06: the Серіали cards carried no date at all while the film tabs
+// showed their years) ----------
+// The serial card is painted WITHOUT the under-title line (its list title has
+// no year). The country-check piggyback fetch settles (synchronously in the
+// mock) with the page's own "Год:" + newest upload date and must FILL the line
+// on the rendered card - no focus involved. A refocus then neither refetches
+// nor duplicates. The film card's rendered year line survives the same
+// background lookup untouched (fill-only, never overwrites real list data).
+// (Runs after the catbg block: the refocus check below preloads a backdrop
+// image, which the catbg assertions' absolute image counter must not see.)
+console.log('catalog: background date fill for year-less serials');
+const bgCat = new Comp({ category: 'webrips' });
+bgCat.activity = { loader() {}, toggle() {} };
+bgCat.create();
+{
+    const bGrid = findAll(bgCat.render(), 'category-full')[0];
+    const cards = bGrid.children;
+    check('bgfill: both cards painted (render-first)', cards.length === 2, String(cards.length));
+    const serialBg = cards.find((c) => c.find('.card__title').text() === 'Бездатный сериал (1 сезон)');
+    const filmBg = cards.find((c) => c.find('.card__title').text() === 'Двойной агент');
+    check('bgfill: year-less serial gains the real year + catalog date from the background lookup (no focus)', (function () {
+        if (!serialBg) return false;
+        const age = serialBg.find('.card__age');
+        if (!age) return false;
+        const kids = age.children;
+        return kids.length === 2 && kids[0].text() === '2024' && kids[1].text() === ' \u2022 05.10' && kids[1].classes.has('udx-ad');
+    })(), (() => { const a = serialBg && serialBg.find('.card__age'); return a ? JSON.stringify(a.children.map((c) => c.text())) : 'no age line'; })());
+    check('bgfill: a rendered year line (film card, year from the list title) is never overwritten by the background lookup (the page says 1999, the card keeps 2025)', filmBg && filmBg.find('.card__age').text() === '2025', filmBg ? txt(filmBg, '.card__age') : 'no card');
+    const fetchesBeforeFocus = fetches.length;
+    serialBg.handlers['hover:focus'].forEach((f) => f());
+    check('bgfill: focusing the filled serial refetches nothing and duplicates nothing', fetches.length === fetchesBeforeFocus && findAll(serialBg, 'card__age').length === 1, String(fetches.length - fetchesBeforeFocus) + ' new fetches, ' + findAll(serialBg, 'card__age').length + ' age lines');
+}
 
 // ---------- 2/3/4. FullPage: detail build + series release selection ----------
 // The exact Shield crash case: an item WITH a poster (item.poster truthy), so

@@ -592,6 +592,34 @@
         return { y: y, a: yy ? p2(d) + '.' + p2(mo) : '' };
     }
 
+    // Paint the under-title line from the item's own site data (the bare year,
+    // "year • dd.mm", or the date alone) onto the item's rendered card. FILL
+    // ONLY: a card that already carries a line (a movie's rendered year, a
+    // fallback row's type/size meta) is left untouched - appendCard removed
+    // the element entirely for a year-less serial, so a missing element is
+    // exactly the case this fills. Idempotent: once the line exists the call
+    // is a no-op, so the background piggyback and a later focus never
+    // duplicate it.
+    function paintItemYear(item) {
+        var card = item._card;
+        if (!card || (!item.year && !item.added)) return;
+        if (card.find('.card__age')) return;
+        var age = document.createElement('div');
+        age.addClass('card__age');
+        if (item.year) {
+            var ye = document.createElement('span');
+            ye.text(item.year);
+            age.append(ye);
+        }
+        if (item.added) {
+            var de = document.createElement('span');
+            de.addClass('udx-ad');
+            de.text((item.year ? ' \u2022 ' : '') + item.added);
+            age.append(de);
+        }
+        card.append(age);
+    }
+
     // The standard Lampa torrent flow (the single handoff, pick-gated): the
     // picked release's MagnetUri/Size go to L.Torrent.start with the item's
     // movie metadata. Called ONLY from explicit row picks (panel rows and the
@@ -792,13 +820,18 @@
         // same detail-page fetch that decides the country filter also carries
         // the site's own release year + newest upload date, which year-less
         // items (serials) need for the card line - no extra request, and a
-        // cached second visit gets the same dates without re-fetching.
+        // cached second visit gets the same dates without re-fetching. The
+        // card was already painted without that line (render-first), so once
+        // the lookup settles the line is filled in on the rendered card -
+        // the serial card shows its dates without any focus (paintItemYear
+        // is fill-only and idempotent).
         function check(item, index) {
             if (!item.itemUrl) { complete(index, false); return; }
             if (Object.prototype.hasOwnProperty.call(countryCache, item.itemUrl)) {
                 var cc = countryCache[item.itemUrl];
                 if (cc.y && !item.year) item.year = cc.y;
                 if (cc.a) item.added = cc.a;
+                paintItemYear(item);
                 complete(index, cc.r);
                 return;
             }
@@ -808,6 +841,7 @@
                 countryCache[item.itemUrl] = { r: russian, y: sd.y, a: sd.a };
                 if (sd.y && !item.year) item.year = sd.y;
                 if (sd.a) item.added = sd.a;
+                paintItemYear(item);
                 complete(index, russian);
             }, function () {
                 // A failed country lookup must not silently hide a release.
@@ -1302,15 +1336,23 @@
             img.src = url;
         }
 
-        // Serials: the list carries no release year (titles end in "(N сезон)"),
-        // so when a year-less card is focused its item page is fetched once and
-        // the real "Год:" field plus the newest catalog-addition date are shown
-        // as the line under the title (year, then the dimmed "• dd.mm"; the
-        // date alone when the page carries no readable year).
-        // Best-effort and silent: a failed fetch leaves the card as-is; a card
-        // with a year from the list data is never fetched.
+        // Serials: the list carries no release year (titles end in "(N сезон)").
+        // The line under the title gets the site's own "Год:" field plus the
+        // newest catalog-addition date (year, then the dimmed "• dd.mm"; the
+        // date alone when the page carries no readable year) through two
+        // paths:
+        //   - the background country check piggybacks both values on its
+        //     detail fetch and fills the line on the rendered card as it
+        //     settles - no focus needed (paintItemYear, fill-only);
+        //   - a focus on a card that still has no data fetches the item page
+        //     ONCE and paints the line, replacing any placeholder line (the
+        //     fallback row's type/size meta) with the real page data.
+        // Best-effort and silent: a failed fetch leaves the card as-is; once
+        // the data is present a refocus never refetches and never duplicates
+        // the line.
         this.enrichYear = function (item, card) {
-            if (item.year || item._yBusy || !item.itemUrl) return;
+            if (item.year || item.added) { paintItemYear(item); return; }
+            if (item._yBusy || !item.itemUrl) return;
             item._yBusy = 1;
             fetchText(item.itemUrl, function (html) {
                 var sd = siteDates(html);
@@ -1319,20 +1361,7 @@
                 if (sd.a) item.added = sd.a;
                 var old = card.find('.card__age');
                 if (old) old.remove();
-                var age = document.createElement('div');
-                age.addClass('card__age');
-                if (item.year) {
-                    var ye = document.createElement('span');
-                    ye.text(item.year);
-                    age.append(ye);
-                }
-                if (item.added) {
-                    var de = document.createElement('span');
-                    de.addClass('udx-ad');
-                    de.text((item.year ? ' \u2022 ' : '') + item.added);
-                    age.append(de);
-                }
-                card.append(age);
+                paintItemYear(item);
             }, function () { item._yBusy = 0; });
         };
 
