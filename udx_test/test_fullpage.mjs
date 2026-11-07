@@ -81,14 +81,19 @@
 //      driven from its own payload; an empty release list shows the clear
 //      in-page empty state. Both controls share one base geometry (60-64px
 //      tall at the 1080p root font, identical padding/radius/icon container).
-//   10. Backdrop fallbacks: fill() resets the previous image/states first,
-//      then applies exactly one state - a valid backdrop stays a plain url()
-//      with --on and no .udxf--poster; the poster fallback is a plain url()
-//      (no embedded gradient, no pixhost "Picture removed" placeholder) with
-//      the .udxf--poster root state (zone veil darkens left+bottom, fades
-//      right, no opaque layer); a pixhost-hosted poster URL never reaches the
+//   10. Backdrop fallbacks + two-stage ambience (user request 2026-11-07):
+//      fill() resets the previous image/states first, then applies exactly
+//      one state - a valid backdrop stays a plain url() with --on and no
+//      .udxf--poster; the poster fallback is a plain url() (no embedded
+//      gradient, no pixhost "Picture removed" placeholder) with the
+//      .udxf--poster root state (zone veil darkens left+bottom, fades right,
+//      no opaque layer); a pixhost-hosted poster URL never reaches the
 //      background-image (neutral fallback, left <img> untouched); the neutral
-//      case leaves no image and no state classes.
+//      case leaves no image and no state classes. The applied state is the
+//      INITIAL look (darker + stronger blur); a plain Image preload of the
+//      same URL (no CORS) resolves it into --settled (the TV-validated
+//      production filter) on load OR error - nothing is ever erased, and a
+//      stale (superseded) load cannot settle a later fill (generation guard).
 //   11. Russian-productions filter (render-first): the list paints as soon
 //      as its data arrives (no loader gate on the per-item detail fetches) -
 //      a "Россия" card is pruned from the grid once its lookup resolves, a
@@ -882,7 +887,12 @@ check('css: an active poster gets the NUM green halo (#57F570 band around the po
 check('css: year line dimmed like the NUM reference (title stays white)', /\.udx-content \.card__age\{[^}]*color:rgba\(255,255,255,\.5\);\}/.test(src) && /\.udx-content \.card__age \.udx-ad\{color:rgba\(255,255,255,\.45\);\}/.test(src), 'missing dim year color');
 check('css: no dead second kind-chip implementation (.udx-chip__kind)', src.indexOf('.udx-chip__kind') === -1, 'dead selector present');
 check('css: .udx-kind pinned inside the poster (left/top 10px, no negative offset) and clipped to it', /\.udx-kind\{position:absolute;left:10px;top:10px;[^}]*max-width:calc\(100% - 20px\);[^}]*overflow:hidden;[^}]*white-space:nowrap/.test(src), 'missing .udx-kind containment rule');
-check('css: the backdrop is always a soft-blurred image (NUM-style): fanart lightly blurred, poster fallback blurred bright (not a flat dark surface)', /\.udxf__backdrop--on\{opacity:1;transform:scale\(1\.06\);filter:blur\(6px\) brightness\(\.72\) saturate\(\.9\);\}/.test(src) && /\.udxf__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src) && src.indexOf('blur(22px)') === -1, 'missing backdrop blur rules');
+// Two-stage ambience (user request 2026-11-07): the detail backdrop opens
+// in the DARKER + MORE BLURRED initial state and settles into the
+// TV-validated production look once its image is ready (--settled, 0.4s
+// filter transition inside the requested 250-450ms band).
+check('css: detail backdrop INITIAL state is darker + stronger blur (fanart blur 12px / poster blur 14px, the base rule carries it too so the entry fade shows no unblurred flash)', /\.udxf__backdrop\{[^}]*opacity:0;transform:scale\(1\.06\);filter:blur\(12px\) brightness\(\.62\) saturate\(\.9\);transition:opacity \.3s ease,filter \.4s ease;[^}]*\}/.test(src) && /\.udxf__backdrop--on\{opacity:1;transform:scale\(1\.06\);filter:blur\(12px\) brightness\(\.62\) saturate\(\.9\);\}/.test(src) && /\.udxf__backdrop--poster\{opacity:1;transform:scale\(1\.06\);filter:blur\(14px\) brightness\(\.55\) saturate\(\.88\);\}/.test(src), 'missing initial-state rules');
+check('css: detail backdrop SETTLED state = the TV-validated production look (fanart blur 6px bright .72 / poster blur 7px bright .62 - the backdrop stays a soft-blurred image, never a flat dark surface)', /\.udxf__backdrop--on\.udxf__backdrop--settled\{filter:blur\(6px\) brightness\(\.72\) saturate\(\.9\);\}/.test(src) && /\.udxf__backdrop--poster\.udxf__backdrop--settled\{filter:blur\(7px\) brightness\(\.62\) saturate\(\.92\);\}/.test(src) && src.indexOf('blur(22px)') === -1, 'missing settled-state rules');
 check('css: list-page poster fallback shares the same bright soft-blur treatment', /\.udxl__backdrop--poster\{[^}]*transform:scale\(1\.06\)[^}]*filter:blur\(7px\)[^}]*brightness\(\.62\)[^}]*saturate\(\.92\)/.test(src), 'missing .udxl__backdrop--poster rule');
 check('css: detail scroll viewport is height-bounded (the TV scroll driver clamps travel to html offsetHeight)', /\.udxf__slot \.scroll\{position:relative;height:100%;overflow:hidden;\}/.test(src), 'missing bounded scroll rule');
 check('css: catalog backdrop layers scale + blur + crossfade duration', /\.udx-bg\{[^}]*transform:scale\(1\.10\)[^}]*filter:blur\(20px\)[^}]*brightness\(\.55\)[^}]*saturate\(\.78\)[^}]*transition:opacity \.32s ease/.test(src), 'missing .udx-bg rule');
@@ -912,7 +922,8 @@ check('css: poster-state veil has no fully opaque layer (the image stays visible
     return m && !/rgba\(\d+,\s*\d+,\s*\d+,\s*1(?:\.0)?\)/.test(m[1]) && m[1].indexOf('rgba(0,0,0,.1) 80%') !== -1 && m[1].indexOf('rgba(0,0,0,0) 46%') !== -1;
 })(), 'opaque layer or missing fade stop');
 check('css: poster fallback uses the plain url() only (no embedded gradient)', /bg\.style\.backgroundImage = 'url\("'\s*\+\s*posterBackdrop/.test(src) && src.indexOf('rgba(0,0,0,.78),rgba(0,0,0,0) 42%') === -1, 'gradient still embedded in the poster fallback');
-check('css: fill() resets the previous image and all states before applying one', /if \(bg\) \{\s*bg\.style\.backgroundImage = '';\s*bg\.removeClass\('udxf__backdrop--on'\);\s*bg\.removeClass\('udxf__backdrop--poster'\);\s*\}/.test(src) && /if \(udxRoot\) udxRoot\.removeClass\('udxf--poster'\);/.test(src), 'reset-first block missing');
+check('css: fill() resets the previous image and all states (incl. --settled) before applying one', /if \(bg\) \{\s*bg\.style\.backgroundImage = '';\s*bg\.removeClass\('udxf__backdrop--on'\);\s*bg\.removeClass\('udxf__backdrop--poster'\);\s*bg\.removeClass\('udxf__backdrop--settled'\);\s*\}/.test(src) && /if \(udxRoot\) udxRoot\.removeClass\('udxf--poster'\);/.test(src), 'reset-first block missing');
+check('static: the settle preload is generation-guarded and orphaned on destroy (a superseded/stale load cannot settle a later fill or a dead page)', /var gen = \+\+bgGen;/.test(src) && /if \(gen !== bgGen\) return;/.test(src) && /img\.onerror = img\.onload;/.test(src) && /enrichToken\+\+;\s*bgGen\+\+;/.test(src), 'settle race guard missing');
 check('css: a pixhost-hosted poster URL is kept out of the backdrop background', src.indexOf('var posterBackdrop = \'\';') !== -1 && src.indexOf('pixhost\\.cc') !== -1, 'pixhost poster guard missing');
 
 // ---------- catalog dynamic backdrop: two permanent layers + crossfade ----------
@@ -1042,6 +1053,7 @@ const FP = L.Component.get('ultradox_full');
 const SERIES_ITEM = { title: 'Show Name (2021)', serial: true, itemUrl: SERIES_URL, poster: 'https://045.ultradox.click/upload/show.jpg' };
 const series = new FP({ item: SERIES_ITEM });
 series.activity = { loader() {}, toggle() {} };
+const imgBeforeSeries = images.length;
 let buildErr = null;
 try { series.create(); } catch (e) { buildErr = e; }
 const seriesScrolls = lastFullPageScrolls();
@@ -1054,6 +1066,15 @@ check('fullpage: backdrop image set', sh.find('.udxf__backdrop').style.backgroun
 check('fullpage: backdrop visible', sh.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
 check('fullpage: poster fallback not active for a valid backdrop', !sh.find('.udxf__backdrop').classes.has('udxf__backdrop--poster'));
 check('fullpage: no poster state on the root for a valid backdrop', sh.find('.udxf') !== null && !sh.find('.udxf').classes.has('udxf--poster'), String(sh.find('.udxf') && sh.find('.udxf').classes));
+// Two-stage ambience: right after the build the backdrop sits in the INITIAL
+// state (darker + stronger blur) - the settle preload (a plain Image of the
+// same URL, no CORS) has been requested but not yet resolved, so --settled is
+// absent; firing its load lands the settled state (the 0.4s filter
+// transition then runs the brighten + unblur on the real webview).
+check('settle: the backdrop opens in the INITIAL state (no --settled yet) while the image preload is pending', sh.find('.udxf__backdrop').classes.has('udxf__backdrop--on') && !sh.find('.udxf__backdrop').classes.has('udxf__backdrop--settled'), String(sh.find('.udxf__backdrop').classes));
+check('settle: the backdrop image is observed through a plain Image preload (the CSS background loads on its own; no crossOrigin needed)', images.length === imgBeforeSeries + 1 && images[imgBeforeSeries].src === 'https://045.ultradox.click/upload/show-fanart.jpg', images.slice(imgBeforeSeries).map((i) => i.src).join('|'));
+images[imgBeforeSeries]._fireLoad();
+check('settle: image ready -> the --settled state lands (initial -> settled path, the fanart keeps --on)', sh.find('.udxf__backdrop').classes.has('udxf__backdrop--settled') && sh.find('.udxf__backdrop').classes.has('udxf__backdrop--on'), String(sh.find('.udxf__backdrop').classes));
 check('fullpage: poster src equals the expected URL', sh.find('.udxf__poster') && sh.find('.udxf__poster').src === 'https://045.ultradox.click/upload/show.jpg', sh.find('.udxf__poster') ? sh.find('.udxf__poster').src : 'no poster element');
 check('fullpage: top line (NUM order: year first, comma, country)', sh.find('.udxf__top').text() === '2021, США', txt(sh, '.udxf__top'));
 check('fullpage: meta line', sh.find('.udxf__line').text() === 'Детектив, Драма • 45 мин. • Многоголосый', txt(sh, '.udxf__line'));
@@ -1386,12 +1407,14 @@ ROUTES.set(NOBG_URL,
     '</body></html>');
 const nobg = new FP({ item: { title: 'No Fanart (2020)', serial: false, itemUrl: NOBG_URL, poster: '' } });
 nobg.activity = { loader() {}, toggle() {} };
+const imgBeforeNobg = images.length;
 const nbgTorr = L.Torrent.calls.length;
 let nobgErr = null;
 try { nobg.create(); } catch (e) { nobgErr = e; }
 const nf = nobg.render();
 check('fullpage(no backdrop): build() did not throw', nobgErr === null, nobgErr && nobgErr.constructor.name + ': ' + nobgErr.message);
 check('fullpage(no backdrop): element present but stays off, image explicitly cleared (neutral fallback)', nf.find('.udxf__backdrop') !== null && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--on') && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && nf.find('.udxf__backdrop').style.backgroundImage === '' && nf.find('.udxf') !== null && !nf.find('.udxf').classes.has('udxf--poster'));
+check('settle(neutral): no image -> no settle preload, no --settled (nothing is created, nothing erased)', images.length === imgBeforeNobg && !nf.find('.udxf__backdrop').classes.has('udxf__backdrop--settled'), 'images: ' + (images.length - imgBeforeNobg) + ' / ' + String(nf.find('.udxf__backdrop').classes));
 check('fullpage(no backdrop): no undefined/broken image left', (function () {
     const imgs = [];
     (function walk(n) { for (const c of n.children || []) { if (c && c.tagName === 'IMG') imgs.push(c); if (c && c.children) walk(c); } })(nf);
@@ -1421,6 +1444,7 @@ ROUTES.set(SHARK_URL,
 const SHARK_ITEM = { title: 'Любитель акул встречает девушку (2025)', serial: false, itemUrl: SHARK_URL, poster: 'https://045.ultradox.click/upload/c.jpg' };
 const shark = new FP({ item: SHARK_ITEM });
 shark.activity = { loader() {}, toggle() {} };
+const imgBeforeShark = images.length;
 let sharkErr = null;
 try { shark.create(); } catch (e) { sharkErr = e; }
 const sp = shark.render();
@@ -1431,6 +1455,13 @@ check('fullpage(pixhost): visible backgroundImage is the plain poster url (no pl
 })(), sp.find('.udxf__backdrop') ? String(sp.find('.udxf__backdrop').style.backgroundImage) : 'no backdrop element');
 check('fullpage(pixhost): only the poster fallback modifier applied', sp.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && !sp.find('.udxf__backdrop').classes.has('udxf__backdrop--on'));
 check('fullpage(pixhost): poster state on the root enables the zone veil', sp.find('.udxf') !== null && sp.find('.udxf').classes.has('udxf--poster'), String(sp.find('.udxf') && sp.find('.udxf').classes));
+// Two-stage ambience in the POSTER-FALLBACK branch too: the fallback opens in
+// its stronger-blur initial state and settles when the poster preload
+// resolves (a small poster keeps a touch more blur than fanart in both states).
+check('settle(poster): the poster-fallback backdrop opens in the INITIAL poster state (no --settled yet)', sp.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && !sp.find('.udxf__backdrop').classes.has('udxf__backdrop--settled'), String(sp.find('.udxf__backdrop').classes));
+check('settle(poster): the poster preload is observed (plain Image of the poster URL)', images.length === imgBeforeShark + 1 && images[imgBeforeShark].src === 'https://045.ultradox.click/upload/c.jpg', images.slice(imgBeforeShark).map((i) => i.src).join('|'));
+images[imgBeforeShark]._fireLoad();
+check('settle(poster): image ready -> settled lands on the poster state too (keeps --poster + root veil)', sp.find('.udxf__backdrop').classes.has('udxf__backdrop--settled') && sp.find('.udxf__backdrop').classes.has('udxf__backdrop--poster') && sp.find('.udxf').classes.has('udxf--poster'), String(sp.find('.udxf__backdrop').classes));
 check('fullpage(pixhost): exactly one backdrop element (no second node)', findAll(sp, 'udxf__backdrop').length === 1, String(findAll(sp, 'udxf__backdrop').length));
 check('fullpage(pixhost): poster kept', sp.find('.udxf__poster') && sp.find('.udxf__poster').src === 'https://045.ultradox.click/upload/c.jpg', sp.find('.udxf__poster') ? sp.find('.udxf__poster').src : 'no poster element');
 check('fullpage(pixhost): title kept', txt(sp, '.udxf__title') === 'Любитель акул встречает девушку', txt(sp, '.udxf__title'));

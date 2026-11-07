@@ -272,16 +272,27 @@
         // .udxf/.udxl height:100% resolves against a real box and the inner
         // .scroll{height:100%} viewport stays bounded for the TV scroll
         // driver's maxOffset clamp.
-        '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transition:opacity .3s ease;pointer-events:none;}' +
-        // NUM-style backdrop: the image is ALWAYS a soft-blurred atmosphere
-        // (never a flat dark surface). The fanart is blurred lightly and kept
-        // bright enough to read as the artwork; scale hides the blur edge.
-        '.udxf__backdrop--on{opacity:1;transform:scale(1.06);filter:blur(6px) brightness(.72) saturate(.9);}' +
-        // Poster-as-backdrop fallback: a small poster stretched full-screen
-        // shows upscale block artifacts, so a stronger blur hides them; the
-        // tone is bright (not a flat dark fill) so it reads as a blurred
-        // poster - the zone veil keeps the text legible.
-        '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(7px) brightness(.62) saturate(.92);}' +
+        // Two-stage ambience (user request 2026-11-07, the Lampa/NUM
+        // cinematic feel): the backdrop opens DARKER + MORE BLURRED (the
+        // initial filter, carried by the base rule too so the entry fade-in
+        // shows no unblurred flash) and "settles" once its own image is
+        // ready (fill() applies --on/--poster, settleBackdrop adds
+        // --settled when the plain Image preload of the same URL resolves;
+        // a failed load resolves it too - nothing is ever erased). The 0.4s
+        // filter transition (inside the requested 250-450ms band) runs the
+        // brighten + unblur; opacity keeps the validated 0.3s crossfade.
+        // The SETTLED filters are the TV-validated production values - the
+        // NUM-style look: the image is always a soft-blurred atmosphere
+        // (never a flat dark surface), the fanart blurred lightly and kept
+        // bright enough to read as the artwork; the poster fallback a touch
+        // stronger - its blur hides the upscale blocks of a small poster
+        // stretched full-screen. Scale hides the blur edge; the zone veil
+        // keeps the right-hand text legible.
+        '.udxf__backdrop{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;background:center/cover no-repeat;opacity:0;transform:scale(1.06);filter:blur(12px) brightness(.62) saturate(.9);transition:opacity .3s ease,filter .4s ease;pointer-events:none;}' +
+        '.udxf__backdrop--on{opacity:1;transform:scale(1.06);filter:blur(12px) brightness(.62) saturate(.9);}' +
+        '.udxf__backdrop--on.udxf__backdrop--settled{filter:blur(6px) brightness(.72) saturate(.9);}' +
+        '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(14px) brightness(.55) saturate(.88);}' +
+        '.udxf__backdrop--poster.udxf__backdrop--settled{filter:blur(7px) brightness(.62) saturate(.92);}' +
         // Valid-backdrop veil (NUM-style): dark text zone on the left, the
         // scene stays clearly visible toward the right, soft bottom fade.
         '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.42) 46%,rgba(0,0,0,.06) 82%),linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0) 46%);}' +
@@ -1180,25 +1191,6 @@
             }
             this.setActive();
             this.display();
-            // DIAG PROBE (temporary, TV test 2026-11-07): paint both
-            // ambience layers with data-URI markers before any focus -
-            // layer 0 keeps the production filter (blur/brightness/
-            // saturate), layer 1 is unfiltered at half opacity and sits
-            // on top (later in DOM). Answers in one capture: does the
-            // layer stack render at all, does the blur filter kill the
-            // layer, and (after the first card focus runs the normal
-            // focusBackdrop path into the unfiltered layer) does a
-            // cross-origin poster load as a CSS background on the TV.
-            if (bgLayers[0]) {
-                bgLayers[0].style.backgroundImage='url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY/jP8P8/AAb+Av4jsC+eAAAAAElFTkSuQmCC")';
-                bgLayers[0].addClass('udx-bg--on');
-            }
-            if (bgLayers[1]) {
-                bgLayers[1].style.filter='none';
-                bgLayers[1].style.opacity='0.5';
-                bgLayers[1].style.backgroundImage='url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY2D4//8/AAX/Av5xy53tAAAAAElFTkSuQmCC")';
-                bgLayers[1].addClass('udx-bg--on');
-            }
         };
 
         this.buildCats = function () {
@@ -1668,6 +1660,7 @@
         var lastAct = null;
         var tmdbSeasons = 0;
         var enrichToken = 0;
+        var bgGen = 0;
         var udxRoot = null;
         var scroll = null;
         // Release side window state (the "Онлайн" target).
@@ -1777,6 +1770,26 @@
             if (this.activity) this.activity.toggle();
         };
 
+        // Settle the two-stage backdrop (see fill): a plain Image preload of
+        // the URL the backdrop layer just got observes its readiness - the
+        // CSS background loads independently, this only fires the state
+        // switch. onload AND onerror resolve the pending state (a failed
+        // image erases nothing: the background-image simply never paints).
+        // The generation token keeps a superseded fill's stale load from
+        // settling a later fill early (the same race guard the catalog
+        // focusBackdrop uses); destroy orphans any pending load.
+        function settleBackdrop(url) {
+            var gen = ++bgGen;
+            var img = new Image();
+            img.onload = function () {
+                if (gen !== bgGen) return;
+                var b = html.find('.udxf__backdrop');
+                if (b) b.addClass('udxf__backdrop--settled');
+            };
+            img.onerror = img.onload;
+            img.src = url;
+        }
+
         this.fill = function () {
             var d = detail || {};
 
@@ -1803,17 +1816,30 @@
                 bg.style.backgroundImage = '';
                 bg.removeClass('udxf__backdrop--on');
                 bg.removeClass('udxf__backdrop--poster');
+                bg.removeClass('udxf__backdrop--settled');
             }
             if (udxRoot) udxRoot.removeClass('udxf--poster');
-            // DIAG PROBE (temporary, TV test 2026-11-07): unfiltered
-            // backdrop with the real URL (magenta when neither source
-            // exists) - isolates cross-origin loading from the blur
-            // filter on the TV.
-            if (bg) {
-                bg.style.filter='none';
-                var probeUrl = d.backdrop || posterBackdrop || '';
-                bg.style.backgroundImage = 'url("' + (probeUrl || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY/jP8P8/AAb+Av4jsC+eAAAAAElFTkSuQmCC').replace(/"/g, '%22') + '")';
+            // Two-stage ambience (user request 2026-11-07): the backdrop
+            // opens in the DARKER + MORE BLURRED initial filter (--on /
+            // --poster states) and "settles" into the TV-validated
+            // production look once ITS image is ready - settleBackdrop
+            // preloads the same URL through a plain Image (no CORS - web
+            // security fully on) and hands the layer the --settled class
+            // on load; the CSS filter transition (0.4s) runs the brighten
+            // + unblur. A failed load erases nothing (the background-image
+            // simply never paints) and still resolves the pending state.
+            if (d.backdrop && bg) {
+                bg.style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
                 bg.addClass('udxf__backdrop--on');
+                settleBackdrop(d.backdrop);
+            } else if (posterBackdrop && bg) {
+                // Poster as backdrop: the plain image only - all darkening
+                // lives in the zone veil (.udxf--poster state), not embedded
+                // into the background-image here.
+                bg.style.backgroundImage = 'url("' + posterBackdrop.replace(/"/g, '%22') + '")';
+                bg.addClass('udxf__backdrop--poster');
+                if (udxRoot) udxRoot.addClass('udxf--poster');
+                settleBackdrop(posterBackdrop);
             }
 
             html.find('.udxf__title').text(stripYear(item.title));
@@ -2104,6 +2130,7 @@
             lastAct = null;
             tmdbSeasons = 0;
             enrichToken++;
+            bgGen++;
             panelEl = null; panelScroll = null; panelBox = null;
             panelOpen = false;
             firstPanelRow = null; lastPanelRow = null;
