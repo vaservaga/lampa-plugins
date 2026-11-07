@@ -20,8 +20,11 @@
 //   2. The detail page builds from the fetched page in the NUM reference
 //      layout 1:1: backdrop, the large poster on the left, the meta block
 //      (top line, large title, original title, rating badge, runtime • genre
-//      line, seasons, the director and the FULL cast lines - no name cap, no
-//      ellipsis, no line clamp), then the two action pills above them, then
+//      line, seasons, the director and the FULL cast lines - every name kept
+//      in the data payload and the DOM, while the display clamps to 2 lines
+//      with an ellipsis (a long ensemble cast can never stretch the meta
+//      column, push the pills off-screen or scroll the top out of view)),
+//      then the two action pills above them, then
 //      the full-width "Детально" details strip with the complete overview
 //      inside a scroll viewport; the real release list keeps
 //      label/size/magnet as UI data.
@@ -30,7 +33,10 @@
 //      standard TorrServer flow (L.Torrent.start with the picked release's
 //      MagnetUri/Size). The "TorrServer" press opens the core Lampa torrents
 //      search page (component 'torrents', the title+year search, the item's
-//      movie metadata). A press itself never starts a torrent.
+//      movie metadata - the detail page's own overview/plot plus the site
+//      genre/country and the already-loaded TMDB rating fill the core info
+//      column from memory; absent data stays absent so the core keeps its
+//      standard placeholder). A press itself never starts a torrent.
 //   4. L.Torrent.start is called ONLY through an explicit user pick: button
 //      presses, catalog navigation and hover events make zero calls; the final
 //      counter must equal the number of performed row selections.
@@ -1145,7 +1151,8 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('css: compact NUM geometry - no min-height dead space, tight zone padding (the page fits 1080p without scrolling)', /\.udxf__zone\{display:flex;align-items:stretch;padding:4\.5% 6% 1% 5%;box-sizing:border-box;\}/.test(src) && src.indexOf('min-height:30em') === -1, 'zone must stay compact');
     check('css: the title is the reference display size at regular weight (3.2em/400 after the 2026-11-07 ~20% shrink, not bold), wrapping at word boundaries to a max of 3 lines (the card-title line-clamp pattern) without any right-side clipping', /\.udxf__title\{font-size:3\.2em;font-weight:400;line-height:1\.1;color:#fff;margin-top:\.25em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:break-word;\}/.test(src), 'title scale rule missing');
     check('css: the meta column spans the poster full height with the actions riding the poster bottom (text and buttons at the level of the poster - the reference layout; the poster carries an explicit 2:3 box so its bottom edge always defines the zone bottom, cover-cropping a short poster instead of distorting)', /\.udxf__meta\{display:flex;flex-direction:column;[^}]*\}/.test(src) && /\.udxf__actions\{[^}]*margin-top:auto;[^}]*padding-top:\.8em;\}/.test(src) && /\.udxf__poster\{[^}]*min-height:28\.5em;[^}]*object-fit:cover/.test(src), 'poster-level meta layout missing');
-    check('css: the details strip keeps the full text at compact spacing (no clamp, tighter lines)', /\.udxf__overview\{font-size:1\.1em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__fact\{font-size:1\.08em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
+    check('css: the details strip keeps the full text at compact spacing (the overview rule carries NO line clamp, tighter lines)', /\.udxf__overview\{font-size:1\.1em;line-height:1\.45;color:#fff;margin-top:\.5em;\}/.test(src) && /\.udxf__details-head\{font-size:1\.3em;font-weight:700;line-height:1\.3;color:#fff;margin-top:\.6em;\}/.test(src), 'compact detail rules missing');
+    check('css: the director/cast fact rows clamp to 2 lines with the ellipsis (the title line-clamp pattern: the FULL list stays in data/DOM, a long ensemble cast can never stretch the meta column, push the pills off-screen or scroll the top out of view; word-boundary wrap, break-word only splits a single oversized name)', /\.udxf__fact\{font-size:1\.08em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:break-word;\}/.test(src), 'fact clamp rule missing');
     check('css: the meta text block is a touch larger (user request 2026-11-06: genre line and the director/cast fact lines at 1.08em)', /\.udxf__line\{font-size:1\.08em;color:rgba\(255,255,255,\.5\);margin-top:\.5em;\}/.test(src), 'meta line scale missing');
     check('css: the director fact line sits a touch lower in the meta column (user request 2026-11-05: margin-top 1em, cast keeps its .5em gap)', /\.udxf__fact--director\{margin-top:1em;\}/.test(src), 'fact--director offset missing');
     check('strip: the resting state is the 1:1 reference gradient pill itself (smooth green->blue sweep left to right, white icon + white regular-weight 1.3em label vertically centered, compact ~60px bar, no per-role rules - user request 2026-11-07: the buttons are the reference gradient, not a dark rectangle)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src), 'gradient base missing');
@@ -1271,8 +1278,18 @@ L.Select.last = null;
 tBtn.handlers['hover:enter'].forEach((f) => f());
 const pushedTS = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('fullpage: "TorrServer" opens the core torrents search page (Activity push, no L.Select)', !!pushedTS && pushedTS.component === 'torrents' && pushedTS.title === L.Lang.translate('title_torrents') && L.Select.last === null, JSON.stringify(pushedTS && pushedTS.component));
-check('fullpage: the core push carries the title+year search and the item movie metadata', !!pushedTS && pushedTS.url === '' && pushedTS.search === 'Show Name 2021' && pushedTS.search_one === 'Show Name' && pushedTS.search_two === 'Show Name' && pushedTS.page === 1 && !!pushedTS.movie && pushedTS.movie.title === 'Show Name' && pushedTS.movie.original_title === 'Show Name' && pushedTS.movie.img === 'https://045.ultradox.click/upload/show.jpg' && pushedTS.movie.release_date === '2021' && Array.isArray(pushedTS.movie.genres) && pushedTS.movie.genres.length === 0 && pushedTS.movie.number_of_seasons === 1 && pushedTS.movie.source === 'ultradox', JSON.stringify(pushedTS && { s: pushedTS.search, m: pushedTS.movie }));
+check('fullpage: the core push carries the title+year search and the item movie metadata', !!pushedTS && pushedTS.url === '' && pushedTS.search === 'Show Name 2021' && pushedTS.search_one === 'Show Name' && pushedTS.search_two === 'Show Name' && pushedTS.page === 1 && !!pushedTS.movie && pushedTS.movie.title === 'Show Name' && pushedTS.movie.original_title === 'Show Name' && pushedTS.movie.img === 'https://045.ultradox.click/upload/show.jpg' && pushedTS.movie.release_date === '2021' && Array.isArray(pushedTS.movie.genres) && pushedTS.movie.genres.length === 2 && pushedTS.movie.number_of_seasons === 1 && pushedTS.movie.source === 'ultradox', JSON.stringify(pushedTS && { s: pushedTS.search, m: pushedTS.movie }));
 check('fullpage: the core press starts nothing (no player, no torrent, no request)', L.Player.plays.length === playsBeforeOnline && L.Torrent.calls.length === torrBeforeTorr && L.Noty.msgs.length === notiesBeforeOnline && fetches.length === fetchesBeforeOnline, JSON.stringify({ plays: L.Player.plays.length - playsBeforeOnline, torr: L.Torrent.calls.length - torrBeforeTorr, fetches: fetches.length - fetchesBeforeOnline }));
+// The plot the detail page already shows must ride the SAME payload: the core
+// Torrents info column (Explorer) reads movie.overview, while absent data the
+// core keeps its own "no data" placeholder (an empty string would suppress
+// even that). Everything below comes from the detail payload fetched for this
+// page - the press above made zero requests (no extra HTTP by construction).
+check('fullpage(series): the torrents payload carries the SAME overview the detail page shows (memory only, no re-fetch)', !!pushedTS && pushedTS.movie.overview === 'Детективний серіал про агентку.' && !!series.detail && pushedTS.movie.overview === series.detail.overview, JSON.stringify(pushedTS && pushedTS.movie.overview));
+check('fullpage(series): the torrents payload carries the site genre list as [{name}] (the core caps at three, uppercases the first letter)', !!pushedTS && JSON.stringify(pushedTS.movie.genres) === JSON.stringify([{ name: 'Детектив' }, { name: 'Драма' }]), JSON.stringify(pushedTS && pushedTS.movie.genres));
+check('fullpage(series): the torrents payload carries the site country (bare name entry - no ISO code invented)', !!pushedTS && JSON.stringify(pushedTS.movie.production_countries) === JSON.stringify([{ name: 'США' }]), JSON.stringify(pushedTS && pushedTS.movie.production_countries));
+check('fullpage(series): the torrents payload carries the already-loaded TMDB rating (no extra request; absent when the enrichment did not deliver one)', !!pushedTS && pushedTS.movie.vote_average === 8.1, String(pushedTS && pushedTS.movie.vote_average));
+check('fullpage(series): the torrents press keeps the detail page intact (back returns to it with its state)', sh.find('.udxf__overview').text() === 'Детективний серіал про агентку.' && sh.find('.udxf__title').text() === 'Show Name' && tBtn.handlers['hover:enter'].length === tHandlers, JSON.stringify({ o: sh.find('.udxf__overview').text(), t: sh.find('.udxf__title').text(), h: tBtn.handlers['hover:enter'].length }));
 
 // The online page from its own payload: the read-only re-probe of the item
 // page for its real embeds, then the pick-gated standard player call.
@@ -1339,6 +1356,8 @@ check('fullpage(film): pick hands off the exact release (MagnetUri/Size)', (func
 ftBtn.handlers['hover:enter'].forEach((f) => f());
 const pushedFTs = L.Activity.pushes[L.Activity.pushes.length - 1];
 check('fullpage(film): "TorrServer" opens the core torrents search page (title+year search, film metadata)', !!pushedFTs && pushedFTs.component === 'torrents' && pushedFTs.search === 'Great Movie 2023' && pushedFTs.search_one === 'Great Movie' && !!pushedFTs.movie && pushedFTs.movie.number_of_seasons === 0 && pushedFTs.movie.img === '', JSON.stringify(pushedFTs && { s: pushedFTs.search, m: pushedFTs.movie }));
+check('fullpage(film): the torrents payload carries the SAME overview the film detail page shows (memory only)', !!pushedFTs && pushedFTs.movie.overview === 'Епічна історія космічної одесьи.' && !!film.detail && pushedFTs.movie.overview === film.detail.overview, JSON.stringify(pushedFTs && pushedFTs.movie.overview));
+check('fullpage(film): the torrents payload carries the film genre + country, and NO rating (the page has no TMDB id - nothing is invented)', !!pushedFTs && JSON.stringify(pushedFTs.movie.genres) === JSON.stringify([{ name: 'Фантастика' }]) && JSON.stringify(pushedFTs.movie.production_countries) === JSON.stringify([{ name: 'Франція' }]) && pushedFTs.movie.vote_average === undefined, JSON.stringify(pushedFTs && { g: pushedFTs.movie.genres, c: pushedFTs.movie.production_countries, v: pushedFTs.movie.vote_average }));
 
 // The film page carries no #iframe_block-player embed: the online page
 // (driven from its own payload - no longer a strip route) shows a clear
@@ -1551,6 +1570,97 @@ check('multi: picking the 720p row hands off exactly that release', (function ()
 })(), JSON.stringify(L.Torrent.calls[L.Torrent.calls.length - 1] && L.Torrent.calls[L.Torrent.calls.length - 1].o));
 check('multi: the pick runs the standard flow silently (no stray noty)', L.Noty.msgs.length === mNoties, JSON.stringify(L.Noty.msgs.slice(mNoties)));
 
+// ---------- FullPage: cast/director overflow (the "Анатомия страсти" class) ----------
+// A soap-opera detail page with a huge ensemble (55 cast names incl. one
+// oversized name) and a long director list (12). The FULL lists stay in the
+// data payload and the DOM (nothing is cut in JS); the DISPLAY clamps to 2
+// lines with an ellipsis via the .udxf__fact CSS rule, so the meta column
+// stays compact and the action pills ride the poster bottom instead of being
+// pushed off-screen / the page top scrolled out of view. Short lists show
+// fully; a page without a cast field renders no empty block; the overview is
+// never clamped by this.
+console.log('fullpage: big-cast multi-season series (55 actors, 12 directors)');
+const BIG_CAST = ['Ева Лонгорри', 'Эрин Гордун', 'Сьюзан Боллард', 'Рон Пирс', 'Кристина Локетт', 'Стив Холланд', 'Сьюзан Снайдер', 'Дейбл Рамирес', 'Фил Омаха', 'Кэтрин Стэнтон', 'Кэти Кларк', 'Джейн Уокер', 'Бренда Бакстер', 'Трейси Эвери', 'Сьюзен Боумен', 'Шэрон Мейсон', 'Дайан Лэнг', 'Келли Картер', 'Джуди Холт', 'Мариса Чавес', 'Анхель Диас', 'Вера Нельсон', 'Гвендолин Райт', 'Люси Фостер', 'Николь Брандт', 'Саманта Кинг', 'Алесса Моран', 'Кристалл Грэйс', 'Мелани Уотсон', 'Тина Барнс', 'Роксанн Кей', 'Шелли Гроув', 'Дейдра Холман', 'Памела Стюарт', 'Кортни Белл', 'Джессика Рид', 'Лорен Адлер', 'Сандра Клайн', 'Беатрис Уорд', 'Изабелла Скотт', 'Валентина Русова', 'Нина Зайцева', 'Анна Соколова', 'Мария Белова', 'Ирина Кравец', 'Юлия Степанова', 'Дарина Клименко', 'Светлана Мороз', 'Наталья Громова', 'Виктория Ланская', 'Елизавета Тарасова', 'Полина Савчук', 'Ксения Марченко', 'Алиса Верещагина', 'Герман Петрович Вельтхаймер-фон-Зальцбург'];
+const BIG_DIRECTORS = ['Олексій Смирнов', 'Віктор Гринь', 'Тетяна Мороз', 'Ігор Балашов', 'Олена Кравець', 'Дмитро Савін', 'Марина Гущина', 'Сергій Лобанов', 'Наталія Верба', 'Андрій Клименко', 'Оксана Гладка', 'Роман Ткачук'];
+const BIG_OVERVIEW = 'Мелодрама про дві родини, чиї долі переплелися понад півстоліття тому. Кожен новий сезон приносить зради, кохання та інтриги, а відомі актори змінюють улюблених героїв.';
+const BIG_URL = 'https://045.ultradox.click/serial/soap-1987/';
+ROUTES.set(BIG_URL,
+    '<html><head>' +
+    '<meta name="description" content="' + BIG_OVERVIEW + '"></head><body><ul>' +
+    '<li><span>Жанр:</span> Драма, Мелодрама</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> США</li>' +
+    '<li><span>Год:</span> 1987</li>' +
+    '<li><span>Время:</span> 42 мин.</li>' +
+    '<li><span>Перевод:</span> Многоголосый</li>' +
+    '<li><span>Качество:</span> WEB-DLRip</li>' +
+    '<li itemprop="director"><span>Режиссерский состав:</span> ' + BIG_DIRECTORS.join(', ') + '</li>' +
+    '<li itemprop="actor"><span>В Ролях:</span> ' + BIG_CAST.join(', ') + '</li>' +
+    '</ul></body></html>');
+const bigC = new FP({ item: { title: 'Анатомия страсти (1987)', serial: true, itemUrl: BIG_URL, poster: '' } });
+bigC.activity = { loader() {}, toggle() {} };
+bigC.create();
+const bigR = bigC.render();
+check('bigcast(55 actors): title (year suffix stripped)', txt(bigR, '.udxf__title') === 'Анатомия страсти', txt(bigR, '.udxf__title'));
+check('bigcast(55 actors): top line (NUM order: year first, comma, country)', txt(bigR, '.udxf__top') === '1987, США', txt(bigR, '.udxf__top'));
+check('bigcast(55 actors): the overview stays COMPLETE in the details strip (the cast fix must not clamp the plot)', txt(bigR, '.udxf__overview') === BIG_OVERVIEW, txt(bigR, '.udxf__overview'));
+check('bigcast(55 actors): the FULL cast list stays in the data payload (nothing cut at the parser level)', !!bigC.detail && bigC.detail.cast === BIG_CAST.join(', '), bigC.detail ? 'len=' + String(bigC.detail.cast).length : 'no detail');
+check('bigcast(55 actors): the cast row carries every name in the DOM (no JS truncation - the 2-line clamp is display-only CSS)', txt(bigR, '.udxf__fact--cast') === 'У ролях: ' + BIG_CAST.join(', '), txt(bigR, '.udxf__fact--cast').slice(0, 80));
+check('bigcast(55 actors): the oversized single name survives the row (break-word is the display guard, not a data cut)', txt(bigR, '.udxf__fact--cast').indexOf('Герман Петрович Вельтхаймер-фон-Зальцбург') !== -1, 'long name missing');
+check('bigcast(12 directors): the full director list stays in data/DOM (same unbounded-wrap source, same clamp)', !!bigC.detail && bigC.detail.director === BIG_DIRECTORS.join(', ') && txt(bigR, '.udxf__fact--director') === 'Режисер: ' + BIG_DIRECTORS.join(', '), txt(bigR, '.udxf__fact--director').slice(0, 80));
+check('bigcast(55 actors): the meta column geometry holds - both fact rows sit above the action pills', (function () {
+    const d = bigR.find('.udxf__fact--director');
+    const c = bigR.find('.udxf__fact--cast');
+    const a = bigR.find('.udxf__actions');
+    if (!d || !c || !a) return false;
+    const meta = d._parent;
+    if (!meta || !meta.classes.has('udxf__meta') || c._parent !== meta || a._parent !== meta) return false;
+    const iD = meta.children.indexOf(d);
+    const iC = meta.children.indexOf(c);
+    const iA = meta.children.indexOf(a);
+    return iD !== -1 && iC !== -1 && iA !== -1 && iD < iC && iC < iA;
+})(), 'facts must precede the pills inside .udxf__meta');
+check('bigcast(55 actors): the action strip stays present and intact under the compact meta (online + TorrServer, no duplication)', findAll(bigR, 'udxf__actions').length === 1 && bigR.find('.udxf__act--online') !== null && bigR.find('.udxf__act--torrents') !== null, findAll(bigR, 'udxf__actions').length + ':' + String(!!bigR.find('.udxf__act--online')));
+check('bigcast(55 actors): no TMDB id -> enrichment slots stay hidden (no invented seasons/rating)', (function () { const r = bigR.find('.udxf__rate'); const o = bigR.find('.udxf__orig'); const s = bigR.find('.udxf__seasons'); return !!(r && o && s) && r.classes.has('hide') && o.classes.has('hide') && s.classes.has('hide') && r.text() === '' && o.text() === '' && s.text() === ''; })(), JSON.stringify([txt(bigR, '.udxf__rate'), txt(bigR, '.udxf__orig'), txt(bigR, '.udxf__seasons')]));
+
+// A short list (2 actors, 1 director): nothing to clamp - the row shows the
+// whole list, the CSS clamp is inert under 2 lines.
+console.log('fullpage: short cast (2 actors)');
+const SHORT_URL = 'https://045.ultradox.click/nerufilm/two-actors-1998/';
+ROUTES.set(SHORT_URL,
+    '<html><head></head><body><ul>' +
+    '<li><span>Жанр:</span> Комедія</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> Італія</li>' +
+    '<li><span>Год:</span> 1998</li>' +
+    '<li><span>Время:</span> 96 мин.</li>' +
+    '<li itemprop="director"><span>Режиссерский состав:</span> Паоло Ренато</li>' +
+    '<li itemprop="actor"><span>В Ролях:</span> Ола Штерн, Макс Верлен</li>' +
+    '</ul></body></html>');
+const shortC = new FP({ item: { title: 'Two Actors (1998)', serial: false, itemUrl: SHORT_URL, poster: '' } });
+shortC.activity = { loader() {}, toggle() {} };
+shortC.create();
+const shortR = shortC.render();
+check('shortcast(2 actors): a short list shows fully in the DOM (no ellipsis, nothing to clamp)', txt(shortR, '.udxf__fact--cast') === 'У ролях: Ола Штерн, Макс Верлен', txt(shortR, '.udxf__fact--cast'));
+check('shortcast: the single director row is intact', txt(shortR, '.udxf__fact--director') === 'Режисер: Паоло Ренато', txt(shortR, '.udxf__fact--director'));
+
+// No cast field at all (0 actors) but a director: no empty block rendered,
+// the other fact row keeps showing.
+console.log('fullpage: zero-actor page (cast field absent)');
+const NOCAST_URL = 'https://045.ultradox.click/nerufilm/no-cast-2001/';
+ROUTES.set(NOCAST_URL,
+    '<html><head></head><body><ul>' +
+    '<li><span>Жанр:</span> Трилер</li>' +
+    '<li itemprop="contributor"><span> Страна: </span> Німеччина</li>' +
+    '<li><span>Год:</span> 2001</li>' +
+    '<li itemprop="director"><span>Режиссерский состав:</span> Клаус Брандт</li>' +
+    '</ul></body></html>');
+const nocaC = new FP({ item: { title: 'No Cast (2001)', serial: false, itemUrl: NOCAST_URL, poster: '' } });
+nocaC.activity = { loader() {}, toggle() {} };
+nocaC.create();
+const nocaR = nocaC.render();
+check('nocast(0 actors): the cast row is hidden and empty (no empty block rendered)', (function () { const c = nocaR.find('.udxf__fact--cast'); return !!c && c.classes.has('hide') && c.text() === ''; })(), JSON.stringify([txt(nocaR, '.udxf__fact--cast')]));
+check('nocast: the director row still shows (an absent cast must not hide the other facts)', txt(nocaR, '.udxf__fact--director') === 'Режисер: Клаус Брандт', txt(nocaR, '.udxf__fact--director'));
+check('nocast: the overview strip is unaffected (no plot on the page -> empty strip, page intact)', txt(nocaR, '.udxf__overview') === '' && nocaR.find('.udxf__details') !== null, JSON.stringify([txt(nocaR, '.udxf__overview')]));
+
 // ---------- empty detail: no releases -> noty, selector untouched ----------
 console.log('fullpage: empty detail');
 const MISSING_ITEM = { title: 'Missing (1999)', serial: false, itemUrl: 'https://045.ultradox.click/serial/missing-1999/', poster: '' };
@@ -1585,6 +1695,10 @@ try {
     mT2.handlers['hover:enter'].forEach((f) => f());
     const pushedMTs = L.Activity.pushes[L.Activity.pushes.length - 1];
     check('fullpage(empty): "TorrServer" opens the core torrents search page with the bare-title search (no year in the failed detail)', !!pushedMTs && pushedMTs.component === 'torrents' && pushedMTs.search === 'Missing' && pushedMTs.search_one === 'Missing' && !!pushedMTs.movie && pushedMTs.movie.number_of_seasons === 0 && L.Select.last === selBefore, JSON.stringify(pushedMTs && { c: pushedMTs.component, s: pushedMTs.search }));
+    // No overview in the source -> the payload OMITS the key entirely (an
+    // empty string would suppress the core's own placeholder): the standard
+    // Lampa "no data" fallback stays exactly as the core draws it.
+    check('fullpage(empty): no overview in the source -> the payload omits it and the genre/country/rating keys (the core keeps its standard placeholder)', !!pushedMTs && pushedMTs.movie.overview === undefined && pushedMTs.movie.genres.length === 0 && !('production_countries' in pushedMTs.movie) && pushedMTs.movie.vote_average === undefined, JSON.stringify(pushedMTs && pushedMTs.movie));
 
     lpeO = new LP_O({ title: MISSING_ITEM.title, component: 'ultradox_online', item: MISSING_ITEM, detail: missing.detail, seasons: missing.detail && missing.detail.seasons });
     lpeO.activity = { loader() {}, toggle() {} };
@@ -1650,7 +1764,7 @@ check('grid: repeated focus keeps the badge text intact', filmCard.find('.udx-ki
 // detail -> back -> catalog re-showing/hiding the bar - cannot happen).
 console.log('fullpage: core top bar lifecycle');
 check('fullpage: the top bar stays while any Ultradox screen is alive (no body class touched)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
-[cat, filterCat, series, lpO, film, lpFO, dead, lpD, nobg, shark, pp, multi, missing, lpeO, tfFail, tfThrow, series2].forEach((c) => c.destroy());
+[cat, filterCat, series, lpO, film, lpFO, dead, lpD, nobg, shark, pp, multi, bigC, shortC, nocaC, missing, lpeO, tfFail, tfThrow, series2].forEach((c) => c.destroy());
 check('fullpage: the top bar stays when the last screen leaves (all screens destroyed)', !bodyClasses.has('udx-nohead') && bodyClasses.size === 0, String(bodyClasses));
 const lcCat = new Comp({ category: 'serial' });
 lcCat.activity = { loader() {}, toggle() {} };

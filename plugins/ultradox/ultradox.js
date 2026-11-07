@@ -454,11 +454,20 @@
         // Reposition them inside the poster on every card of Lampa.
         '.card__view>.content-label{left:10px!important;top:10px!important;}' +
         '.card__view>.card__quality{left:10px!important;bottom:10px!important;}' +
-        // Full-width details strip under the top zone: heading, the complete
-        // overview, director and the full cast (wrapped, never truncated).
+        // Full-width details strip under the top zone: heading + the complete
+        // overview (never clamped - the full plot always shows).
         '.udxf__details{padding:0 6% 1% 5%;}' +
         '.udxf__details-head{font-size:1.3em;font-weight:700;line-height:1.3;color:#fff;margin-top:.6em;}' +
-        '.udxf__fact{font-size:1.08em;line-height:1.45;color:rgba(255,255,255,.6);margin-top:.5em;}' +
+        // Director + cast fact rows (meta column): the FULL list always stays
+        // in the data payload and the DOM - only the DISPLAY is compact: a
+        // 2-line clamp with the ellipsis (the title/card-title line-clamp
+        // pattern, TV-validated) so a long ensemble cast or a long director
+        // list can never stretch the meta column, push the action pills
+        // off-screen or scroll the page top out of view (user report
+        // 2026-11-07: a soap-opera detail page with dozens of actors). Names
+        // wrap at word boundaries; break-word only splits a single oversized
+        // name (the same guard the title carries).
+        '.udxf__fact{font-size:1.08em;line-height:1.45;color:rgba(255,255,255,.6);margin-top:.5em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:break-word;}' +
         // The director line sits a touch lower in the meta column (user
         // request 2026-11-05: the fact pair read too high under the rating
         // line); the cast line keeps its .5em gap below the director.
@@ -1719,8 +1728,10 @@
     // large poster on the left, the meta block on the right (country • year,
     // large title, original title, rating badge, runtime • genre line,
     // seasons) with the two MODS-style action pills below it, and the
-    // full-width "Детально" details strip (complete overview, director, full
-    // cast - nothing clamped or truncated) inside a scroll viewport, with
+    // full-width "Детально" details strip (the complete overview - never
+    // clamped) inside a scroll viewport, the director + full cast lines in
+    // the meta column (every name kept in data/DOM; the display clamps to
+    // 2 lines with an ellipsis so a long cast can't push the layout), with
     // exactly two actions:
     //   left  "Онлайн"    -> opens the in-page release SIDE WINDOW (user
     //                        request 2026-11-04, replaces the old dedicated
@@ -1732,8 +1743,13 @@
     //                        move closes the window and refocuses the strip;
     //   right "TorrServer"-> pushes the core Lampa torrents search page
     //                        (component 'torrents', the title+year search and
-    //                        the item's movie metadata); the result list is
-    //                        rendered by the core from the parser response.
+    //                        the item's movie metadata: the detail page's own
+    //                        overview/plot, the site genre/country and the
+    //                        already-loaded TMDB rating fill the core info
+    //                        column from memory - no extra request; absent
+    //                        data stays absent, the core keeps its own
+    //                        placeholder); the result list is rendered by the
+    //                        core from the parser response.
     // TMDB enrichment (rating / original title / seasons) is best-effort via
     // the core Lampa.TMDB integration; without it the page shows the
     // Ultradox data alone. Back returns to the catalog on the same card.
@@ -1745,6 +1761,7 @@
         var onlineBtn = null, torrentsBtn = null;
         var lastAct = null;
         var tmdbSeasons = 0;
+        var tmdbRating = 0;
         var enrichToken = 0;
         var bgGen = 0;
         var udxRoot = null;
@@ -1787,8 +1804,9 @@
                 html.append($(DETAIL_HTML));
                 udxRoot = html.find('.udxf');
                 // Scroll viewport inside the slot: the zone + details strip
-                // are one content node (the page grows when the overview or
-                // the cast is long - no text is ever clamped).
+                // are one content node (the page grows when the overview is
+                // long; the cast/director lines are display-clamped to two
+                // lines, so they never grow the page).
                 var content = document.createElement('div');
                 content.addClass('udxf__content');
                 content.append($(ZONE_HTML));
@@ -1951,8 +1969,10 @@
             slotShow('.udxf__overview', d.overview || '');
             slotShow('.udxf__fact--director', d.director ? L.Lang.translate('ultradox_director') + ': ' + d.director : '');
 
-            // Full cast list: every name the page carries, wrapped - no name
-            // cap and no ellipsis truncation.
+            // Full cast list: every name the page carries stays in the data
+            // payload and in this element (no name cap, nothing cut in JS);
+            // the .udxf__fact CSS clamp shows at most 2 lines with an
+            // ellipsis, so a long ensemble cast never stretches the layout.
             var castNames = d.cast ? String(d.cast).split(',').map(function (n) { return n.replace(/\s+/g, ' ').trim(); }).filter(function (n) { return n; }) : [];
             var castShown = castNames.join(', ');
             slotShow('.udxf__fact--cast', castShown ? L.Lang.translate('ultradox_cast') + ': ' + castShown : '');
@@ -1975,9 +1995,18 @@
 
         // Movie metadata for the core torrent screens. The Ultradox card has
         // no TMDB id: the core derives a storage key from it, which is
-        // harmless. genres stays an empty list so the core's genre branch
-        // remains inert; number_of_seasons=1 marks a serial, which the core
-        // uses to sort results by season/episode.
+        // harmless. The core Torrents screen's info column (Explorer) reads
+        // the rest straight from this object: the plot is movie.overview -
+        // exactly the text the detail page already shows, taken from the
+        // detail payload fetched for this page (no extra request); while the
+        // key stays ABSENT the core keeps its own "no data" placeholder (an
+        // empty string would suppress even that), genres are the site's own
+        // list as [{name}] entries (the core caps at three and uppercases the
+        // first letter), the country rides production_countries with a bare
+        // name (the site gives no ISO code - the core falls back to the entry
+        // name when it has none), and the rating only when the already-loaded
+        // TMDB enrichment delivered one. number_of_seasons=1 marks a serial,
+        // which the core uses to sort results by season/episode.
         function moviePayload() {
             var title = stripYear(item.title);
             var year = item.year || (detail && detail.year) || '';
@@ -1994,6 +2023,14 @@
                 p.original_name = title;
                 p.first_air_date = year;
             }
+            var d = detail;
+            if (d && d.overview) p.overview = d.overview;
+            if (d && d.genre) {
+                var gs = String(d.genre).split(',').map(function (n) { return n.replace(/\s+/g, ' ').trim(); }).filter(function (n) { return n; });
+                if (gs.length) p.genres = gs.map(function (n) { return { name: n }; });
+            }
+            if (d && d.country) p.production_countries = [{ name: String(d.country).replace(/\s+/g, ' ').trim() }];
+            if (tmdbRating > 0) p.vote_average = tmdbRating;
             return p;
         }
 
@@ -2150,6 +2187,11 @@
             // ("8.1 TMDB"), no word prefix.
             if (typeof d.vote_average === 'number' && d.vote_average > 0) {
                 slotShow('.udxf__rate', (Math.round(d.vote_average * 10) / 10).toFixed(1) + ' TMDB');
+                // Remember the same value for the core torrents payload: the
+                // enrichment already fetched it for this page, so passing it
+                // on costs no extra request (an absent rating stays absent -
+                // nothing is invented).
+                tmdbRating = Math.round(d.vote_average * 10) / 10;
             }
             var ot = String(d.original_title || '');
             var shown = stripYear(String(item.title || ''));
@@ -2215,6 +2257,7 @@
             onlineBtn = null; torrentsBtn = null; udxRoot = null;
             lastAct = null;
             tmdbSeasons = 0;
+            tmdbRating = 0;
             enrichToken++;
             bgGen++;
             panelEl = null; panelScroll = null; panelBox = null;
