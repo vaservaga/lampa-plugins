@@ -1180,6 +1180,25 @@
             }
             this.setActive();
             this.display();
+            // DIAG PROBE (temporary, TV test 2026-11-07): paint both
+            // ambience layers with data-URI markers before any focus -
+            // layer 0 keeps the production filter (blur/brightness/
+            // saturate), layer 1 is unfiltered at half opacity and sits
+            // on top (later in DOM). Answers in one capture: does the
+            // layer stack render at all, does the blur filter kill the
+            // layer, and (after the first card focus runs the normal
+            // focusBackdrop path into the unfiltered layer) does a
+            // cross-origin poster load as a CSS background on the TV.
+            if (bgLayers[0]) {
+                bgLayers[0].style.backgroundImage='url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY/jP8P8/AAb+Av4jsC+eAAAAAElFTkSuQmCC")';
+                bgLayers[0].addClass('udx-bg--on');
+            }
+            if (bgLayers[1]) {
+                bgLayers[1].style.filter='none';
+                bgLayers[1].style.opacity='0.5';
+                bgLayers[1].style.backgroundImage='url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY2D4//8/AAX/Av5xy53tAAAAAElFTkSuQmCC")';
+                bgLayers[1].addClass('udx-bg--on');
+            }
         };
 
         this.buildCats = function () {
@@ -1786,16 +1805,15 @@
                 bg.removeClass('udxf__backdrop--poster');
             }
             if (udxRoot) udxRoot.removeClass('udxf--poster');
-            if (d.backdrop && bg) {
-                bg.style.backgroundImage = 'url("' + d.backdrop.replace(/"/g, '%22') + '")';
+            // DIAG PROBE (temporary, TV test 2026-11-07): unfiltered
+            // backdrop with the real URL (magenta when neither source
+            // exists) - isolates cross-origin loading from the blur
+            // filter on the TV.
+            if (bg) {
+                bg.style.filter='none';
+                var probeUrl = d.backdrop || posterBackdrop || '';
+                bg.style.backgroundImage = 'url("' + (probeUrl || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAANSURBVBhXY/jP8P8/AAb+Av4jsC+eAAAAAElFTkSuQmCC').replace(/"/g, '%22') + '")';
                 bg.addClass('udxf__backdrop--on');
-            } else if (posterBackdrop && bg) {
-                // Poster as backdrop: the plain image only - all darkening
-                // lives in the zone veil (.udxf--poster state), not embedded
-                // into the background-image here.
-                bg.style.backgroundImage = 'url("' + posterBackdrop.replace(/"/g, '%22') + '")';
-                bg.addClass('udxf__backdrop--poster');
-                if (udxRoot) udxRoot.addClass('udxf--poster');
             }
 
             html.find('.udxf__title').text(stripYear(item.title));
