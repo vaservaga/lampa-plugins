@@ -1138,21 +1138,23 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     const fEm = base && base[1].match(/font-size:([\d.]+)em/);
     const px = hEm && fEm ? parseFloat(hEm[1]) * parseFloat(fEm[1]) * 16 : 0;
     check('strip: shared base height is in the 60-64px band at the 1080p root font', !!base && px >= 60 && px <= 64, 'height=' + px + 'px');
-    check('strip: both controls share ONE gradient pill - no per-role rules at all (no color/geometry override possible)', src.indexOf('.udxf__act--online{') === -1 && src.indexOf('.udxf__act--torrents{') === -1, 'role rules must be gone');
-    // Focus (user request 2026-11-07, refined per the reference screenshots):
-    // the pill brightens via filter (no layout shift) and its light greenish
-    // glow intensifies - NO white border/ring. The rule restates color:#fff
+    check('strip: both controls share ONE shared base - no per-role rules at all (no color/geometry override possible)', src.indexOf('.udxf__act--online{') === -1 && src.indexOf('.udxf__act--torrents{') === -1, 'role rules must be gone');
+    // Hover/focus (user request 2026-11-07 final, per the reference
+    // screenshots): the TRANSPARENT pill turns into the 1:1 reference
+    // gradient with the greenish glow - brightness lift via filter (no
+    // layout shift), NO white border/ring. The rule restates color:#fff
     // and the gradient background: the core .simple-button.focus (same 0-2-0
     // specificity, decompiled core_app.css) sets background-color:#fff;
     // color:#000, and the base rule (0-1-0) cannot stop that invert - only
-    // declarations inside this 0-2-0 rule, winning the document-order tie
+    // declarations inside these 0-2-0 rules, winning the document-order tie
     // (plugin style tag appended after the core sheet), keep text/icon white.
-    check('strip: focus lifts the pill (brightness filter + intensified greenish glow, NO white border; restated white color + gradient override the core .simple-button.focus invert; transform-free, zero layout shift)', /\.udxf__act\.focus\{filter:brightness\(1\.18\);color:#fff;background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);box-shadow:0 0 1\.4em rgba\(87,245,112,\.62\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1 && src.indexOf('rgba(255,255,255,.9)') === -1, 'non-contract focus rule present');
-    // Resting state (reference screenshots): a light greenish glow around
-    // each pill, and the core .simple-button margin-right:1em leak is
-    // neutralized so the pair keeps the compact 1em gap (the old render
-    // showed a 2em inter-pill space).
-    check('strip: the resting pill carries the light greenish glow + zero margin (compact 1em pair gap, no 1.6em icon-label space)', /\.udxf__act\{[^}]*margin:0;[^}]*box-shadow:0 0 \.9em rgba\(87,245,112,\.28\);[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src), 'resting glow/margin missing');
+    check('strip: hover/focus lights the transparent pill into the 1:1 reference gradient (brightness filter + greenish glow, NO white border; restated white color + gradient override the core .simple-button.focus invert; transform-free, zero layout shift)', /\.udxf__act\.focus\{filter:brightness\(1\.18\);color:#fff;background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);box-shadow:0 0 1\.4em rgba\(87,245,112,\.62\);\}/.test(src) && /\.udxf__act\.hover\{filter:brightness\(1\.18\);color:#fff;background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);box-shadow:0 0 1\.4em rgba\(87,245,112,\.62\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1 && src.indexOf('rgba(255,255,255,.9)') === -1, 'non-contract focus rule present');
+    // Resting state (user request 2026-11-07 final): the pill is TRANSPARENT
+    // - no gradient, no glow - only the white icon + label over the page
+    // ambience; the color appears only on hover/focus. The core
+    // .simple-button margin-right:1em leak is neutralized so the pair keeps
+    // the compact 1em gap (the old render showed a 2em inter-pill space).
+    check('strip: the resting pill is transparent (no gradient, no glow - the color appears only on hover/focus) with zero margin (compact 1em pair gap, no 1.6em icon-label space)', /\.udxf__act\{[^}]*margin:0;[^}]*color:#fff;[^}]*background:transparent;\}/.test(src) && src.indexOf('0 0 .9em rgba(87,245,112,.28)') === -1, 'resting pill must be transparent');
     // Core child-rule leaks neutralized (decompiled core_app.css:
     // .simple-button > svg 1.5em, > span margin-top:-0.2em,
     // > svg + span margin-left:1em): the icon renders at the contract 1em
@@ -1170,7 +1172,7 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('css: the director/cast fact rows clamp to 2 lines with the ellipsis (the title line-clamp pattern: the FULL list stays in data/DOM, a long ensemble cast can never stretch the meta column, push the pills off-screen or scroll the top out of view; word-boundary wrap, break-word only splits a single oversized name)', /\.udxf__fact\{font-size:1\.08em;line-height:1\.45;color:rgba\(255,255,255,\.6\);margin-top:\.5em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:break-word;\}/.test(src), 'fact clamp rule missing');
     check('css: the meta text block is a touch larger (user request 2026-11-06: genre line and the director/cast fact lines at 1.08em)', /\.udxf__line\{font-size:1\.08em;color:rgba\(255,255,255,\.5\);margin-top:\.5em;\}/.test(src), 'meta line scale missing');
     check('css: the director fact line sits a touch lower in the meta column (user request 2026-11-05: margin-top 1em, cast keeps its .5em gap)', /\.udxf__fact--director\{margin-top:1em;\}/.test(src), 'fact--director offset missing');
-    check('strip: the resting state is the 1:1 reference gradient pill itself (smooth green->blue sweep left to right, white icon + white regular-weight 1.3em label vertically centered, compact ~60px bar, no per-role rules - user request 2026-11-07: the buttons are the reference gradient, not a dark rectangle)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src), 'gradient base missing');
+    check('strip: the resting state is a transparent pill with the full reference geometry (white icon + white regular-weight 1.3em label vertically centered, compact ~60px bar, no per-role rules - the gradient/glow belong to hover/focus only, user request 2026-11-07 final)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:transparent;\}/.test(src), 'transparent base missing');
     check('strip: both icon containers are identical 1em inline SVGs (reference proportion to the 1.3em label)', src.indexOf("ICON_PLAY = '<svg width=\"1em\" height=\"1em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1em\" height=\"1em\"") !== -1, 'icon container mismatch');
     // Reference screenshot 2: the "Торренти" mark is a SOLID white circular
     // silhouette with the "u" cut out (evenodd - the gradient shows through

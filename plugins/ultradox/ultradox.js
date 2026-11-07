@@ -424,45 +424,48 @@
         '.udxf__overview{font-size:1.1em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~60px tall at the 1080p root font
         // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
-        // columns. The RESTING surface is the 1:1 reference green->blue
-        // gradient itself (user request 2026-11-07: the buttons are the
-        // reference gradient, not a dark rectangle the focus reveals):
-        // large rounded rectangle, a smooth mint->blue sweep left to right,
-        // a light greenish glow around the pill (reference screenshots,
-        // 2026-11-07), the white icon left of the white regular-weight label,
-        // both vertically centered by the inline-flex base. Focus (D-pad
-        // readable, transform-free, zero layout shift): a moderate brightness
-        // lift of the same gradient + the SAME greenish glow intensified -
-        // NO white border (user request 2026-11-07: the reference focus is a
-        // glow, not a ring). The rule also restates color:#fff and the
-        // gradient background: the core .simple-button.focus (same 0-2-0
-        // specificity, verified in the decompiled core_app.css) sets
-        // background-color:#fff; color:#000, and a plain base rule (0-1-0)
-        // CANNOT stop the invert - only declarations inside this 0-2-0 rule,
-        // winning the document-order tie (plugin style tag appended after the
-        // core sheet), keep the text and icon white. The core's child leaks
-        // (.simple-button > svg 1.5em, > span margin-top:-0.2em,
-        // > svg + span margin-left:1em, margin-right:1em) are neutralized by
-        // the overrides below so the icon stays the contract 1em, the label
-        // sits exactly centered and the pair keeps the compact 1em/.6em gaps.
-        // No per-role rules - both inherit this base.
+        // columns. The RESTING pill is TRANSPARENT (user request 2026-11-07
+        // final: no gradient, no glow at rest - only the white icon left of
+        // the white regular-weight label over the page ambience). The 1:1
+        // reference green->blue gradient + the greenish glow (reference
+        // screenshots) appear ONLY on hover/focus, when the D-pad lands on
+        // the pill (the core hover:enter = focus entry also applies the
+        // .hover class): a moderate brightness lift of the gradient + the
+        // 1.4em glow - NO white border, NO ring. Hover/focus are
+        // transform-free (filter + box-shadow only), so the pair keeps zero
+        // layout shift between states. The hover/focus rules restate
+        // color:#fff and the gradient background: the core .simple-button.
+        // focus (same 0-2-0 specificity, verified in the decompiled
+        // core_app.css) sets background-color:#fff; color:#000, and a plain
+        // base rule (0-1-0) CANNOT stop the invert - only declarations
+        // inside these 0-2-0 rules, winning the document-order tie (plugin
+        // style tag appended after the core sheet), keep the text and icon
+        // white (the .hover rule restates them too). The core's child leaks
+        // (.simple-button > svg 1.5em,
+        // > span margin-top:-0.2em, > svg + span margin-left:1em,
+        // margin-right:1em) are neutralized by the overrides below so the
+        // icon stays the contract 1em, the label sits exactly centered and
+        // the pair keeps the compact 1em/.6em gaps. No per-role rules - both
+        // inherit this base.
         // The action strip rides the BOTTOM of the poster (the meta column is
         // a flex column stretched to the poster height): margin-top:auto eats
         // the free space, so the text starts at the poster top and the pills
         // sit at the poster bottom - the reference layout.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;box-shadow:0 0 .9em rgba(87,245,112,.28);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         // The core sizes .simple-button children (1.5em svg, shifted span
         // margins); restate the contract geometry so it wins the document-
         // order tie and both pills stay identical.
         '.udxf__act svg{flex:0 0 auto;width:1em;height:1em;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxf__act>svg+span{margin:0;}' +
-        // Focus: the pill brightens (filter only - no layout shift) and its
-        // greenish glow intensifies; the restated white color + gradient keep
-        // the core's .simple-button.focus invert (black text on white) from
-        // ever reaching the pill.
+        // Hover/focus: the transparent pill turns into the 1:1 reference
+        // gradient with the greenish glow (brightness lift, filter only - no
+        // layout shift); the restated white color + gradient keep the core's
+        // .simple-button.focus invert (black text on white) from ever
+        // reaching the pill.
         '.udxf__act.focus{filter:brightness(1.18);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
+        '.udxf__act.hover{filter:brightness(1.18);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
