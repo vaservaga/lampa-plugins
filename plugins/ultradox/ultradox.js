@@ -426,24 +426,32 @@
         '.udxf__overview{font-size:1.1em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~60px tall at the 1080p root font
         // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
-        // columns. The RESTING pill is TRANSPARENT (user request 2026-11-07
-        // final: no gradient, no glow at rest - only the white icon left of
-        // the white regular-weight label over the page ambience). The 1:1
+        // columns. The RESTING pill is a DARK GRAPHITE semi-transparent
+        // surface (reference screenshot 3: rgba(22,25,29,.6) - no gradient,
+        // no glow; the white icon + label stay visible over it). The 1:1
         // reference green->blue gradient + the greenish glow (reference
-        // screenshots) appear ONLY on hover/focus, when the D-pad lands on
-        // the pill (the core hover:enter = focus entry also applies the
-        // .hover class): a moderate brightness lift of the gradient + the
-        // 1.4em glow - NO white border, NO ring. Hover/focus are
-        // transform-free (filter + box-shadow only), so the pair keeps zero
-        // layout shift between states. The hover/focus rules restate
-        // color:#fff and the gradient background: the core .simple-button.
-        // focus (same 0-2-0 specificity, verified in the decompiled
-        // core_app.css) sets background-color:#fff; color:#000, and a plain
-        // base rule (0-1-0) CANNOT stop the invert - only declarations
-        // inside these 0-2-0 rules, winning the document-order tie (plugin
-        // style tag appended after the core sheet), keep the text and icon
-        // white (the .hover rule restates them too). The core's child leaks
-        // (.simple-button > svg 1.5em,
+        // screenshots 1+2) appear ONLY while the D-pad focus is ON the pill
+        // (ACTIVE = D-pad focus, never mere availability - only ONE pill
+        // shows the gradient at a time). The gradient lives on the ::before
+        // layer (z-index:-1 inside the pill's own stacking context: position
+        // relative + z-index 0) and crossfades opacity 0->1 in 180ms (the
+        // requested 150-200ms band) - a linear-gradient cannot interpolate,
+        // so a pseudo-element opacity fade is the flicker-free way; the glow
+        // (box-shadow) and the brightness lift (filter) interpolate natively
+        // over the same 180ms. Everything is opacity/filter/box-shadow only
+        // - transform-free, zero layout shift between states. The .focus
+        // rule restates color:#fff and the dark background-color: the core
+        // .simple-button.focus (same 0-2-0 specificity, verified in the
+        // decompiled core_app.css) sets background-color:#fff; color:#000,
+        // and a plain base rule (0-1-0) CANNOT stop the invert - only
+        // declarations inside this 0-2-0 rule, winning the document-order
+        // tie (plugin style tag appended after the core sheet), keep the
+        // text/icon white and the surface dark while the gradient fades in.
+        // The base also carries animation:none !important: the core's 0-4-1
+        // body.advanced--animation... .simple-button.focus pulse (scale
+        // 0.9->1, 0.2s) beats any plugin specificity without !important, and
+        // a scale pulse would break the no-geometry-change contract. The
+        // core's child leaks (.simple-button > svg 1.5em,
         // > span margin-top:-0.2em, > svg + span margin-left:1em,
         // margin-right:1em) are neutralized by the overrides below so the
         // icons render at their reference-screenshot sizes (1.8em play box,
@@ -455,7 +463,11 @@
         // the free space, so the text starts at the poster top and the pills
         // sit at the poster bottom - the reference layout.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
+        '.udxf__act{position:relative;z-index:0;display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background-color:rgba(22,25,29,.6);filter:brightness(1);box-shadow:0 0 0 rgba(87,245,112,0);transition:filter .18s ease,box-shadow .18s ease;animation:none !important;}' +
+        // The reference gradient as a crossfade layer: z-index:-1 stays
+        // inside the pill's stacking context (above its dark surface, below
+        // the icon + label), border-radius:inherit matches the .5em pill.
+        '.udxf__act::before{content:"";position:absolute;left:0;top:0;right:0;bottom:0;z-index:-1;border-radius:inherit;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);opacity:0;transition:opacity .18s ease;}' +
         // The core sizes .simple-button children (1.5em svg, shifted span
         // margins); width/height:auto neutralizes that leak while letting
         // each SVG render at its own reference size from the attributes
@@ -465,13 +477,16 @@
         '.udxf__act svg{flex:0 0 auto;width:auto;height:auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxf__act>svg+span{margin:0;}' +
-        // Hover/focus: the transparent pill turns into the 1:1 reference
-        // gradient with the greenish glow (brightness lift, filter only - no
-        // layout shift); the restated white color + gradient keep the core's
+        // Focus (the D-pad lands on the pill): the ::before gradient fades
+        // in over the dark surface (opacity 0 -> 1, 180ms), the brightness
+        // lifts, the greenish glow grows - the reference screenshots 1+2.
+        // The restated white color + dark background-color keep the core's
         // .simple-button.focus invert (black text on white) from ever
-        // reaching the pill.
-        '.udxf__act.focus{filter:brightness(1.18);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
-        '.udxf__act.hover{filter:brightness(1.18);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
+        // reaching the pill, even mid-transition. No .hover rule: ACTIVE is
+        // the D-pad focus only, so the previously-hovered pill can never
+        // stay gradient while focus sits on the other one.
+        '.udxf__act.focus{filter:brightness(1.18);color:#fff;background-color:rgba(22,25,29,.6);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
+        '.udxf__act.focus::before{opacity:1;}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
