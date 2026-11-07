@@ -75,13 +75,13 @@
     // evenodd - the pill shows through the fold) - the reference's
     // folded-corner look 1:1, one compact local SVG (no emoji, no external
     // fetch on every page open).
-    var ICON_PLAY = '<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8.4 4.4C10.2 4.1 11.6 5.2 12 7.2L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2L6.6 6.4C6.6 5.3 7.3 4.5 8.4 4.4ZM7.1 11.6C8.2 14.2 10.8 13.2 12 8.2C10.4 9.4 8.9 9.2 7.1 10.2Z" fill="currentColor"/></svg>';
+    var ICON_PLAY = '<svg width="2.1em" height="2.1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8.5 4.9L17.9 10.4C19.2 11.2 19.2 12.9 17.9 13.7L8.5 19.1C7.3 19.8 5.8 18.9 5.8 17.5L5.8 6.5C5.8 5.1 7.3 4.2 8.5 4.9ZM5.8 6.5L8.8 6.5L5.8 9.5Z" fill="currentColor"/></svg>';
     // µTorrent mark for the "Торренти" pill (reference screenshot 2): a SOLID
     // white circular silhouette with a BOLD "u" cut OUT of it (fill-rule
     // evenodd - the pill's gradient shows through the u-hole, a thin white
     // ring around the thick u), the u carrying the small bottom-right tail
     // of the brand glyph; one compact local SVG.
-    var ICON_RELEASES = '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM6.2 5.9L6.2 14C6.2 17.4 9 18.4 12 18.4C15 18.4 17.8 17.4 17.8 14L17.8 5.9L13.3 5.9L13.3 14.5C13.3 15.3 12.7 15.8 12 15.8C11.3 15.8 10.7 15.3 10.7 14.5L10.7 5.9ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>';
+    var ICON_RELEASES = '<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0ZM6.2 5.2L6.2 13.4C6.2 17.6 8.9 19.4 12 19.4C15.1 19.4 17.8 17.6 17.8 13.4L17.8 5.2L13 5.2L13 13.6C13 14.9 12.6 15.4 12 15.4C11.4 15.4 11 14.9 11 13.6L11 5.2ZM14.6 14.6L16.4 14.6L16.4 16.4L14.6 16.4Z" fill="currentColor"/></svg>';
 
     var CONTENT_HTML =
         '<div class="udx-content">' +
@@ -427,10 +427,11 @@
         // Compact horizontal action strip, ~60px tall at the 1080p root font
         // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
         // columns. The RESTING pill is a DARK GRAPHITE semi-transparent
-        // surface (reference screenshot 3: rgba(22,25,29,.6) - no gradient,
-        // no glow; the white icon + label stay visible over it). The 1:1
-        // reference green->blue gradient + the greenish glow (reference
-        // screenshots 1+2) appear ONLY while the D-pad focus is ON the pill
+         // surface (reference screenshot 3: soft graphite rgba(47,52,59,.6)
+         // - no gradient, no glow; the white icon + label stay visible over
+         // it). The muted green->blue gradient + a faint green shadow
+         // (reference screenshots 1+2, restrained per user request 2026-11-07)
+         // appear ONLY while the D-pad focus is ON the pill
         // (ACTIVE = D-pad focus, never mere availability - only ONE pill
         // shows the gradient at a time). The gradient lives on the ::before
         // layer (z-index:-1 inside the pill's own stacking context: position
@@ -454,8 +455,8 @@
         // core's child leaks (.simple-button > svg 1.5em,
         // > span margin-top:-0.2em, > svg + span margin-left:1em,
         // margin-right:1em) are neutralized by the overrides below so the
-        // icons render at their reference-screenshot sizes (1.8em play box,
-        // 1.2em µ-disc box), the label sits exactly centered and the pair
+         // icons render at their reference-screenshot sizes (2.1em play box,
+         // 1.8em µ-disc box), the label sits exactly centered and the pair
         // keeps the compact 1em/.6em gaps. No per-role rules - both inherit
         // this base.
         // The action strip rides the BOTTOM of the poster (the meta column is
@@ -463,29 +464,31 @@
         // the free space, so the text starts at the poster top and the pills
         // sit at the poster bottom - the reference layout.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
-        '.udxf__act{position:relative;z-index:0;display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background-color:rgba(22,25,29,.6);filter:brightness(1);box-shadow:0 0 0 rgba(87,245,112,0);transition:filter .18s ease,box-shadow .18s ease;animation:none !important;}' +
+        '.udxf__act{position:relative;z-index:0;display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background-color:rgba(47,52,59,.6);filter:brightness(1);box-shadow:0 0 0 rgba(87,245,112,0);transition:filter .18s ease,box-shadow .18s ease;animation:none !important;}' +
         // The reference gradient as a crossfade layer: z-index:-1 stays
         // inside the pill's stacking context (above its dark surface, below
         // the icon + label), border-radius:inherit matches the .5em pill.
-        '.udxf__act::before{content:"";position:absolute;left:0;top:0;right:0;bottom:0;z-index:-1;border-radius:inherit;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);opacity:0;transition:opacity .18s ease;}' +
+        '.udxf__act::before{content:"";position:absolute;left:0;top:0;right:0;bottom:0;z-index:-1;border-radius:inherit;background:linear-gradient(90deg,#3e9268 0%,#3a63b8 100%);opacity:0;transition:opacity .18s ease;}' +
         // The core sizes .simple-button children (1.5em svg, shifted span
         // margins); width/height:auto neutralizes that leak while letting
         // each SVG render at its own reference size from the attributes
         // (user request 2026-11-07: the icons must match the reference
-        // screenshots 1:1 - the folded play mark sits larger than the label
-        // cap height, the µ-disc a touch smaller: 1.8em / 1.2em boxes).
+         // screenshots 1:1 - the folded play mark sits larger than the label
+         // cap height, the µ-disc a touch smaller: 2.1em / 1.8em boxes).
         '.udxf__act svg{flex:0 0 auto;width:auto;height:auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxf__act>svg+span{margin:0;}' +
         // Focus (the D-pad lands on the pill): the ::before gradient fades
-        // in over the dark surface (opacity 0 -> 1, 180ms), the brightness
-        // lifts, the greenish glow grows - the reference screenshots 1+2.
+        // in over the dark surface (opacity 0 -> 1, 180ms) and is the ONLY
+        // visible state change (user request 2026-11-07: restrained look, no
+        // neon - no brightness lift, the old strong green glow replaced by a
+        // faint .35em/.10 alpha shadow that reads as presence, not emission).
         // The restated white color + dark background-color keep the core's
         // .simple-button.focus invert (black text on white) from ever
         // reaching the pill, even mid-transition. No .hover rule: ACTIVE is
         // the D-pad focus only, so the previously-hovered pill can never
         // stay gradient while focus sits on the other one.
-        '.udxf__act.focus{filter:brightness(1.18);color:#fff;background-color:rgba(22,25,29,.6);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
+        '.udxf__act.focus{color:#fff;background-color:rgba(47,52,59,.6);box-shadow:0 0 .35em rgba(87,245,112,.10);}' +
         '.udxf__act.focus::before{opacity:1;}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
