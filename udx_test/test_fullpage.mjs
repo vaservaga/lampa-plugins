@@ -1139,10 +1139,25 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     const px = hEm && fEm ? parseFloat(hEm[1]) * parseFloat(fEm[1]) * 16 : 0;
     check('strip: shared base height is in the 60-64px band at the 1080p root font', !!base && px >= 60 && px <= 64, 'height=' + px + 'px');
     check('strip: both controls share ONE gradient pill - no per-role rules at all (no color/geometry override possible)', src.indexOf('.udxf__act--online{') === -1 && src.indexOf('.udxf__act--torrents{') === -1, 'role rules must be gone');
-    // Focus (user request 2026-11-07): the pill brightens via filter (no
-    // layout shift) and gains a thin white ring - D-pad readable across the
-    // room, clean over the gradient, no green ring.
-    check('strip: focus lifts the pill (brightness filter + thin white ring, transform-free, zero layout shift; the core .simple-button.focus white invert is overridden by this rule)', /\.udxf__act\.focus\{filter:brightness\(1\.18\);box-shadow:0 0 0 \.18em rgba\(255,255,255,\.9\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1, 'non-contract focus rule present');
+    // Focus (user request 2026-11-07, refined per the reference screenshots):
+    // the pill brightens via filter (no layout shift) and its light greenish
+    // glow intensifies - NO white border/ring. The rule restates color:#fff
+    // and the gradient background: the core .simple-button.focus (same 0-2-0
+    // specificity, decompiled core_app.css) sets background-color:#fff;
+    // color:#000, and the base rule (0-1-0) cannot stop that invert - only
+    // declarations inside this 0-2-0 rule, winning the document-order tie
+    // (plugin style tag appended after the core sheet), keep text/icon white.
+    check('strip: focus lifts the pill (brightness filter + intensified greenish glow, NO white border; restated white color + gradient override the core .simple-button.focus invert; transform-free, zero layout shift)', /\.udxf__act\.focus\{filter:brightness\(1\.18\);color:#fff;background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);box-shadow:0 0 1\.4em rgba\(87,245,112,\.62\);\}/.test(src) && src.indexOf('.udxf__act--online.focus') === -1 && src.indexOf('.udxf__act--torrents.focus') === -1 && src.indexOf('rgba(255,255,255,.9)') === -1, 'non-contract focus rule present');
+    // Resting state (reference screenshots): a light greenish glow around
+    // each pill, and the core .simple-button margin-right:1em leak is
+    // neutralized so the pair keeps the compact 1em gap (the old render
+    // showed a 2em inter-pill space).
+    check('strip: the resting pill carries the light greenish glow + zero margin (compact 1em pair gap, no 1.6em icon-label space)', /\.udxf__act\{[^}]*margin:0;[^}]*box-shadow:0 0 \.9em rgba\(87,245,112,\.28\);[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src), 'resting glow/margin missing');
+    // Core child-rule leaks neutralized (decompiled core_app.css:
+    // .simple-button > svg 1.5em, > span margin-top:-0.2em,
+    // > svg + span margin-left:1em): the icon renders at the contract 1em
+    // and the label sits exactly vertically centered - both pills identical.
+    check('strip: the core simple-button child leaks are overridden (icon 1em box, zero span margins - vertical centering + compact proportions)', /\.udxf__act svg\{flex:0 0 auto;width:1em;height:1em;opacity:1;\}/.test(src) && src.indexOf('.udxf__act>svg+span{margin:0;}') !== -1, 'child-leak overrides missing');
     check('focus: the side-window release rows focus WITHOUT the green halo (user request 2026-11-05: darkened bar only) while the list-page rows keep it', src.indexOf('.udxf__prow.focus{background-color:rgba(0,0,0,.55);color:#fff;}') !== -1 && src.indexOf('.udxl__row.focus{background-color:rgba(0,0,0,.3);box-shadow:0 0 0 .2em #57F570;}') !== -1, 'prow/row focus rules missing');
     check('css: the release side window sits flush at the top/right/bottom edges (the drawn scheme: top raised, right/bottom insets gone), 23% wide (narrowed from 28% per user request 2026-11-07: too much horizontal space; the % resolves against the widened 100%+15em detail root, so at 1080p the left edge sits at ~73% of the screen and clears the action strip whose right pill ends at ~67% with room to spare), rounded 1.4em like the card halo', /\.udxf__panel\{position:absolute;top:0;right:0;bottom:0;width:23%;z-index:30;[^}]*border-radius:1\.4em;\}/.test(src), 'edge-flush rounded panel geometry missing');
     check('css: release rows are full-width bars in the panel (text left, a long label wraps inside the bar), LESS rounded than the card halo (0.7em, not the 1.4em pill - user request 2026-11-05)', /\.udxf__prow\{display:block;width:100%;box-sizing:border-box;white-space:normal;margin:0 0 \.7em 0;height:auto;min-height:2\.8em;padding:\.55em 1\.1em;border-radius:0\.7em;\}/.test(src), 'full-width row rule missing');
@@ -1157,6 +1172,15 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('css: the director fact line sits a touch lower in the meta column (user request 2026-11-05: margin-top 1em, cast keeps its .5em gap)', /\.udxf__fact--director\{margin-top:1em;\}/.test(src), 'fact--director offset missing');
     check('strip: the resting state is the 1:1 reference gradient pill itself (smooth green->blue sweep left to right, white icon + white regular-weight 1.3em label vertically centered, compact ~60px bar, no per-role rules - user request 2026-11-07: the buttons are the reference gradient, not a dark rectangle)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:linear-gradient\(90deg,#37a26e 0%,#316fdd 100%\);\}/.test(src), 'gradient base missing');
     check('strip: both icon containers are identical 1em inline SVGs (reference proportion to the 1.3em label)', src.indexOf("ICON_PLAY = '<svg width=\"1em\" height=\"1em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1em\" height=\"1em\"") !== -1, 'icon container mismatch');
+    // Reference screenshot 2: the "Торренти" mark is a SOLID white circular
+    // silhouette with the "u" cut out (evenodd - the gradient shows through
+    // the u-hole), the u carrying the brand's bottom-right tail; one compact
+    // local SVG (no emoji, no third-party image fetched on page open).
+    check('strip: the "Торренти" icon is the solid-disc µ mark (circle subpath + cut-out u subpath with the tail, one local 1em SVG)', src.indexOf('ICON_RELEASES = \'<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM8.8 7.4L8.8 12.8C8.8 15.5 10.1 16 11.8 16L12.8 16L14.8 16L14.8 7.4L12.8 7.4L12.8 13A1 1 0 0 1 10.8 13L10.8 7.4ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>\'') !== -1, 'solid-disc µ mark missing');
+    // Reference screenshot 1: the "Онлайн" mark is a stylized rounded play
+    // triangle with the top-left corner curled in and a thin crease sliver
+    // cut across it (evenodd) - the folded-corner look of the reference.
+    check('strip: the "Онлайн" icon is the stylized folded play mark (rounded triangle + curled corner + crease sliver, one local 1em SVG)', src.indexOf('ICON_PLAY = \'<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M6.6 6.8C6.6 5.8 7.2 5.1 8.2 5.2C9 5.3 9.3 5.9 10 6.3L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2ZM7.2 6L11.4 8.6L10.7 9.4L7.1 6.7Z" fill="currentColor"/></svg>\'') !== -1, 'folded play mark missing');
 })();
 
 check('softTo: a focus target already fully inside the scroll viewport triggers no scroll (the initial detail-page focus must not crop the poster top - the reported "press UP to fix the picture" bug)', src.indexOf('erect.height > 0 && vrect.height > 0') !== -1 && src.indexOf('erect.top >= vrect.top && erect.bottom <= vrect.bottom') !== -1, 'visibility guard missing');

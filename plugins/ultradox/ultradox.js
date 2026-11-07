@@ -69,11 +69,17 @@
     var ICON_MENU = '<svg width="38" height="31" viewBox="0 0 38 31" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8-4-1-7-4-7-9V3h6v9c0 4 3 6 7 6s7-2 7-6V3z" fill="currentColor"/><path d="M22 3h6v9c0 5-3 8-7 9 2 1 4 3 4 6v10h-6V27c0-4-3-7-7-8V3z" fill="currentColor" opacity="0.55"/></svg>';
     // Globe mark (kept for the legacy online page icon use).
     var ICON_ONLINE = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" stroke="currentColor" stroke-width="1.7"/></svg>';
-    // Play mark for the "Онлайн" pill (the MODS reference shape: a white play
-    // triangle sitting on the gradient disc).
-    var ICON_PLAY = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.2-6.8c.6-.4.6-1.4 0-1.8L9.6 4.3c-.7-.4-1.6.1-1.6.9z" fill="currentColor"/></svg>';
-    // List pictogram for the releases button: a plain list, no play hint.
-    var ICON_RELEASES = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.5 5.5h11M8.5 12h11M8.5 18.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="4.2" cy="5.5" r="1.5" fill="currentColor"/><circle cx="4.2" cy="12" r="1.5" fill="currentColor"/><circle cx="4.2" cy="18.5" r="1.5" fill="currentColor"/></svg>';
+    // Stylized play mark for the "Онлайн" pill (reference screenshot 1): a
+    // rounded right-pointing triangle whose top-left corner curls in, with a
+    // thin crease sliver cut across it (fill-rule evenodd) - the reference's
+    // folded-corner look, one compact local SVG (no emoji, no external
+    // fetch on every page open).
+    var ICON_PLAY = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M6.6 6.8C6.6 5.8 7.2 5.1 8.2 5.2C9 5.3 9.3 5.9 10 6.3L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2ZM7.2 6L11.4 8.6L10.7 9.4L7.1 6.7Z" fill="currentColor"/></svg>';
+    // µTorrent mark for the "Торренти" pill (reference screenshot 2): a SOLID
+    // white circular silhouette with the "u" symbol cut OUT of it (fill-rule
+    // evenodd - the pill's gradient shows through the u-hole), the u carrying
+    // the small bottom-right tail of the brand glyph; one compact local SVG.
+    var ICON_RELEASES = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM8.8 7.4L8.8 12.8C8.8 15.5 10.1 16 11.8 16L12.8 16L14.8 16L14.8 7.4L12.8 7.4L12.8 13A1 1 0 0 1 10.8 13L10.8 7.4ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>';
 
     var CONTENT_HTML =
         '<div class="udx-content">' +
@@ -422,27 +428,41 @@
         // gradient itself (user request 2026-11-07: the buttons are the
         // reference gradient, not a dark rectangle the focus reveals):
         // large rounded rectangle, a smooth mint->blue sweep left to right,
-        // the white icon left of the white regular-weight label, both
-        // vertically centered by the inline-flex base. Focus (D-pad
-        // readable, transform-free, zero layout shift): a brightness lift of
-        // the same gradient + a thin white ring (the core's own focus
-        // language, e.g. .online.focus) - no green ring; the core
-        // .simple-button.focus white invert never reaches the pill (this
-        // rule wins the specificity tie by document order - the plugin
-        // style tag is appended to body after the core stylesheet). No
-        // per-role rules - both inherit this base.
+        // a light greenish glow around the pill (reference screenshots,
+        // 2026-11-07), the white icon left of the white regular-weight label,
+        // both vertically centered by the inline-flex base. Focus (D-pad
+        // readable, transform-free, zero layout shift): a moderate brightness
+        // lift of the same gradient + the SAME greenish glow intensified -
+        // NO white border (user request 2026-11-07: the reference focus is a
+        // glow, not a ring). The rule also restates color:#fff and the
+        // gradient background: the core .simple-button.focus (same 0-2-0
+        // specificity, verified in the decompiled core_app.css) sets
+        // background-color:#fff; color:#000, and a plain base rule (0-1-0)
+        // CANNOT stop the invert - only declarations inside this 0-2-0 rule,
+        // winning the document-order tie (plugin style tag appended after the
+        // core sheet), keep the text and icon white. The core's child leaks
+        // (.simple-button > svg 1.5em, > span margin-top:-0.2em,
+        // > svg + span margin-left:1em, margin-right:1em) are neutralized by
+        // the overrides below so the icon stays the contract 1em, the label
+        // sits exactly centered and the pair keeps the compact 1em/.6em gaps.
+        // No per-role rules - both inherit this base.
         // The action strip rides the BOTTOM of the poster (the meta column is
         // a flex column stretched to the poster height): margin-top:auto eats
         // the free space, so the text starts at the poster top and the pills
         // sit at the poster bottom - the reference layout.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
-        '.udxf__act svg{flex:0 0 auto;opacity:1;}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;box-shadow:0 0 .9em rgba(87,245,112,.28);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
+        // The core sizes .simple-button children (1.5em svg, shifted span
+        // margins); restate the contract geometry so it wins the document-
+        // order tie and both pills stay identical.
+        '.udxf__act svg{flex:0 0 auto;width:1em;height:1em;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        // Focus: the pill brightens (filter only - no layout shift) and gains
-        // a thin white ring: readable across the room, clean over the
-        // gradient, no green ring.
-        '.udxf__act.focus{filter:brightness(1.18);box-shadow:0 0 0 .18em rgba(255,255,255,.9);}' +
+        '.udxf__act>svg+span{margin:0;}' +
+        // Focus: the pill brightens (filter only - no layout shift) and its
+        // greenish glow intensifies; the restated white color + gradient keep
+        // the core's .simple-button.focus invert (black text on white) from
+        // ever reaching the pill.
+        '.udxf__act.focus{filter:brightness(1.18);color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);box-shadow:0 0 1.4em rgba(87,245,112,.62);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
