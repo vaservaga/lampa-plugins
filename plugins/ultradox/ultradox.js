@@ -169,7 +169,17 @@
         // list); the detail content is absolute, so its viewport keeps
         // position via .udxf__slot top:4em - every element stays where it
         // was validated.
-        '.udx-content{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;padding-top:4em;display:flex;flex-direction:column;}' +
+        // NUM-seamless catalog ambience (user request 2026-11-07, the same
+        // wing the detail root got): the root reaches 15em LEFT of the
+        // content box (margin-left:-15em, width:calc(100% + 15em)) so the
+        // blurred .udx-bg layers continue UNDER the core left-menu zone -
+        // before, the body #1d1f20 ended hard at the content-box edge and
+        // read as a visible vertical seam whenever the transparent menu
+        // opened. padding-left:15em keeps every in-flow element (tabs,
+        // grid, focus) pixel-identical to the pre-wing box in both menu
+        // states; the body overflow:hidden clips the off-screen wing when
+        // the menu is closed (the .udxf pattern, TV-validated).
+        '.udx-content{position:relative;width:calc(100% + 15em);height:calc(100% + 4em);overflow:hidden;margin-top:-4em;margin-left:-15em;padding-top:4em;padding-left:15em;display:flex;flex-direction:column;}' +
         // Ambience backdrop: two permanent crossfading layers behind the grid
         // (focus on a card swaps the image, NUM-style). display must stay
         // visible - the OFF state is opacity:0 only (a display:none layer was
@@ -179,6 +189,19 @@
         // band over the top-left of the screen.
         '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
+        // Wing scrim (user request 2026-11-07): the left 15em menu wing sits
+        // on a touch of extra dark that melts into the blurred backdrop -
+        // the smooth "darker zone under the menu -> backdrop" transition
+        // instead of a hard edge at the menu's right border. WING-ONLY fade
+        // (the screen width is 84.17em at every Lampa resolution, so the
+        // wing is 15/84.17 ~ 17.8% of the open root and 15/99.17 ~ 15.1% of
+        // the closed one): plateau to 14%, clear by 20% - unlike the removed
+        // 2026-11-04 full-width left-darkening veil it never reads as a
+        // black band and the grid area stays on the plain dynamic image.
+        // A pseudo-element: no DOM node, no crossfade-layer interference;
+        // z-index:0 paints it over the two .udx-bg layers (same z, later
+        // tree order) and under the grid/tabs (z 1/20).
+        '.udx-content::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.5),rgba(0,0,0,.5) 14%,rgba(0,0,0,0) 20%);}' +
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
@@ -371,24 +394,31 @@
         '.udxf__overview{font-size:1.1em;line-height:1.45;color:#fff;margin-top:.5em;}' +
         // Compact horizontal action strip, ~60px tall at the 1080p root font
         // (2.9em of the 1.3em button font), 1em gap, two-line wrap on narrow
-        // columns. Default state: a TRANSPARENT dark-glass pill (the reference
-        // "MODS's" look - barely there over the backdrop); focus turns it into
-        // the 1:1 reference green->blue gradient pill (user request
-        // 2026-11-04, both states from the reference screenshots). White icon
-        // + white regular-weight label, the reference proportions (big label
-        // in a compact bar). No per-role rules - both inherit this base.
+        // columns. The RESTING surface is the 1:1 reference green->blue
+        // gradient itself (user request 2026-11-07: the buttons are the
+        // reference gradient, not a dark rectangle the focus reveals):
+        // large rounded rectangle, a smooth mint->blue sweep left to right,
+        // the white icon left of the white regular-weight label, both
+        // vertically centered by the inline-flex base. Focus (D-pad
+        // readable, transform-free, zero layout shift): a brightness lift of
+        // the same gradient + a thin white ring (the core's own focus
+        // language, e.g. .online.focus) - no green ring; the core
+        // .simple-button.focus white invert never reaches the pill (this
+        // rule wins the specificity tie by document order - the plugin
+        // style tag is appended to body after the core stylesheet). No
+        // per-role rules - both inherit this base.
         // The action strip rides the BOTTOM of the poster (the meta column is
         // a flex column stretched to the poster height): margin-top:auto eats
         // the free space, so the text starts at the poster top and the pills
         // sit at the poster bottom - the reference layout.
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
-        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:rgba(24,26,28,.6);}' +
+        '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
         '.udxf__act svg{flex:0 0 auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
-        // Focus: the pill becomes the 1:1 reference green->blue gradient
-        // surface (the reference screenshot shows a clean gradient - no green
-        // ring, no brightness lift). Transform-free, zero layout shift.
-        '.udxf__act.focus{background:linear-gradient(90deg,#37a26e 0%,#316fdd 100%);}' +
+        // Focus: the pill brightens (filter only - no layout shift) and gains
+        // a thin white ring: readable across the room, clean over the
+        // gradient, no green ring.
+        '.udxf__act.focus{filter:brightness(1.18);box-shadow:0 0 0 .18em rgba(255,255,255,.9);}' +
         '.udx-kind{position:absolute;left:10px;top:10px;z-index:2;max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:#57F570;color:#000;font-weight:700;padding:0 .55em;border-radius:.45em;font-size:.75em;line-height:1.5;white-space:nowrap;pointer-events:none;}' +
         // The third-party interface_mod plugin (an Lampa user setting) appends
         // its own type label (.content-label, left:-0.8em -> clipped corner
