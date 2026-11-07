@@ -74,12 +74,12 @@
     // thin crease sliver cut across it (fill-rule evenodd) - the reference's
     // folded-corner look, one compact local SVG (no emoji, no external
     // fetch on every page open).
-    var ICON_PLAY = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M6.6 6.8C6.6 5.8 7.2 5.1 8.2 5.2C9 5.3 9.3 5.9 10 6.3L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2ZM7.2 6L11.4 8.6L10.7 9.4L7.1 6.7Z" fill="currentColor"/></svg>';
+    var ICON_PLAY = '<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M6.6 6.8C6.6 5.8 7.2 5.1 8.2 5.2C9 5.3 9.3 5.9 10 6.3L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2ZM7.2 6L11.4 8.6L10.7 9.4L7.1 6.7Z" fill="currentColor"/></svg>';
     // µTorrent mark for the "Торренти" pill (reference screenshot 2): a SOLID
     // white circular silhouette with the "u" symbol cut OUT of it (fill-rule
     // evenodd - the pill's gradient shows through the u-hole), the u carrying
     // the small bottom-right tail of the brand glyph; one compact local SVG.
-    var ICON_RELEASES = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM8.8 7.4L8.8 12.8C8.8 15.5 10.1 16 11.8 16L12.8 16L14.8 16L14.8 7.4L12.8 7.4L12.8 13A1 1 0 0 1 10.8 13L10.8 7.4ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>';
+    var ICON_RELEASES = '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM8.8 7.4L8.8 12.8C8.8 15.5 10.1 16 11.8 16L12.8 16L14.8 16L14.8 7.4L12.8 7.4L12.8 13A1 1 0 0 1 10.8 13L10.8 7.4ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>';
 
     var CONTENT_HTML =
         '<div class="udx-content">' +
@@ -444,9 +444,10 @@
         // (.simple-button > svg 1.5em,
         // > span margin-top:-0.2em, > svg + span margin-left:1em,
         // margin-right:1em) are neutralized by the overrides below so the
-        // icon stays the contract 1em, the label sits exactly centered and
-        // the pair keeps the compact 1em/.6em gaps. No per-role rules - both
-        // inherit this base.
+        // icons render at their reference-screenshot sizes (1.8em play box,
+        // 1.2em µ-disc box), the label sits exactly centered and the pair
+        // keeps the compact 1em/.6em gaps. No per-role rules - both inherit
+        // this base.
         // The action strip rides the BOTTOM of the poster (the meta column is
         // a flex column stretched to the poster height): margin-top:auto eats
         // the free space, so the text starts at the poster top and the pills
@@ -454,9 +455,12 @@
         '.udxf__actions{display:flex;align-items:center;flex-wrap:wrap;gap:1em;margin-top:auto;padding-top:.8em;}' +
         '.udxf__act{display:inline-flex;align-items:center;justify-content:center;gap:.6em;height:2.9em;padding:0 1.5em;margin:0;border-radius:.5em;font-size:1.3em;font-weight:400;line-height:1;white-space:nowrap;flex:0 1 auto;max-width:100%;color:#fff;background:transparent;}' +
         // The core sizes .simple-button children (1.5em svg, shifted span
-        // margins); restate the contract geometry so it wins the document-
-        // order tie and both pills stay identical.
-        '.udxf__act svg{flex:0 0 auto;width:1em;height:1em;opacity:1;}' +
+        // margins); width/height:auto neutralizes that leak while letting
+        // each SVG render at its own reference size from the attributes
+        // (user request 2026-11-07: the icons must match the reference
+        // screenshots 1:1 - the folded play mark sits larger than the label
+        // cap height, the µ-disc a touch smaller: 1.8em / 1.2em boxes).
+        '.udxf__act svg{flex:0 0 auto;width:auto;height:auto;opacity:1;}' +
         '.udxf__act__label{min-width:0;overflow:hidden;text-overflow:ellipsis;}' +
         '.udxf__act>svg+span{margin:0;}' +
         // Hover/focus: the transparent pill turns into the 1:1 reference
