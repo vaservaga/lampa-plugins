@@ -264,7 +264,24 @@
         // transparent core head; the content (the absolute .udxf__slot
         // viewport) stays at its validated position via top:4em below. The
         // opaque root is the neutral surface when no image is usable.
-        '.udxf{position:relative;width:100%;height:calc(100% + 4em);overflow:hidden;margin-top:-4em;background:#1d1f20;}' +
+        // NUM-seamless ambience (user request 2026-11-07): the root reaches
+        // 15em LEFT of the content box (margin-left:-15em,
+        // width:calc(100% + 15em)) so the backdrop + veil continue UNDER the
+        // core left-menu zone - before, the body #1d1f20 ended hard at the
+        // content-box edge and read as a visible vertical seam between the
+        // menu and the backdrop. The core menu itself carries NO background
+        // (.wrap__left z-2 floats over .wrap__content, transparent), so the
+        // extended ambience shows through it: one surface, dark scrim on the
+        // left fading into the blurred image (the veil's 15% plateau keeps
+        // the menu zone uniformly dark). When the core menu opens it shifts
+        // .wrap__content 15em right - the wing meets the menu flush and the
+        // backdrop stays put (the box size is identical in both states, so
+        // the image crop never re-fits: no flicker on the 0.2s menu slide).
+        // The inner .udxf__slot is pinned 15em from the box left, so the
+        // content zone width equals the old box width and every element
+        // keeps its exact validated position in both menu states; the body
+        // overflow:hidden clips the off-screen wing.
+        '.udxf{position:relative;width:calc(100% + 15em);height:calc(100% + 4em);overflow:hidden;margin-top:-4em;margin-left:-15em;background:#1d1f20;}' +
         // The core top bar stays visible on every Ultradox screen (user
         // request 2026-11-05): the screens sit in flow in the core content
         // area below the head, exactly like a core page. The core gives
@@ -293,15 +310,20 @@
         '.udxf__backdrop--on.udxf__backdrop--settled{filter:blur(6px) brightness(.72) saturate(.9);}' +
         '.udxf__backdrop--poster{opacity:1;transform:scale(1.06);filter:blur(14px) brightness(.55) saturate(.88);}' +
         '.udxf__backdrop--poster.udxf__backdrop--settled{filter:blur(7px) brightness(.62) saturate(.92);}' +
-        // Valid-backdrop veil (NUM-style): dark text zone on the left, the
-        // scene stays clearly visible toward the right, soft bottom fade.
-        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.42) 46%,rgba(0,0,0,.06) 82%),linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0) 46%);}' +
+        // Valid-backdrop veil (NUM-style): the left 15em (the menu wing) sits
+        // on a uniform dark scrim, then the scrim fades across the content
+        // zone - stops re-anchored to the widened root (the content starts at
+        // 15em/(100% + 15em) ~ 15%), so the validated darkness over the
+        // poster/title/strip is kept while the menu zone gets its own dark
+        // band that melts into the backdrop; the scene stays clearly visible
+        // toward the right, soft bottom fade.
+        '.udxf__gradient{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.82),rgba(0,0,0,.82) 15%,rgba(0,0,0,.42) 61%,rgba(0,0,0,.06) 97%),linear-gradient(to top,rgba(0,0,0,.58),rgba(0,0,0,0) 46%);}' +
         // Poster-fallback state (.udxf--poster on the root): the poster doubles
         // as the backdrop, so the veil darkens the left text zone and the bottom
         // rows (title/overview/actions) and fades to clear artwork toward the
         // right and the top - no layer is opaque, so the image stays visible
         // as atmosphere on the right.
-        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(0,0,0,.86),rgba(0,0,0,.58) 46%,rgba(0,0,0,.1) 80%),linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0) 46%);}' +
+        '.udxf--poster .udxf__gradient{background:linear-gradient(90deg,rgba(0,0,0,.86),rgba(0,0,0,.86) 15%,rgba(0,0,0,.58) 61%,rgba(0,0,0,.1) 95%),linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,0) 46%);}' +
         // NUM reference geometry (measured from the NUM detail screen): the
         // poster is large (~22em wide at the 1080p root font), the title is a
         // display size (3em), the meta block sits to the right of the poster,
@@ -309,7 +331,11 @@
         // The scroll viewport starts 4em DOWN (the head zone is ambience, not
         // content - see the root rule): the page keeps its validated geometry
         // (fits 1080p without scrolling) while the backdrop fills the head.
-        '.udxf__slot{position:absolute;top:4em;left:0;right:0;bottom:0;z-index:2;}' +
+        // left:15em pins the content zone to the right of the root's 15em
+        // left wing (see the .udxf rule): the slot width equals the old box
+        // width, so the zone/pills/strip positions are pixel-identical in
+        // both menu states while the ambience spans the full root.
+        '.udxf__slot{position:absolute;top:4em;left:15em;right:0;bottom:0;z-index:2;}' +
         // Hard height bound on the core scroll element: the TV scroll driver
         // clamps travel to maxOffset(body vs html offsetHeight) - without a
         // fixed viewport height the page can never scroll.
