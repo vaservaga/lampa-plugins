@@ -1176,14 +1176,15 @@ check('fullpage: enrichment used the core door exactly 3 times (find + detail + 
     check('strip: the resting state is a transparent pill with the full reference geometry (white icon + white regular-weight 1.3em label vertically centered, compact ~60px bar, no per-role rules - the gradient/glow belong to hover/focus only, user request 2026-11-07 final)', /\.udxf__act\{[^}]*font-size:1\.3em;font-weight:400;[^}]*color:#fff;[^}]*background:transparent;\}/.test(src), 'transparent base missing');
     check('strip: both icon containers are the reference-proportion inline SVGs (play mark 1.8em box vs the 1.2em µ-disc box against the 1.3em label - the screenshots 1:1)', src.indexOf("ICON_PLAY = '<svg width=\"1.8em\" height=\"1.8em\"") !== -1 && src.indexOf("ICON_RELEASES = '<svg width=\"1.2em\" height=\"1.2em\"") !== -1, 'icon container mismatch');
     // Reference screenshot 2: the "Торренти" mark is a SOLID white circular
-    // silhouette with the "u" cut out (evenodd - the gradient shows through
-    // the u-hole), the u carrying the brand's bottom-right tail; one compact
-    // local SVG (no emoji, no third-party image fetched on page open).
-    check('strip: the "Торренти" icon is the solid-disc µ mark (circle subpath + cut-out u subpath with the tail, one local 1.2em SVG at the reference proportion)', src.indexOf('ICON_RELEASES = \'<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM8.8 7.4L8.8 12.8C8.8 15.5 10.1 16 11.8 16L12.8 16L14.8 16L14.8 7.4L12.8 7.4L12.8 13A1 1 0 0 1 10.8 13L10.8 7.4ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>\'') !== -1, 'solid-disc µ mark missing');
-    // Reference screenshot 1: the "Онлайн" mark is a stylized rounded play
-    // triangle with the top-left corner curled in and a thin crease sliver
-    // cut across it (evenodd) - the folded-corner look of the reference.
-    check('strip: the "Онлайн" icon is the stylized folded play mark (rounded triangle + curled corner + crease sliver, one local 1.8em SVG at the reference proportion)', src.indexOf('ICON_PLAY = \'<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M6.6 6.8C6.6 5.8 7.2 5.1 8.2 5.2C9 5.3 9.3 5.9 10 6.3L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2ZM7.2 6L11.4 8.6L10.7 9.4L7.1 6.7Z" fill="currentColor"/></svg>\'') !== -1, 'folded play mark missing');
+    // silhouette with a BOLD "u" cut out (evenodd - the gradient shows
+    // through the u-hole, a thin white ring around the thick u), the u
+    // carrying the brand's bottom-right tail; one compact local SVG (no
+    // emoji, no third-party image fetched on page open).
+    check('strip: the "Торренти" icon is the solid-disc bold-µ mark (circle subpath + bold cut-out u subpath with the tail, one local 1.2em SVG at the reference proportion)', src.indexOf('ICON_RELEASES = \'<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM6.2 5.9L6.2 14C6.2 17.4 9 18.4 12 18.4C15 18.4 17.8 17.4 17.8 14L17.8 5.9L13.3 5.9L13.3 14.5C13.3 15.3 12.7 15.8 12 15.8C11.3 15.8 10.7 15.3 10.7 14.5L10.7 5.9ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>\'') !== -1, 'solid-disc µ mark missing');
+    // Reference screenshot 1: the "Онлайн" mark is a chunky rounded play
+    // blob with a folded top-left "petal" corner and a bold crescent crease
+    // cut across it (evenodd) - the folded-corner look of the reference 1:1.
+    check('strip: the "Онлайн" icon is the folded-corner play mark (rounded play blob + petal corner + bold crescent crease, one local 1.8em SVG at the reference proportion)', src.indexOf('ICON_PLAY = \'<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8.4 4.4C10.2 4.1 11.6 5.2 12 7.2L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2L6.6 6.4C6.6 5.3 7.3 4.5 8.4 4.4ZM7.1 11.6C8.2 14.2 10.8 13.2 12 8.2C10.4 9.4 8.9 9.2 7.1 10.2Z" fill="currentColor"/></svg>\'') !== -1, 'folded play mark missing');
 })();
 
 check('softTo: a focus target already fully inside the scroll viewport triggers no scroll (the initial detail-page focus must not crop the poster top - the reported "press UP to fix the picture" bug)', src.indexOf('erect.height > 0 && vrect.height > 0') !== -1 && src.indexOf('erect.top >= vrect.top && erect.bottom <= vrect.bottom') !== -1, 'visibility guard missing');

@@ -70,16 +70,18 @@
     // Globe mark (kept for the legacy online page icon use).
     var ICON_ONLINE = '<svg width="1.3em" height="1.3em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z" stroke="currentColor" stroke-width="1.7"/></svg>';
     // Stylized play mark for the "Онлайн" pill (reference screenshot 1): a
-    // rounded right-pointing triangle whose top-left corner curls in, with a
-    // thin crease sliver cut across it (fill-rule evenodd) - the reference's
-    // folded-corner look, one compact local SVG (no emoji, no external
+    // chunky rounded right-pointing play blob whose top-left is a folded
+    // "petal" corner, a bold crescent crease cut across it (fill-rule
+    // evenodd - the pill shows through the fold) - the reference's
+    // folded-corner look 1:1, one compact local SVG (no emoji, no external
     // fetch on every page open).
-    var ICON_PLAY = '<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M6.6 6.8C6.6 5.8 7.2 5.1 8.2 5.2C9 5.3 9.3 5.9 10 6.3L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2ZM7.2 6L11.4 8.6L10.7 9.4L7.1 6.7Z" fill="currentColor"/></svg>';
+    var ICON_PLAY = '<svg width="1.8em" height="1.8em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8.4 4.4C10.2 4.1 11.6 5.2 12 7.2L17 10.5C18.5 11.2 18.5 12.8 17 13.5L10 17.7C9.3 18.1 9 18.7 8.2 18.8C7.2 18.9 6.6 18.2 6.6 17.2L6.6 6.4C6.6 5.3 7.3 4.5 8.4 4.4ZM7.1 11.6C8.2 14.2 10.8 13.2 12 8.2C10.4 9.4 8.9 9.2 7.1 10.2Z" fill="currentColor"/></svg>';
     // µTorrent mark for the "Торренти" pill (reference screenshot 2): a SOLID
-    // white circular silhouette with the "u" symbol cut OUT of it (fill-rule
-    // evenodd - the pill's gradient shows through the u-hole), the u carrying
-    // the small bottom-right tail of the brand glyph; one compact local SVG.
-    var ICON_RELEASES = '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM8.8 7.4L8.8 12.8C8.8 15.5 10.1 16 11.8 16L12.8 16L14.8 16L14.8 7.4L12.8 7.4L12.8 13A1 1 0 0 1 10.8 13L10.8 7.4ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>';
+    // white circular silhouette with a BOLD "u" cut OUT of it (fill-rule
+    // evenodd - the pill's gradient shows through the u-hole, a thin white
+    // ring around the thick u), the u carrying the small bottom-right tail
+    // of the brand glyph; one compact local SVG.
+    var ICON_RELEASES = '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M2.5 12a9.5 9.5 0 1 0 19 0a9.5 9.5 0 1 0 -19 0ZM6.2 5.9L6.2 14C6.2 17.4 9 18.4 12 18.4C15 18.4 17.8 17.4 17.8 14L17.8 5.9L13.3 5.9L13.3 14.5C13.3 15.3 12.7 15.8 12 15.8C11.3 15.8 10.7 15.3 10.7 14.5L10.7 5.9ZM14.9 14.7L16.3 14.7L16.3 16L14.9 16Z" fill="currentColor"/></svg>';
 
     var CONTENT_HTML =
         '<div class="udx-content">' +
