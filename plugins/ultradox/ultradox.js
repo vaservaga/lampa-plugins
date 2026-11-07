@@ -189,19 +189,36 @@
         // band over the top-left of the screen.
         '.udx-bg{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:center/cover no-repeat;transform:scale(1.10);filter:blur(20px) brightness(.55) saturate(.78);opacity:0;transition:opacity .32s ease;}' +
         '.udx-bg--on{opacity:1;}' +
-        // Wing scrim (user request 2026-11-07): the left 15em menu wing sits
-        // on a touch of extra dark that melts into the blurred backdrop -
-        // the smooth "darker zone under the menu -> backdrop" transition
-        // instead of a hard edge at the menu's right border. WING-ONLY fade
-        // (the screen width is 84.17em at every Lampa resolution, so the
-        // wing is 15/84.17 ~ 17.8% of the open root and 15/99.17 ~ 15.1% of
-        // the closed one): plateau to 14%, clear by 20% - unlike the removed
-        // 2026-11-04 full-width left-darkening veil it never reads as a
-        // black band and the grid area stays on the plain dynamic image.
-        // A pseudo-element: no DOM node, no crossfade-layer interference;
-        // z-index:0 paints it over the two .udx-bg layers (same z, later
-        // tree order) and under the grid/tabs (z 1/20).
-        '.udx-content::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.5),rgba(0,0,0,.5) 14%,rgba(0,0,0,0) 20%);}' +
+        // Wing scrim (user request 2026-11-07, reworked twice - both
+        // earlier versions left a visible vertical band at the menu edge):
+        // the dark zone under the transparent left menu melts into the
+        // blurred backdrop. GATED to body.menu--open (the core's own
+        // selector pattern, core_app.css:1059/1064): the scrim exists ONLY
+        // while the menu actually slides over the wing - with the menu
+        // closed the ambience is ONE uniform blurred image all around again
+        // (the 2026-11-04 contract) instead of the old always-on ramp
+        // painting a dark band at the screen's left edge. ONE monotone ramp
+        // 0.5 -> 0 over 0..45% of the widened root (~0..1018px at 1080p,
+        // the root being 100% + 15em = 99.17em at every Lampa resolution)
+        // - NO plateau and NO stop at 15.13% (the menu width): the first
+        // rework plateaued 0.5 right up to the menu's right border, and a
+        // plateau->fade corner is a curvature discontinuity (the slope
+        // jumps from 0 to the fade's slope exactly at 15em = x346px at
+        // 1080p) which the eye reads as the boundary between two
+        // brightness regions - that band survived even the long 676px fade
+        // (headless probe, 1920x1080, verbatim CSS: the 8px-window knee
+        // stayed pinned at x=346 in both variants). A single ramp carries
+        // the same slope on both sides of the menu edge - zero curvature
+        // anywhere, so the dark zone under the menu and the backdrop form
+        // one continuous cinematic surface; the menu zone stays the
+        // darkest region on screen (0.5 at the far-left edge melting to
+        // ~0.33 at the menu's right border) so the white menu items keep
+        // their contrast. A pseudo-element: no DOM node, no crossfade-layer
+        // interference; z-index:0 paints it over the two .udx-bg layers
+        // (same z, later tree order) and under the grid/tabs (z 1/20);
+        // pointer-events:none keeps it out of the spatial focus map.
+        '.udx-content::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;pointer-events:none;background:none;}' +
+        'body.menu--open:not(.light--version) .udx-content::after{background:linear-gradient(90deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,0) 45%);}' +
         // The tabs are their own zone above the grid (flex flow, NOT an
         // overlay): the head keeps its natural height, the grid area is what
         // remains - no poster can be covered by the tabs and the tab height
@@ -386,8 +403,15 @@
         '.udxf__meta{display:flex;flex-direction:column;margin-left:2.5em;min-width:0;max-width:64%;}' +
         '.udxf__top{font-size:1.2em;color:rgba(255,255,255,.6);letter-spacing:.03em;}' +
         // Display-size title (user request 2026-11-04: match the reference -
-        // a large regular-weight display title over the meta line).
-        '.udxf__title{font-size:4em;font-weight:400;line-height:1.1;color:#fff;margin-top:.25em;}' +
+        // a large regular-weight display title over the meta line), shrunk
+        // ~20% per user request 2026-11-07 (the names read too large): 4em ->
+        // 3.2em of the same root font, so it scales with every resolution the
+        // core sets. Long names wrap at word boundaries to at most 3 lines
+        // (the catalog card-title line-clamp pattern, ultradox.js
+        // .card__title) so the compact 1080p page fit holds even for very
+        // long titles; overflow-wrap breaks only pathological single words -
+        // the text is never clipped at the right edge.
+        '.udxf__title{font-size:3.2em;font-weight:400;line-height:1.1;color:#fff;margin-top:.25em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:break-word;}' +
         '.udxf__line{font-size:1.08em;color:rgba(255,255,255,.5);margin-top:.5em;}' +
         // Full overview - no line clamp; the compact spacing keeps even a long
         // one inside the 1080p page.
@@ -455,15 +479,21 @@
         // surface (dark) at the right edge of the detail page. Per the user's
         // drawn scheme (2026-11-05): flush with the top/right/bottom edges
         // (top:0;right:0;bottom:0 - the top raised, the right/bottom insets
-        // gone), rounded 1.4em (the card halo radius); 28% wide (widened from
-        // 24% per user report 2026-11-05: the row's green focus halo pressed
-        // the panel's left edge) so the left edge (72%) still clears the
-        // action strip (the right pill ends at ~67%); the rows are
-        // full-width bars (text left), not fit-content pills.
+        // gone), rounded 1.4em (the card halo radius); 23% wide (widened from
+        // 24% to 28% per user report 2026-11-05 - the row's green focus halo
+        // pressed the panel's left edge - then narrowed back to 23% per user
+        // request 2026-11-07: the panel took too much horizontal space). The
+        // % resolves against the WIDENED detail root (100% + 15em left wing):
+        // at 1080p 23% = ~520px and the panel's left edge sits at ~73% of the
+        // screen, clearing the action strip (the right pill ends at ~67%)
+        // with ~5% room to spare - the old 28% (= ~633px) put the left edge
+        // at ~67%, exactly on the pill. The rows are full-width bars (text
+        // left), not fit-content pills; the row content box stays ~450px,
+        // enough for "quality • size" and the date on one line each.
         // display:none when closed so its selectors leave the spatial focus
         // map; the scroll viewport stays height-bounded (TV driver clamps
         // travel to the scroll element's offsetHeight).
-        '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:28%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);border-radius:1.4em;}' +
+        '.udxf__panel{position:absolute;top:0;right:0;bottom:0;width:23%;z-index:30;display:none;flex-direction:column;box-sizing:border-box;padding:1.5em 1.5em 1em;background:rgba(16,18,21,.96);border-left:1px solid rgba(255,255,255,.08);border-radius:1.4em;}' +
         '.udxf__panel--open{display:flex;}' +
         '.udxf__panel__list{flex:1 1 auto;min-height:0;position:relative;}' +
         '.udxf__panel__list>.scroll{position:relative;height:100%;overflow:hidden;}' +
